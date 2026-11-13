@@ -1,0 +1,88 @@
+{
+ "version": "v1",
+ "file": "detector_v1.onnx",
+ "classes": [
+  "pothole",
+  "crack",
+  "guardrail",
+  "sign"
+ ],
+ "input_size": 640,
+ "input": "1x3xHxW float32 RGB 0~1 (letterbox, OnnxDetector 가 처리)",
+ "recommended_conf": 0.25,
+ "nms_iou": 0.45,
+ "base_model": "yolo11n.pt",
+ "data_parts": [
+  "rdd2022"
+ ],
+ "train_counts": {
+  "test": {
+   "crack": 4239,
+   "images": 3526,
+   "pothole": 638
+  },
+  "train": {
+   "crack": 36299,
+   "images": 19457,
+   "pothole": 5105
+  },
+  "val": {
+   "crack": 4369,
+   "images": 3672,
+   "pothole": 617
+  }
+ },
+ "epochs_trained": 30,
+ "metrics": {
+  "val": {
+   "pothole": {
+    "P": 0.536,
+    "R": 0.405,
+    "mAP50": 0.409,
+    "mAP50_95": 0.167
+   },
+   "crack": {
+    "P": 0.576,
+    "R": 0.568,
+    "mAP50": 0.568,
+    "mAP50_95": 0.294
+   },
+   "all": {
+    "P": 0.556,
+    "R": 0.487,
+    "mAP50": 0.488,
+    "mAP50_95": 0.23
+   }
+  },
+  "test": {
+   "pothole": {
+    "P": 0.572,
+    "R": 0.37,
+    "mAP50": 0.409,
+    "mAP50_95": 0.181
+   },
+   "crack": {
+    "P": 0.598,
+    "R": 0.54,
+    "mAP50": 0.57,
+    "mAP50_95": 0.294
+   },
+   "all": {
+    "P": 0.585,
+    "R": 0.455,
+    "mAP50": 0.49,
+    "mAP50_95": 0.237
+   }
+  }
+ },
+ "onnx_parity": {
+  "images": 10,
+  "ultralytics_boxes": 24,
+  "matched": 24
+ },
+ "colab_cpu_speed": {
+  "1thread_ms": 91.5,
+  "2thread_ms": 232.6
+ },
+ "created": "2026-11-13T17:17:37"
+}

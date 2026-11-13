@@ -118,8 +118,9 @@ daboyeo/
 │   │   └── 03_train_damage_cls.ipynb # 예정
 │   ├── daboyeo_ai/inference/onnx_detector.py # ★ 구현됨 — OnnxDetector (Detector 계약, letterbox·NMS, 스레드 제한). Ultralytics 와 박스·신뢰도 일치 확인
 │   ├── daboyeo_ai/inference/damage_classifier.py # 예정
-│   ├── lane_wear/lane_wear.py
-│   ├── eval/{eval_detector,bench_cpu,interval_sweep}.py
+│   ├── daboyeo_ai/lane_wear.py   # ★ 구현됨 — LaneWearMeter: 하단 ROI → 노면 대비 top-hat·노랑 마스크 → Hough 선분 → 차선/노면 밝기 대비 (기준값 TBD, #6)
+│   ├── daboyeo_ai/eval/lane_wear_calib.py # ★ 구현됨 — 실제 프레임 contrast 분포 CSV·백분위수 (#6 기준값 보정용)
+│   ├── daboyeo_ai/eval/{eval_detector,bench_cpu,interval_sweep}.py # 예정
 │   └── models/                   # .gitignore — detector_vN.onnx + detector_vN.json
 ├── edge/blackbox/                # 정현우 — 가상 블랙박스
 │   ├── main.py                   # --video --gps --vehicle --detector {fake,onnx,replay} --gps-noise-m
@@ -350,6 +351,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 
 ## 변경 이력
 
+- **r3.3 (2026-11-14)** — 차선 마모 측정 `ai/daboyeo_ai/lane_wear.py`(`LaneWearMeter.measure(frame) -> LaneWearResult`)와 보정 도구 `ai/daboyeo_ai/eval/lane_wear_calib.py` 구현 (2.6). 합성 프레임 시험 통과, 1280×720 에서 약 1.5 ms. 기준값은 잠정 0.3 — 실제 프레임 분포로 #6 에서 결정. 사용법은 `docs/ai-handoff.md` 8장(정현우 확인 필요). 3장 레포 구조의 경로를 실제 위치로 갱신.
 - **r3.2 (2026-11-13)** — 탐지 학습 노트북 `02_train_detector.ipynb`·`OnnxDetector` 구현 (1.4·1.5). 확인: 사전학습 YOLO11n ONNX 로 Ultralytics 와 박스·신뢰도 완전 일치, 노트북 전체를 CPU 1 epoch 로 모의 실행, 중단된 학습 이어하기·끝난 학습 건너뛰기 (끝난 last.pt 를 resume 하면 Ultralytics 가 COCO 샘플로 새 학습을 시작하는 문제를 막음).
 - **r3.1 (2026-11-13)** — 데이터 준비를 Colab 에서 하도록 확정: `ai/daboyeo_ai/data/*`, `ai/notebooks/01_data_prep.ipynb` 구현. 원본은 Colab 로컬 디스크에서만 다루고 Drive 에는 변환 결과만 저장. 0.2b·0.3·0.4·2.7 작업 설명 갱신.
 - **r3 (2026-11-13)** — PRD v0.4 반영: AI Hub 상세 페이지 확인 결과. KRID(전국 도로시설물 영상정보)에 정상/파손 라벨 있음 → 파손 분류 데이터를 KRID에서 추출(2.7, `prepare_damage_crops.py`), 라벨 먼저 받아 집계하는 0.2b 단계, 폴리곤→박스·마스크→박스 변환, 리스크 1건 추가, 0.9 완료 표시, PRD 줄번호 v0.4 기준으로 갱신.

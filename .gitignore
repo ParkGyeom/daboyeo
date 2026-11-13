@@ -5,9 +5,9 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
-# 용량 큰 데이터 — 레포에 올리지 않는다
-data/
-datasets/
+# 용량 큰 데이터 — 레포에 올리지 않는다 (맨 앞 / : 레포 최상위 폴더만. 코드 폴더 ai/daboyeo_ai/data/ 는 제외되면 안 됨)
+/data/
+/datasets/
 ai/models/*.onnx
 ai/models/*.pt
 runs/

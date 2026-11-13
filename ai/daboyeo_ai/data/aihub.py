@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import tarfile
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,8 +67,20 @@ def parse_tree(text: str) -> list[AihubFile]:
 SNAPSHOT_DIR = Path(__file__).parent / "aihub_trees"  # 2026-11-13 에 받아 둔 파일 트리
 
 
+def _read_tree(datasetkey: int) -> str:
+    """트리 응답 본문. AI Hub 는 정상 트리도 HTTP 502 로 줄 때가 있어서, 오류 응답의 본문도 돌려준다."""
+    try:
+        with urllib.request.urlopen(f"{BASE_URL}/info/{datasetkey}.do", timeout=60) as r:
+            return r.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace") if e.fp is not None else ""
+        if parse_tree(body):
+            return body
+        raise
+
+
 def fetch_tree(datasetkey: int, retries: int = 3, wait_s: float = 5.0, use_snapshot: bool = True) -> list[AihubFile]:
-    """파일 트리를 받는다. AI Hub 트리 API 가 죽어 있으면(502 등) 받아 둔 스냅샷을 쓴다.
+    """파일 트리를 받는다. 응답이 502 여도 본문이 트리면 그대로 쓰고, 정말 실패하면 받아 둔 스냅샷을 쓴다.
 
     파일 키(fileSn)는 데이터셋이 갱신되지 않는 한 바뀌지 않는다. 다운로드는 다른 엔드포인트라
     트리 API 가 죽어도 될 수 있다.
@@ -75,8 +88,7 @@ def fetch_tree(datasetkey: int, retries: int = 3, wait_s: float = 5.0, use_snaps
     last: Exception | None = None
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(f"{BASE_URL}/info/{datasetkey}.do", timeout=60) as r:
-                files = parse_tree(r.read().decode("utf-8"))
+            files = parse_tree(_read_tree(datasetkey))
             if files:
                 return files
             last = RuntimeError("empty file tree")
@@ -113,8 +125,23 @@ def merge_parts(root: Path) -> list[Path]:
     return merged
 
 
+GEO_BLOCK_HINT = (
+    "AI Hub blocks downloads from outside Korea (body mentions 해외). Colab runs abroad, so run the "
+    "download in Korea instead: uv run python -m daboyeo_ai.data.prepare_local --out data/aihub"
+)
+
+
+def _redact(text: str, secret: str) -> str:
+    return text.replace(secret, "***") if secret else text
+
+
 def download(datasetkey: int, file: AihubFile, apikey: str, dest: Path) -> Path:
-    """파일 1개를 받아 병합까지 끝낸 zip 경로를 돌려준다. 이미 있으면 다시 받지 않는다."""
+    """파일 1개를 받아 병합까지 끝낸 zip 경로를 돌려준다. 이미 있으면 다시 받지 않는다.
+
+    `dest/<fileSn>/` 아래에 받는다: 179 는 라벨 zip 과 이미지 zip 의 이름이 같아서, 같은 폴더에
+    받으면 이름만으로 '이미 받음'을 판단할 때 다른 파일을 돌려줄 수 있다.
+    """
+    dest = Path(dest) / str(file.key)
     dest.mkdir(parents=True, exist_ok=True)
     existing = list(dest.rglob(file.name))
     if existing:
@@ -122,17 +149,19 @@ def download(datasetkey: int, file: AihubFile, apikey: str, dest: Path) -> Path:
 
     tar_path = dest / f"download_{file.key}.tar"
     url = f"{BASE_URL}/down/{API_VERSION}/{datasetkey}.do?fileSn={file.key}"
-    # curl: 이어받기(-C -) 지원, 진행률 표시. API 키는 헤더로만 보낸다.
+    # curl: 이어받기(-C -). API 키는 표준입력의 헤더로만 넘긴다 (프로세스 목록·오류 메시지에 안 남게).
     proc = subprocess.run(
-        ["curl", "-L", "-C", "-", "-o", str(tar_path), "-H", f"apikey:{apikey}",
-         "-w", "%{http_code}", "-sS", url],
-        capture_output=True, text=True,
+        ["curl", "-L", "-C", "-", "-o", str(tar_path), "-H", "@-", "-w", "%{http_code}", "-sS", url],
+        input=f"apikey: {apikey}\n", capture_output=True, text=True,
     )
     code = proc.stdout.strip()[-3:]
-    if proc.returncode != 0 or code not in ("200", "206"):
+    ok = proc.returncode == 0 and (code in ("200", "206") or (tar_path.exists() and tarfile.is_tarfile(tar_path)))
+    if not ok:
         body = tar_path.read_text(errors="replace")[:500] if tar_path.exists() else ""
         tar_path.unlink(missing_ok=True)
-        raise RuntimeError(f"AI Hub download failed ({file.name}): curl={proc.returncode} http={code} {body}")
+        hint = f"\n{GEO_BLOCK_HINT}" if "해외" in body else ""
+        msg = f"AI Hub download failed ({file.name}): curl={proc.returncode} http={code} {body.strip()} {proc.stderr.strip()}"
+        raise RuntimeError(_redact(msg, apikey) + hint)
 
     with tarfile.open(tar_path) as tf:
         tf.extractall(dest, filter="data")

@@ -54,7 +54,9 @@ docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 - 데이터 준비·학습은 **Colab** 에서 `ai/notebooks/0N_*.ipynb` 로 돌린다. 노트북 셀에는 순서만 두고, 로직은 `ai/daboyeo_ai/` 에 넣어 테스트한다.
 - 노트북을 고칠 때는 출력이 비어 있는 상태로 커밋한다. 사용자는 Colab 에서 GitHub 노트북을 열어 **Drive 사본**으로 실행하므로, 레포를 고쳐도 이미 만든 사본에는 반영되지 않는다 — 사용자에게 바뀐 셀을 알려준다.
 - 알려진 함정:
-  - AI Hub 파일 트리 API(`api.aihub.or.kr/info/*.do`)가 502 를 낼 때가 있다 → `aihub.fetch_tree` 가 `ai/daboyeo_ai/data/aihub_trees/` 스냅샷을 쓴다.
+  - AI Hub 파일 트리 API(`api.aihub.or.kr/info/*.do`)는 정상 트리도 HTTP 502 로 줄 때가 있다 → `aihub.fetch_tree` 는 502 본문이 트리면 그대로 쓰고, 아니면 `ai/daboyeo_ai/data/aihub_trees/` 스냅샷을 쓴다.
+  - **AI Hub 는 해외 IP 의 다운로드를 막는다** (Colab 은 502 + "해외에서의 데이터 다운로드를 제한"). AI Hub 다운로드·변환은 한국 안의 Mac 에서 `uv run python -m daboyeo_ai.data.prepare_local --out data/aihub` 로 돌리고, 결과 `data/aihub/parts/*.zip` 을 Drive `daboyeo_data/parts/` 에 올린다. 학습과 RDD2022 변환은 Colab 그대로.
+  - 도로장애물(179) 라벨은 COCO 와 비슷하지만 `images` 가 리스트가 아닌 객체 하나이고, 크랙은 `bbox` 없이 `polyline` 으로 온다 (`sources.parse_coco_like` 가 둘 다 처리).
   - Ultralytics 에 **끝난** 학습의 `last.pt` 로 `resume=True` 를 주면 경고만 하고 COCO 샘플로 새 학습을 시작한다 → 노트북의 `is_finished` 확인을 지우지 말 것.
   - Ultralytics PyTorch `predict` 는 직사각형 letterbox 라 ONNX 와 신뢰도가 조금 다르다. ONNX 결과 비교는 같은 ONNX 를 Ultralytics 로 돌린 것과 한다.
 

@@ -1,0 +1,22 @@
+# 로컬 개발·시연용. 서버·UI 서비스는 구현되면 여기에 추가한다.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    platform: linux/amd64  # 공식 이미지는 amd64 전용 — Apple Silicon에서는 에뮬레이션으로 실행
+    environment:
+      POSTGRES_USER: daboyeo
+      POSTGRES_PASSWORD: daboyeo
+      POSTGRES_DB: daboyeo
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./server/sql:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daboyeo -d daboyeo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

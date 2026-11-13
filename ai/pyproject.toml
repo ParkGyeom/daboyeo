@@ -7,6 +7,7 @@ dependencies = [
     "daboyeo-contracts",
     "numpy>=1.24",
     "opencv-python-headless>=4.8",
+    "onnxruntime>=1.17",  # OnnxDetector (가상 블랙박스 CPU 추론)
 ]
 
 [build-system]

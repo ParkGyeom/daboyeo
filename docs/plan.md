@@ -114,9 +114,10 @@ daboyeo/
 │   │   └── pipeline.py           # zip 단위 변환 + 라벨 집계(count_label_zip). 파손 프레임은 stride 로 버리지 않음
 │   ├── notebooks/
 │   │   ├── 01_data_prep.ipynb    # ★ 구현됨 — Colab: 라벨 먼저 → 집계 → 이미지 zip 하나씩 변환 → Drive parts/*.zip
-│   │   └── {02_train_detector,03_train_damage_cls}.ipynb   # 예정
-│   ├── export/export_onnx.py
-│   ├── inference/{onnx_detector,damage_classifier}.py
+│   │   ├── 02_train_detector.ipynb # ★ 구현됨 — Colab GPU: parts 풀기 → YOLO 학습(끊기면 이어서) → 평가 → ONNX + 일치 확인 → Drive models/
+│   │   └── 03_train_damage_cls.ipynb # 예정
+│   ├── daboyeo_ai/inference/onnx_detector.py # ★ 구현됨 — OnnxDetector (Detector 계약, letterbox·NMS, 스레드 제한). Ultralytics 와 박스·신뢰도 일치 확인
+│   ├── daboyeo_ai/inference/damage_classifier.py # 예정
 │   ├── lane_wear/lane_wear.py
 │   ├── eval/{eval_detector,bench_cpu,interval_sweep}.py
 │   └── models/                   # .gitignore — detector_vN.onnx + detector_vN.json
@@ -165,7 +166,7 @@ class Detector(Protocol):
     def detect(self, frame_bgr: np.ndarray) -> list[Detection]: ...
 ```
 
-- ONNX: `ai/models/detector_vN.onnx`, 입력 `1×3×640×640` float32 RGB 0~1. **전처리·NMS는 `ai/inference/onnx_detector.py` 책임** → 정현우는 `OnnxDetector(path, threads=1).detect(frame)`만 호출.
+- ONNX: `ai/models/detector_vN.onnx`, 입력 `1×3×640×640` float32 RGB 0~1. **전처리·NMS는 `ai/daboyeo_ai/inference/onnx_detector.py` 책임** (구현됨) → 정현우는 `from daboyeo_ai.inference import OnnxDetector` 후 `OnnxDetector(path, threads=1).detect(frame)`만 호출. 출력은 v1부터 4클래스 고정(v1은 guardrail·sign 데이터만 없음)이라 v1→v2 교체 때 블랙박스 코드 변경 없음.
 - 함께 두는 `detector_vN.json`: 클래스, 입력 크기, 권장 임계값, 학습 데이터 버전, val mAP.
 
 **GPS (FR-4.4)**
@@ -219,8 +220,8 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | 1.1 | 정현우 | **걷는 골격 (11/16 목표)**: `main.py --detector fake` → 업로드 → DB 저장. 가짜 탐지기는 `gt_events` CSV를 탐지처럼 내보냄 | 영상 1개 실행 후 `observations` 행 = 라벨 수 |
 | 1.2 | 정현우 | `/trips`, `/trips/{id}/end`, 차량별 구분 (FR-2.2), `--gps-noise-m` | `run_fleet.py --n 3` 후 차량별 행 수 일치 |
 | 1.3 | 정현우 | `clipper.py`, 전송 바이트 집계 (기준값 2가지, 2장 표) | 로그에 원본 크기 vs 전송량 |
-| 1.4 | 박겸 | 탐지 v1 학습 (RDD 2클래스) → 데이터 도착 시 v2 (+AI Hub 도로장애물, +KRID 4클래스) | val mAP@0.5 기록 |
-| 1.5 | 박겸 | `export_onnx.py` + `onnx_detector.py` | 같은 이미지 10장에서 PyTorch·ONNX 박스 일치 |
+| 1.4 | 박겸 | 탐지 v1 학습 (RDD 2클래스) → 데이터 도착 시 v2 (+AI Hub 도로장애물, +KRID 4클래스). **`02_train_detector.ipynb`** (`VERSION`, `PARTS` 만 바꿈) | val/test 클래스별 mAP@0.5 표, Drive `models/detector_vN.json` |
+| 1.5 | 박겸 | ONNX 변환 + `OnnxDetector` — 같은 노트북 4단계 | val 10장에서 `OnnxDetector` 와 Ultralytics(같은 ONNX) 박스 일치 ≥ 95% |
 | 1.6 | 공동 | **11/18 인터페이스 맞춤**: `--detector onnx`로 선정 영상 실행 | 탐지 박스 오버레이가 보임 |
 
 **11/18 Go/No-go** (`PRD.md:641`): ONNX가 안 돌면 PyTorch로 같은 `Detector` 프로토콜을 구현해 연결, ONNX는 속도 측정용.
@@ -349,6 +350,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 
 ## 변경 이력
 
+- **r3.2 (2026-11-13)** — 탐지 학습 노트북 `02_train_detector.ipynb`·`OnnxDetector` 구현 (1.4·1.5). 확인: 사전학습 YOLO11n ONNX 로 Ultralytics 와 박스·신뢰도 완전 일치, 노트북 전체를 CPU 1 epoch 로 모의 실행, 중단된 학습 이어하기·끝난 학습 건너뛰기 (끝난 last.pt 를 resume 하면 Ultralytics 가 COCO 샘플로 새 학습을 시작하는 문제를 막음).
 - **r3.1 (2026-11-13)** — 데이터 준비를 Colab 에서 하도록 확정: `ai/daboyeo_ai/data/*`, `ai/notebooks/01_data_prep.ipynb` 구현. 원본은 Colab 로컬 디스크에서만 다루고 Drive 에는 변환 결과만 저장. 0.2b·0.3·0.4·2.7 작업 설명 갱신.
 - **r3 (2026-11-13)** — PRD v0.4 반영: AI Hub 상세 페이지 확인 결과. KRID(전국 도로시설물 영상정보)에 정상/파손 라벨 있음 → 파손 분류 데이터를 KRID에서 추출(2.7, `prepare_damage_crops.py`), 라벨 먼저 받아 집계하는 0.2b 단계, 폴리곤→박스·마스크→박스 변환, 리스크 1건 추가, 0.9 완료 표시, PRD 줄번호 v0.4 기준으로 갱신.
 - **r2 (2026-11-13)** — PRD v0.3 반영: 직접 촬영 → 공개 영상 + GPS 재구성(`tools/video`, `tools/gps`, M0 0.5~0.8), GPS CSV 계약, AI Hub 도로장애물 데이터 추가, BDD100K 보조 경로(4.6), 다중 차량 대체안(`--gps-noise-m`), 반경 20 m 시작, 재구성 오차 측정(AC-13), 통신량 기준값 2가지, 영상 관련 리스크 5건, 이슈 #13. r1의 "RDD2022 한국 서브셋" 오류 삭제.

@@ -167,6 +167,28 @@ class CropWriter:
         return True
 
 
+def cap_background(det_root: Path, ratio: float = 0.1, split: str = "train", salt: str = "daboyeo") -> dict[str, int]:
+    """split 의 배경 이미지(빈 라벨)를 전체의 ratio 이하로 줄인다 (넘치는 것은 이미지·라벨 파일 삭제).
+
+    어떤 배경을 남길지는 파일 이름 해시로 정해서, 다시 실행해도 같은 결과가 나온다.
+    val/test 는 건드리지 않는다 (평가는 실제 분포 그대로).
+    """
+    det_root = Path(det_root)
+    labels = sorted((det_root / "labels" / split).glob("*.txt"))
+    bg = [p for p in labels if not p.read_text().strip()]
+    n_pos = len(labels) - len(bg)
+    keep = int(ratio / (1 - ratio) * n_pos) if ratio < 1 else len(bg)
+    bg.sort(key=lambda p: hashlib.sha1(f"{salt}:{p.stem}".encode()).hexdigest())
+    removed = 0
+    for p in bg[keep:]:
+        p.unlink()
+        (det_root / "images" / split / f"{p.stem}.jpg").unlink(missing_ok=True)
+        removed += 1
+    for cache in (det_root / "labels").glob("*.cache"):  # Ultralytics 라벨 캐시는 다시 만들게 한다
+        cache.unlink()
+    return {"positive": n_pos, "background_before": len(bg), "background_kept": len(bg) - removed, "removed": removed}
+
+
 def write_data_yaml(root: Path) -> Path:
     root = Path(root)
     names = "\n".join(f"  {i}: {n}" for i, n in enumerate(CLASS_NAMES))

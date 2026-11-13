@@ -199,6 +199,29 @@ def test_process_rdd2022_nested_country_zip(tmp_path):
     assert stats["written_Czech"] == 1
 
 
+def test_cap_background_train_only_and_deterministic(tmp_path):
+    from daboyeo_ai.data.yolo import Box, cap_background
+
+    img = np.full((100, 100, 3), 128, np.uint8)
+    w = YoloDetWriter(tmp_path / "det")
+    for i in range(300):  # 1/3 양성, 2/3 배경
+        w.write(f"x{i}", img, [Box(0, 10, 10, 60, 60)] if i % 3 == 0 else [], group=f"g{i}")
+    det = tmp_path / "det"
+    before_val = len(list((det / "labels" / "val").glob("*.txt")))
+    (det / "labels" / "train.cache").write_text("stale")
+
+    r = cap_background(det, ratio=0.1)
+    train = list((det / "labels" / "train").glob("*.txt"))
+    bg = [p for p in train if not p.read_text().strip()]
+    assert len(bg) / len(train) == pytest.approx(0.1, abs=0.01)
+    assert r["background_kept"] == len(bg) and r["positive"] == len(train) - len(bg)
+    # 지운 라벨의 이미지도 함께 지워져 짝이 맞아야 한다
+    assert {p.stem for p in train} == {p.stem for p in (det / "images" / "train").glob("*.jpg")}
+    assert len(list((det / "labels" / "val").glob("*.txt"))) == before_val  # val 은 그대로
+    assert not (det / "labels" / "train.cache").exists()
+    assert cap_background(det, ratio=0.1)["removed"] == 0  # 다시 실행해도 그대로
+
+
 def test_data_yaml_lists_contract_classes(tmp_path):
     text = write_data_yaml(tmp_path).read_text()
     assert "0: pothole" in text and "3: sign" in text and "val: images/val" in text

@@ -88,16 +88,18 @@ def road_obstacle_class(category_name: str) -> int | str | None:
 
 
 def parse_coco_like(js: dict) -> list[LabeledImage]:
-    """COCO 형식(images / annotations / categories) 라벨을 파싱한다.
+    """COCO 비슷한 형식(images / annotations / categories) 라벨을 파싱한다.
 
-    도로장애물 데이터의 정확한 JSON 키는 공개 문서에 없어서, 형식이 다르면 여기서 바로 실패하게 했다.
-    노트북의 '라벨 구조 확인' 셀 출력을 보고 맞춘다.
+    도로장애물(179) 실제 형식 (2026-11-14 확인): JSON 하나에 이미지 1장이라 `images` 가 리스트가 아니라
+    객체 하나이고, 크랙은 `bbox`·`segmentation` 이 비어 있고 `polyline` 에 점 좌표가 온다.
+    둘 다 받는다. 키가 없으면 바로 실패하게 했다.
     """
     missing = [k for k in ("images", "annotations", "categories") if k not in js]
     if missing:
         raise ValueError(f"not COCO-like: missing {missing}; top-level keys={sorted(js)}")
+    images = js["images"] if isinstance(js["images"], list) else [js["images"]]
     cats = {c["id"]: road_obstacle_class(c["name"]) for c in js["categories"]}
-    by_id = {im["id"]: LabeledImage(im["file_name"], int(im["width"]), int(im["height"])) for im in js["images"]}
+    by_id = {im["id"]: LabeledImage(im["file_name"], int(im["width"]), int(im["height"])) for im in images}
     negatives: set = set()
     for a in js["annotations"]:
         cls = cats.get(a["category_id"])
@@ -107,7 +109,10 @@ def parse_coco_like(js: dict) -> list[LabeledImage]:
         if cls == "negative":
             negatives.add(a["image_id"])
             continue
-        box = bbox_xywh(cls, a["bbox"]) if a.get("bbox") else polygon_box(cls, a.get("segmentation") or [])
+        if a.get("bbox"):
+            box = bbox_xywh(cls, a["bbox"])
+        else:
+            box = polygon_box(cls, a.get("segmentation") or a.get("polyline") or [])
         if box is not None:
             img.boxes.append(box)
     for i in negatives:

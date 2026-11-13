@@ -75,7 +75,7 @@ def peek_label_zip(label_zip: Path, max_chars: int = 3000) -> str:
         if not jsons:
             return head
         js = _read_json(zf, jsons[0])
-    summary = {k: (v[:2] if isinstance(v, list) else v) for k, v in js.items()}
+    summary = {k: (v[:2] if isinstance(v, list) and k != "categories" else v) for k, v in js.items()}  # 카테고리는 전부
     return head + json.dumps(summary, ensure_ascii=False, indent=1)[:max_chars]
 
 

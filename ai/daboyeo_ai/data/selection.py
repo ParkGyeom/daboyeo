@@ -30,6 +30,7 @@ ROAD_POTHOLE_ZIPS = 3
 ROAD_CRACK_ZIPS = 2
 ROAD_STRIDE = 5              # 1분 영상의 연속 프레임이라 5장에 1장
 ROAD_NEGATIVE_RATIO = 0.1    # 보수완료 포트홀·맨홀만 있는 배경 이미지 비율
+MIN_ROAD_IMAGE_GB = 0.1     # 이보다 작은 이미지 zip 은 고르지 않는다 (사실상 빈 zip)
 MAX_IMAGES_PER_ZIP = 4000    # zip 하나에서 쓸 최대 이미지 수 (클래스 균형용)
 
 KRID_LABEL_DIR = "/02.라벨링데이터/"
@@ -109,9 +110,14 @@ def road_count_row(label: AihubFile, counts: Counter[str], image: AihubFile | No
     )
 
 
-def pick_road_rows(rows: list[dict], n_pothole=ROAD_POTHOLE_ZIPS, n_crack=ROAD_CRACK_ZIPS) -> list[dict]:
-    """대상 도로 종류 + 이미지 zip 이 있는 것 중 TOA 는 포트홀/GB, CRACK 은 크랙/GB 상위 n 개."""
-    cand = [r for r in rows if r["road"] != "other" and r["image"] and r["image_gb"]]
+def pick_road_rows(rows: list[dict], n_pothole=ROAD_POTHOLE_ZIPS, n_crack=ROAD_CRACK_ZIPS,
+                   min_image_gb: float = MIN_ROAD_IMAGE_GB) -> list[dict]:
+    """대상 도로 종류 + 이미지 zip 이 있는 것 중 TOA 는 포트홀/GB, CRACK 은 크랙/GB 상위 n 개.
+
+    이미지 zip 이 아주 작으면(예: 실제 179 의 4 KB 짜리 C_Frontback_B02) 라벨만 있고 이미지는 거의 없는데
+    'GB 당 개수' 만 터무니없이 커지므로 min_image_gb 미만은 뺀다.
+    """
+    cand = [r for r in rows if r["road"] != "other" and r["image"] and (r["image_gb"] or 0) >= min_image_gb]
 
     def top(kind: str, field: str, n: int) -> list[dict]:
         rs = [r for r in cand if r["kind"] == kind and r[field] > 0]

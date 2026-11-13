@@ -72,6 +72,7 @@ def test_pick_road_rows_ranks_per_gb_and_filters():
         row("f", "CRACK", "Mainroad", crack=5, gb=1),
         row("g", "CRACK", "Frontback", crack=20, gb=2),
         row("h", "CRACK", "Mainroad", crack=0, gb=0.1),    # 0개는 고르지 않는다
+        row("i", "CRACK", "Frontback", crack=500, gb=4 / 1024**2),  # 4 KB 이미지 zip (실제 사례)
     ]
     picked = selection.pick_road_rows(rows, n_pothole=2, n_crack=3)
     assert [r["label"] for r in picked] == ["b", "e", "g", "f"]

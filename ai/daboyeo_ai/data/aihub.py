@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import tarfile
+import time
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,9 +63,32 @@ def parse_tree(text: str) -> list[AihubFile]:
     return files
 
 
-def fetch_tree(datasetkey: int) -> list[AihubFile]:
-    with urllib.request.urlopen(f"{BASE_URL}/info/{datasetkey}.do", timeout=60) as r:
-        return parse_tree(r.read().decode("utf-8"))
+SNAPSHOT_DIR = Path(__file__).parent / "aihub_trees"  # 2026-11-13 에 받아 둔 파일 트리
+
+
+def fetch_tree(datasetkey: int, retries: int = 3, wait_s: float = 5.0, use_snapshot: bool = True) -> list[AihubFile]:
+    """파일 트리를 받는다. AI Hub 트리 API 가 죽어 있으면(502 등) 받아 둔 스냅샷을 쓴다.
+
+    파일 키(fileSn)는 데이터셋이 갱신되지 않는 한 바뀌지 않는다. 다운로드는 다른 엔드포인트라
+    트리 API 가 죽어도 될 수 있다.
+    """
+    last: Exception | None = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(f"{BASE_URL}/info/{datasetkey}.do", timeout=60) as r:
+                files = parse_tree(r.read().decode("utf-8"))
+            if files:
+                return files
+            last = RuntimeError("empty file tree")
+        except Exception as e:  # noqa: BLE001 — 네트워크 오류 종류가 다양함
+            last = e
+        if attempt + 1 < retries:
+            time.sleep(wait_s * (attempt + 1))
+    snapshot = SNAPSHOT_DIR / f"{datasetkey}.txt"
+    if use_snapshot and snapshot.exists():
+        print(f"[aihub] file tree API failed ({last}); using snapshot {snapshot.name}")
+        return parse_tree(snapshot.read_text(encoding="utf-8"))
+    raise RuntimeError(f"AI Hub file tree {datasetkey} unavailable: {last}")
 
 
 def _natural_key(p: Path) -> int:

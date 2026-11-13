@@ -92,16 +92,46 @@ DB enum(`server/sql/001_init.sql`)과 `DefectType`·`RiskLevel` 이 어긋나면
 - 세션 생성(`OnnxDetector(...)`)은 무거우니 한 번 만들어 재사용한다. 차량(가상 블랙박스)마다 하나씩 만드는 건 괜찮다.
 - `detect()` 가 빈 리스트를 주는 프레임이 대부분이다.
 
-## 8. 아직 AI 쪽에서 안 넘긴 것
+## 8. 차선 마모 (제안 — 정현우 확인 필요)
+
+> 계획 2.6, PRD FR-1.3. 학습 모델이 아니라 OpenCV 영상 처리다. **입력·출력 형식은 아래가 제안이고, 11/18 인터페이스 맞춤 때 같이 확정한다.**
+> 마모 기준값은 **잠정값 0.3 (TBD)** — 실제 프레임 분포를 보고 오픈 이슈 #6(11/22)에서 정한다.
+
+```python
+from daboyeo_ai.lane_wear import LaneWearMeter
+
+meter = LaneWearMeter()               # 한 번 만들어 재사용 (threshold=0.3 잠정, roi=하단 사다리꼴)
+r = meter.measure(frame_bgr)          # OpenCV BGR 프레임 그대로, 1280×720 에서 약 1.5 ms
+r.lane_found        # 차선 선분을 찾았나
+r.contrast          # (차선 밝기 − 노면 밝기) / 노면 밝기. 못 찾으면 None
+r.is_worn           # lane_found 이고 contrast < threshold
+r.confidence        # 0~1, 판정 신뢰도 → ObservationIn.confidence
+r.lane_pixel_ratio  # 진단용: ROI 중 차선 화소 비율
+r.n_segments        # 진단용: 차선으로 인정된 선분 수
+```
+
+| 항목 | 제안 |
+|---|---|
+| 언제 부르나 | **품질 판별을 통과한 프레임**에서만, 탐지보다 긴 주기로 (PRD 8.3 — 주기 값은 `scheduler.py` 에서 정함) |
+| 서버 전송 | `is_worn` 일 때 `ObservationIn(defect_type=DefectType.LANE_WEAR, bbox=None, confidence=r.confidence, ...)` |
+| 확정 | 한 프레임으로 확정하지 않는다. **같은 지점 여러 번 관측**해서 확정 (규칙은 #6, 블랙박스 연속 프레임 묶기와 서버 군집 중 어디서 할지 같이 정하기) |
+| 못 찾음 | `lane_found=False` 면 `is_worn=False`. **완전히 지워진 차선과 차선 없는 도로는 구별 못 하므로** 마모로 보내지 않는다 |
+
+주의:
+- 야간·비·역광·그림자에서는 밝기 대비가 크게 흔들린다. 낮·맑은 품질 통과 프레임만 쓰는 걸 권장.
+- ROI 기본값은 카메라가 정면·수평이고 지평선이 화면 가운데쯤이라고 가정한다. 영상 화각이 다르면 `LaneWearMeter(roi=...)` 로 바꾼다 (정규화 좌표 사다리꼴).
+- 보정 도구: `uv run python -m daboyeo_ai.eval.lane_wear_calib <프레임 폴더|영상> --overlay-dir out/` — 프레임별 contrast CSV, 백분위수, ROI·선분 오버레이.
+
+## 9. 아직 AI 쪽에서 안 넘긴 것
 
 | 항목 | 예정 | 비고 |
 |---|---|---|
 | v1 모델 파일 | 11/13~14 | 학습 끝나면 Drive 공유 |
 | 시설물 파손 분류 (`Detection.damage` 채우기) | 11/19~20 (P1) | KRID 파손 라벨 사용. 11/20 유지 여부 결정 |
-| 차선 마모 판별 | 11/19~21 | 입력·출력 형식은 만들기 전에 같이 정하기 |
+| 차선 마모 기준값·확정 규칙 | 11/22 (#6) | 측정 코드는 8장 (형식은 제안 상태). 기준값은 실제 프레임으로 보정 |
 | v2 모델 (4클래스) | AI Hub 데이터 확보 후 | 파일만 교체 |
 
-## 9. AI 쪽이 받아야 하는 것 (계획 4장)
+## 10. AI 쪽이 받아야 하는 것 (계획 4장)
 
 - **속도 측정 로그 형식**: 프레임·단계별 `{"frame", "t", "stage", "ran", "ms"}` JSONL — `bench_cpu`·`interval_sweep` 실험이 이 로그를 읽는다. 형식이 바뀌면 알려주기.
 - **프레임 샘플링 방식**: 분석 주기(N프레임마다 탐지 등)를 어떻게 적용하는지.

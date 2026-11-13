@@ -150,7 +150,7 @@ def process_road_obstacle(
         masks = _index_by_stem(lz, (".png",))
         labeled: list = []
         for n in sorted(x for x in lz.namelist() if x.lower().endswith(".json")):
-            labeled.extend(parse_coco_like(_read_json(lz, n)))
+            labeled.extend(parse_coco_like(_read_json(lz, n), stats))
         positives = 0
         for li in labeled:
             stem = _stem(li.file_name)

@@ -15,6 +15,7 @@ train/val/test 는 `group`(같은 영상·같은 구간) 단위로 나눈다. �
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -53,18 +54,45 @@ def bbox_xywh(cls: int, bbox: list[float]) -> Box:
     return Box(cls, x, y, x + w, y + h)
 
 
+def _num(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def valid_points(seg: list) -> tuple[list[tuple[float, float]], int]:
+    """세그멘테이션/폴리라인 좌표 → ((x, y) 점들, 버린 점 수).
+
+    `[x1,y1,x2,y2,...]` 와 `[[x1,y1,...], ...]` 둘 다 받는다. 실제 179 크랙 라벨에는 `[None, None, ...]`
+    로 시작하는 polyline 이 있어서 (2026-11-14, C_Frontback_B01 에서 179,518 개 중 3개), x·y 가 둘 다
+    유한한 숫자인 점만 남긴다. 짝이 안 맞는 남는 좌표 하나도 버린다.
+    """
+    rings = seg if any(isinstance(r, (list, tuple)) for r in seg) else [seg]
+    points: list[tuple[float, float]] = []
+    dropped = 0
+    for ring in rings:
+        if not isinstance(ring, (list, tuple)):
+            dropped += 1
+            continue
+        for i in range(0, len(ring) - 1, 2):
+            x, y = ring[i], ring[i + 1]
+            if _num(x) and _num(y):
+                points.append((float(x), float(y)))
+            else:
+                dropped += 1
+        dropped += len(ring) % 2
+    return points, dropped
+
+
 def polygon_box(cls: int, seg: list) -> Box | None:
-    """세그멘테이션 좌표 → 외접 박스. `[x1,y1,x2,y2,...]` 와 `[[x1,y1,...], ...]` 둘 다 받는다."""
-    flat: list[float] = []
-    for item in seg:
-        if isinstance(item, (list, tuple)):
-            flat.extend(item)
-        else:
-            flat.append(item)
-    if len(flat) < 4:
+    """세그멘테이션 좌표 → 외접 박스. 잘못된 점은 버리고, 유효한 점이 2개 미만이면 None."""
+    points, _ = valid_points(seg or [])
+    if len(points) < 2:
         return None
-    xs, ys = flat[0::2], flat[1::2]
+    xs, ys = [p[0] for p in points], [p[1] for p in points]
     return Box(cls, min(xs), min(ys), max(xs), max(ys))
+
+
+def valid_bbox(bbox) -> bool:
+    return isinstance(bbox, (list, tuple)) and len(bbox) == 4 and all(_num(v) for v in bbox)
 
 
 def mask_boxes(cls: int, mask: np.ndarray, min_area: int = 64) -> list[Box]:

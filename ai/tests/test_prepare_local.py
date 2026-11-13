@@ -253,3 +253,39 @@ def test_coco_like_check_catches_unparseable(tmp_path):
     with zipfile.ZipFile(z, "w") as zf:  # images 객체에 id 가 없다 → 파싱 실패를 보고해야 한다
         zf.writestr("a.json", json.dumps({"images": {"file_name": "a.png"}, "annotations": [], "categories": []}))
     assert "parse_coco_like failed" in prepare_local.coco_like_problem(z)
+
+
+def test_polygon_box_drops_none_and_malformed_points():
+    from daboyeo_ai.data.yolo import polygon_box, valid_points
+
+    # 실제 C_Frontback_B01 라벨: polyline 앞부분 좌표가 None
+    real = [[None, None, None, None, None, None, None, None, 8.3, 375.5, 53.4, 373.1, 153.3, 372.0]]
+    b = polygon_box(CRACK, real)
+    assert (b.x1, b.y1, b.x2, b.y2) == pytest.approx((8.3, 372.0, 153.3, 375.5))
+    assert valid_points(real) == ([(8.3, 375.5), (53.4, 373.1), (153.3, 372.0)], 4)
+    assert polygon_box(CRACK, [[None, None, None, None]]) is None
+    assert polygon_box(CRACK, [1.0, 2.0, "x", 3.0, float("nan"), 1.0, 5.0]) is None  # 유효한 점 1개뿐
+    assert polygon_box(CRACK, [[1, 2, 3, 4], None, [5, 6, True, 7]]) == pytest.approx(
+        polygon_box(CRACK, [[1, 2, 3, 4], [5, 6]]))
+
+
+def test_parse_coco_like_counts_bad_geometry():
+    from daboyeo_ai.data.sources import parse_coco_like
+
+    def ann(i, **geo):
+        return {"id": i, "image_id": 1, "category_id": 1, "bbox": [], "segmentation": [], "polyline": [], **geo}
+
+    js = {
+        "images": {"file_name": "a_000001.png", "height": 720, "width": 1280, "id": 1},
+        "annotations": [
+            ann(1, polyline=[[None, None, 10.0, 20.0, 30.0, 40.0]]),      # 점 일부만 버림
+            ann(2, polyline=[[None, None, None, None]]),                  # 남는 점 없음 → 건너뜀
+            ann(3, bbox=[None, 1, 2, 3]),                                 # 깨진 bbox, 다른 좌표 없음 → 건너뜀
+            ann(4, polyline=[[0.0, 0.0, 100.0, 50.0]]),
+        ],
+        "categories": [{"id": 1, "name": "Crack"}],
+    }
+    stats = Counter()
+    [li] = parse_coco_like(js, stats)
+    assert len(li.boxes) == 2
+    assert (stats["ann_bad_points"], stats["ann_bad_geometry"]) == (2, 2)

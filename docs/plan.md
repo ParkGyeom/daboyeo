@@ -107,15 +107,14 @@ daboyeo/
 │       ├── bdd_to_csv.py         # (P2) BDD100K info JSON → 같은 CSV
 │       └── preview_map.py        # 경로·기준점을 folium 지도로 확인
 ├── ai/                           # 박겸
-│   ├── data/
-│   │   ├── prepare_rdd2022.py    # XML→YOLO txt, 클래스 병합
-│   │   ├── count_labels.py       # AI Hub 라벨만 받아 zip별·클래스별·파손 여부별 개수 집계 → 받을 이미지 zip 선택
-│   │   ├── prepare_aihub_road.py # 도로장애물: 포트홀(박스), 크랙(마스크→연결 영역 박스); 보수완료 포트홀·맨홀은 배경
-│   │   ├── prepare_krid.py       # 전국 도로시설물: 방호울타리(폴리곤→박스)→guardrail, 도로·안전 표지·이정표·도로명판→sign, 3328px→축소
-│   │   ├── prepare_damage_crops.py # KRID state(정상/파손)로 가드레일·표지판 크롭 → 분류 데이터셋
-│   │   ├── merge_dataset.py      # 합치기 + 분할 + 샘플링
-│   │   └── dataset.yaml
-│   ├── notebooks/{train_detector,train_damage_cls}.ipynb   # Colab
+│   ├── daboyeo_ai/data/          # ★ 구현됨
+│   │   ├── aihub.py              # AI Hub 파일 트리·다운로드·분할 병합 (aihubshell 과 같은 API)
+│   │   ├── sources.py            # 라벨 파서: KRID(폴리곤→박스, 정상/파손), 도로장애물(COCO형, 보수완료 포트홀·맨홀=배경), RDD2022(XML)
+│   │   ├── yolo.py               # YOLO 탐지·분류 데이터셋 쓰기, 640 축소, 영상 구간 단위 train/val/test 분할
+│   │   └── pipeline.py           # zip 단위 변환 + 라벨 집계(count_label_zip). 파손 프레임은 stride 로 버리지 않음
+│   ├── notebooks/
+│   │   ├── 01_data_prep.ipynb    # ★ 구현됨 — Colab: 라벨 먼저 → 집계 → 이미지 zip 하나씩 변환 → Drive parts/*.zip
+│   │   └── {02_train_detector,03_train_damage_cls}.ipynb   # 예정
 │   ├── export/export_onnx.py
 │   ├── inference/{onnx_detector,damage_classifier}.py
 │   ├── lane_wear/lane_wear.py
@@ -201,9 +200,9 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 |---|---|---|---|
 | 0.1 | 공동 | 레포 생성, 폴더 구조, `contracts/` (GPS CSV 포함), README | 두 사람 모두 `import daboyeo_contracts` 성공 |
 | 0.2 | 박겸 | **오늘: AI Hub「전국 도로시설물 영상정보」+「도로장애물/표면 인지 영상(수도권)」 다운로드 신청** (`PRD.md:375-394`) | 신청 완료 화면 |
-| 0.2b | 박겸 | 승인 후 **라벨만 먼저** 받기 (도로시설물 `TL_*`·`VL_*` 약 440 MB, 도로장애물 `Annotations` 약 1.2 GB) → `count_labels.py`로 zip별 포트홀 수, 가드레일·표지판 수, **파손 객체 수** 집계 → 받을 이미지 zip 결정 | `experiments/label_counts.csv`, 받을 zip 목록 |
-| 0.3 | 박겸 | RDD2022 다운로드 + `prepare_rdd2022.py` (클래스 병합) | 클래스별 박스 수 표 |
-| 0.4 | 박겸 | 데이터셋 v1 (RDD2022, 2클래스) + `dataset.yaml` | Colab에서 1 epoch 실행 |
+| 0.2b | 박겸 | 승인 후 **라벨만 먼저** 받기 (도로시설물 `TL_*`·`VL_*` 약 440 MB, 도로장애물 `Annotations` 약 1.2 GB) → zip별 포트홀 수, 가드레일·표지판 수, **파손 객체 수** 집계 → 받을 이미지 zip 결정. **`ai/notebooks/01_data_prep.ipynb` 2~3단계** (전부 Colab 에서, 노트북 PC 에는 받지 않음) | Drive `label_counts_*.csv`, 받을 zip 목록 |
+| 0.3 | 박겸 | RDD2022 다운로드·변환 — 같은 노트북 5단계 (Figshare, 신청 불필요) | Drive `parts/rdd2022.zip`, 클래스별 박스 수 |
+| 0.4 | 박겸 | 데이터셋 v1 (RDD2022, 2클래스) — 노트북 6단계로 `data.yaml` 생성 | Colab에서 1 epoch 실행 |
 | 0.5 | 정현우 | **영상 후보 찾기** — 기준 `PRD.md:433-438`. 목표: 같은 도로 지나는 서로 다른 업로더 영상 **2개 이상** + 야간/우천 1~2개. `sources.csv`에 URL·업로더·라이선스·도로명 기록 | `sources.csv` 5행 이상, 이슈 #13 확정 (11/14) |
 | 0.6 | 정현우 | `fetch.py`로 받기 + 1080p/30fps 정규화. 라이선스 확인(CC 우선, 아니면 업로더 허락), 영상은 레포에 올리지 않음 | `data/videos/`에 파일, 길이·fps 로그 |
 | 0.7 | 정현우 | **GPS 재구성** (`PRD.md:440-445`): gpx.studio로 경로 → 기준점 영상당 **8개 이상**(교차로·육교·표지판) → `reconstruct.py` | `<video_id>.gps.csv` 생성, `preview_map.py`로 경로가 도로 위에 있음 |
@@ -236,7 +235,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | 2.4 | 정현우 | `clustering.py` — `ST_DWithin(20m)` 같은 유형에 붙이거나 신규, `vehicle_count`·대표 좌표 갱신. 한 트랜잭션 + `FOR UPDATE` | 테스트: 3대 같은 지점 → 결함 1건, vehicle_count=3 |
 | 2.5 | 정현우 | `risk.py` | 모든 결함에 risk_level (F4) |
 | 2.6 | 박겸 | `lane_wear.py` — 하단 ROI → 흰/노랑 마스크 → 차선 대 노면 밝기 대비 | 선정 영상 수동 라벨 대비 정확도 |
-| 2.7 | 박겸 | `prepare_damage_crops.py`로 **KRID 파손 라벨에서 크롭** → 분류 학습. 파손이 부족할 때만 공개 영상 프레임·공개 이미지로 보충 (`PRD.md:371`) | 클래스별 크롭 수, 홀드아웃 정확도·F1 |
+| 2.7 | 박겸 | 01 노트북이 만든 **KRID 파손 크롭**(`cls/{train,val,test}/{normal,damaged}`)으로 → 분류 학습. 파손이 부족할 때만 공개 영상 프레임·공개 이미지로 보충 (`PRD.md:371`) | 클래스별 크롭 수, 홀드아웃 정확도·F1 |
 | 2.8 | 공동 | **11/21 첫 end-to-end** — `e2e_smoke.py` | 영상 2개(또는 노이즈 3대) → DB에서 공통 결함이 묶임, 라벨 대비 결함 수 출력 |
 
 **11/20 Go/No-go** (`PRD.md:642`): 파손 크롭(KRID + 보충)이 클래스당 100장 미만(제안값)이면 위치 탐지만으로 확정. 0.2b 집계에서 이미 넉넉하면 사실상 유지 확정.
@@ -350,6 +349,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 
 ## 변경 이력
 
+- **r3.1 (2026-11-13)** — 데이터 준비를 Colab 에서 하도록 확정: `ai/daboyeo_ai/data/*`, `ai/notebooks/01_data_prep.ipynb` 구현. 원본은 Colab 로컬 디스크에서만 다루고 Drive 에는 변환 결과만 저장. 0.2b·0.3·0.4·2.7 작업 설명 갱신.
 - **r3 (2026-11-13)** — PRD v0.4 반영: AI Hub 상세 페이지 확인 결과. KRID(전국 도로시설물 영상정보)에 정상/파손 라벨 있음 → 파손 분류 데이터를 KRID에서 추출(2.7, `prepare_damage_crops.py`), 라벨 먼저 받아 집계하는 0.2b 단계, 폴리곤→박스·마스크→박스 변환, 리스크 1건 추가, 0.9 완료 표시, PRD 줄번호 v0.4 기준으로 갱신.
 - **r2 (2026-11-13)** — PRD v0.3 반영: 직접 촬영 → 공개 영상 + GPS 재구성(`tools/video`, `tools/gps`, M0 0.5~0.8), GPS CSV 계약, AI Hub 도로장애물 데이터 추가, BDD100K 보조 경로(4.6), 다중 차량 대체안(`--gps-noise-m`), 반경 20 m 시작, 재구성 오차 측정(AC-13), 통신량 기준값 2가지, 영상 관련 리스크 5건, 이슈 #13. r1의 "RDD2022 한국 서브셋" 오류 삭제.
 - r1 (2026-11-13) — PRD v0.2 기준 최초 작성.

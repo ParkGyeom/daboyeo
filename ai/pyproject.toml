@@ -1,0 +1,20 @@
+[project]
+name = "daboyeo-ai"
+version = "0.1.0"
+description = "다보여 AI: 데이터셋 다운로드·변환, 학습 보조 코드 (박겸)"
+requires-python = ">=3.11"  # contracts 와 같음 (Colab 기본 런타임은 3.11 이상)
+dependencies = [
+    "daboyeo-contracts",
+    "numpy>=1.24",
+    "opencv-python-headless>=4.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["daboyeo_ai"]
+
+[tool.uv.sources]
+daboyeo-contracts = { workspace = true }

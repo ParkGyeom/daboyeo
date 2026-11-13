@@ -1,0 +1,55 @@
+The contents are encoded in UTF-8 including Korean characters. 
+If the following contents are not output normally, 
+Please modify the character information of the OS. 
+=================공지사항=================== 
+========================================== 
+
+    └─059.전국 도로시설물 영상정보 데이터
+        └─3.개방데이터
+            └─1.데이터
+                ├─Other
+                │  ├─Other_1.zip | 97 GB | 546987
+                │  ├─Other_10.zip | 97 GB | 546988
+                │  ├─Other_11.zip | 97 GB | 546989
+                │  ├─Other_12.zip | 97 GB | 546990
+                │  ├─Other_13.zip | 97 GB | 546991
+                │  ├─Other_14.zip | 97 GB | 546992
+                │  ├─Other_15.zip | 97 GB | 546993
+                │  ├─Other_16.zip | 85 GB | 546994
+                │  ├─Other_2.zip | 97 GB | 546995
+                │  ├─Other_3.zip | 97 GB | 546996
+                │  ├─Other_4.zip | 96 GB | 546997
+                │  ├─Other_5.zip | 97 GB | 546998
+                │  ├─Other_6.zip | 97 GB | 546999
+                │  ├─Other_7.zip | 97 GB | 547000
+                │  ├─Other_8.zip | 97 GB | 547001
+                │  └─Other_9.zip | 97 GB | 547002
+                ├─Training
+                │  ├─01.원천데이터
+                │  │  ├─TS_1.고속도로_01.비도시부.zip | 44 GB | 547003
+                │  │  ├─TS_2.국도_01.비도시부.zip | 76 GB | 547004
+                │  │  ├─TS_2.국도_02.도시부.zip | 9 GB | 547005
+                │  │  ├─TS_3.지방도_01.비도시부.zip | 13 GB | 547006
+                │  │  └─TS_3.지방도_02.도시부.zip | 689 MB | 547007
+                │  └─02.라벨링데이터
+                │      ├─TL_1.고속도로_01.비도시부.zip | 129 MB | 547008
+                │      ├─TL_2.국도_01.비도시부.zip | 211 MB | 547009
+                │      ├─TL_2.국도_02.도시부.zip | 22 MB | 547010
+                │      ├─TL_3.지방도_01.비도시부.zip | 27 MB | 547011
+                │      └─TL_3.지방도_02.도시부.zip | 1 MB | 547012
+                ├─Validation
+                │  ├─01.원천데이터
+                │  │  ├─VS_1.고속도로_01.비도시부.zip | 6 GB | 547013
+                │  │  ├─VS_2.국도_01.비도시부.zip | 10 GB | 547014
+                │  │  ├─VS_2.국도_02.도시부.zip | 1 GB | 547015
+                │  │  ├─VS_3.지방도_01.비도시부.zip | 2 GB | 547016
+                │  │  └─VS_3.지방도_02.도시부.zip | 79 MB | 547017
+                │  └─02.라벨링데이터
+                │      ├─VL_1.고속도로_01.비도시부.zip | 18 MB | 547018
+                │      ├─VL_2.국도_01.비도시부.zip | 27 MB | 547019
+                │      ├─VL_2.국도_02.도시부.zip | 3 MB | 547020
+                │      ├─VL_3.지방도_01.비도시부.zip | 4 MB | 547021
+                │      └─VL_3.지방도_02.도시부.zip | 176 KB | 547022
+                └─Sublabel
+                    └─SbL.zip | 17 GB | 549780
+

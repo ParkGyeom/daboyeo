@@ -3,17 +3,18 @@ name = "daboyeo"
 version = "0.1.0"
 description = "블랙박스 탑재형 AI 도로 결함 탐지 및 간편 신고 시스템 (학술제 MVP)"
 requires-python = ">=3.11,<3.13"
-dependencies = ["daboyeo-contracts"]
+dependencies = ["daboyeo-contracts", "daboyeo-ai"]
 
 [dependency-groups]
 dev = ["pytest>=8"]
 
 [tool.uv.workspace]
-# 구성요소가 생길 때마다 여기에 추가한다: "edge", "server", "ai", "tools", "ui"
-members = ["contracts"]
+# 구성요소가 생길 때마다 여기에 추가한다: "edge", "server", "tools", "ui"
+members = ["contracts", "ai"]
 
 [tool.uv.sources]
 daboyeo-contracts = { workspace = true }
+daboyeo-ai = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["contracts/tests", "tests"]
+testpaths = ["contracts/tests", "ai/tests", "tests"]

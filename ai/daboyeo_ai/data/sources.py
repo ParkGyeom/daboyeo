@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from daboyeo_contracts import CLASS_NAMES
 
-from .yolo import Box, bbox_xywh, polygon_box
+from .yolo import Box, bbox_xywh, polygon_box, valid_bbox, valid_points
 
 POTHOLE, CRACK, GUARDRAIL, SIGN = (CLASS_NAMES.index(n) for n in ("pothole", "crack", "guardrail", "sign"))
 
@@ -87,13 +87,17 @@ def road_obstacle_class(category_name: str) -> int | str | None:
     return None
 
 
-def parse_coco_like(js: dict) -> list[LabeledImage]:
+def parse_coco_like(js: dict, stats: Counter[str] | None = None) -> list[LabeledImage]:
     """COCO 비슷한 형식(images / annotations / categories) 라벨을 파싱한다.
 
     도로장애물(179) 실제 형식 (2026-11-14 확인): JSON 하나에 이미지 1장이라 `images` 가 리스트가 아니라
     객체 하나이고, 크랙은 `bbox`·`segmentation` 이 비어 있고 `polyline` 에 점 좌표가 온다.
     둘 다 받는다. 키가 없으면 바로 실패하게 했다.
+
+    좌표에 None 등 잘못된 값이 섞이면 그 점만 버린다 (`ann_bad_points`). 유효한 좌표가 하나도 안 남으면
+    그 어노테이션은 건너뛴다 (`ann_bad_geometry`). 개수는 stats 에 더한다.
     """
+    stats = stats if stats is not None else Counter()
     missing = [k for k in ("images", "annotations", "categories") if k not in js]
     if missing:
         raise ValueError(f"not COCO-like: missing {missing}; top-level keys={sorted(js)}")
@@ -109,12 +113,17 @@ def parse_coco_like(js: dict) -> list[LabeledImage]:
         if cls == "negative":
             negatives.add(a["image_id"])
             continue
-        if a.get("bbox"):
+        if valid_bbox(a.get("bbox")):
             box = bbox_xywh(cls, a["bbox"])
         else:
-            box = polygon_box(cls, a.get("segmentation") or a.get("polyline") or [])
-        if box is not None:
-            img.boxes.append(box)
+            seg = a.get("segmentation") or a.get("polyline") or []
+            points, dropped = valid_points(seg)
+            stats["ann_bad_points"] += bool(dropped)
+            box = polygon_box(cls, seg) if len(points) >= 2 else None
+        if box is None:
+            stats["ann_bad_geometry"] += 1
+            continue
+        img.boxes.append(box)
     for i in negatives:
         if not by_id[i].boxes:
             by_id[i].hard_negative = True

@@ -1,0 +1,20 @@
+# PR 에서 이 경로를 바꾸면 담당자에게 리뷰가 자동 요청된다 (CONTRIBUTING.md 1·2장).
+# 아래에 있을수록 우선한다.
+
+# 기본: 공동
+*                       @ParkGyeom @hunywoo
+
+# 박겸 (AI)
+/ai/                    @ParkGyeom
+/docs/ai-handoff.md     @ParkGyeom
+
+# 정현우 (백엔드)
+/edge/                  @hunywoo
+/server/                @hunywoo
+/ui/                    @hunywoo
+/tools/                 @hunywoo
+/docker-compose.yml     @hunywoo
+
+# 공동 — 계약과 DB enum 은 서로 맞물려 있어 둘 다 본다
+/contracts/             @ParkGyeom @hunywoo
+/server/sql/            @ParkGyeom @hunywoo

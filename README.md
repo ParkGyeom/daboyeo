@@ -1,7 +1,7 @@
 # 다보여
 
 블랙박스 탑재형 AI 도로 결함 탐지 및 간편 신고 시스템 — 2026 세종대 컴퓨터공학과 학술제 MVP.
-요구사항은 [PRD.md](PRD.md)를 본다.
+요구사항은 [PRD.md](PRD.md), 실행 계획은 [docs/plan.md](docs/plan.md), 협업 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md), 탐지 모델 사용법은 [docs/ai-handoff.md](docs/ai-handoff.md).
 
 ## 시작하기
 

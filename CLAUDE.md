@@ -28,6 +28,16 @@ docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
   - 상대가 넘겨주기로 합의한 작업이라고 요청자가 말하면 진행하되, `docs/plan.md` 의 담당자 표기도 바꾸도록 안내한다.
 - 공동 폴더는 고칠 수 있지만, 커밋 메시지에 무엇이 바뀌었는지 적고 상대에게 알린다 (CONTRIBUTING.md "공동 파일 변경").
 
+## Git 작업 흐름 (CONTRIBUTING.md 2장)
+
+- **`main` 에 직접 push 하지 않는다.** 작업 전 `git switch main && git pull` 후 브랜치를 만든다. 이름은 요청자 역할로: 박겸 `ai/…`, 정현우 `be/…`, 문서만 바꿀 때 `docs/…`.
+- 커밋 전에 `uv run pytest -q` 를 통과시킨다.
+- 사용자가 PR·머지를 요청하면: `git push -u` → `gh pr create --fill` → `gh pr checks --watch` 로 CI 확인 →
+  - 변경에 **`contracts/` 나 `server/sql/` 이 없으면** `gh pr merge --squash --delete-branch` 로 머지하고 `git switch main && git pull`.
+  - **있으면 머지하지 않는다.** 상대 리뷰가 필요하다고 알리고 PR 링크를 준다.
+  - CI 가 실패하면 머지하지 않고 원인을 고치거나 보고한다.
+- 브랜치 보호는 걸려 있지 않다 — 위 규칙은 도구가 아니라 약속으로 지킨다.
+
 ## 계약 (`contracts/`)
 
 - `CLASS_NAMES` 순서는 모델 출력 class_id 와 같다. **바꾸면 모델을 다시 학습해야 한다.**

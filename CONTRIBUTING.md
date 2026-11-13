@@ -35,17 +35,34 @@
 4. 표에 없는 새 작업이 생기면 누가 할지 먼저 정하고 이 표에 추가한다.
 5. **Claude Code 도 같은 규칙을 따른다.** 내 Claude 에게 상대 작업을 시키지 않는다 (CLAUDE.md 에도 적혀 있다).
 
-## 2. 브랜치와 push
+## 2. 브랜치와 PR
 
-| 바꾸는 곳 | 방법 |
+**모든 변경은 브랜치 → PR → CI 통과 → 머지.** `main` 에 직접 push 하지 않는다.
+이유: CI(테스트)가 `main` 에 들어가기 **전에** 돌아서 `main` 은 항상 돌아가는 상태로 남고, 기능마다 PR 기록이 남는다.
+
+| 바꾸는 곳 | 머지 조건 |
 |---|---|
-| 내 담당 폴더만 | `main` 에 바로 push 해도 된다 |
-| **공동 파일** (특히 `contracts/`, DB 스키마) | 브랜치 → PR → **상대 승인 후** merge. `CODEOWNERS` 가 리뷰를 자동 요청한다 |
+| 내 담당 폴더, 문서(PRD·계획·규칙), 루트 설정 | **CI 통과하면 본인이 바로 머지** (리뷰 기다리지 않음) |
+| **`contracts/`, `server/sql/`** (계약·DB 스키마) | CI 통과 + **상대 승인** 후 머지. `CODEOWNERS` 가 리뷰를 자동 요청한다 |
 
-- push 전에 `uv run pytest -q` 통과. GitHub Actions(CI)도 push·PR 마다 같은 테스트를 돌린다.
-- push 전에 `git pull --rebase` 로 최신을 받는다.
+- 문서·규칙을 바꾼 PR 은 머지한 뒤 상대에게 한 줄로 알린다.
 - 브랜치 이름: `ai/<내용>`, `be/<내용>`, `docs/<내용>` (예: `ai/v2-dataset`, `be/clustering`).
-- **11/25(수) 기능 동결** 이후에는 버그 수정만 (계획 15.1).
+- PR 은 작게: 하루 작업 이하, 한 가지 목적. 커지면 나눠서 올린다.
+- 머지는 **squash** (PR 하나 = `main` 커밋 하나)로 하고, 머지한 브랜치는 지운다.
+- **11/25(수) 기능 동결** 이후에는 버그 수정 PR 만 (계획 15.1).
+
+```bash
+git switch main && git pull                 # 1. 최신 main 에서 시작
+git switch -c ai/v2-dataset                 # 2. 브랜치
+# ... 작업, uv run pytest -q, git commit ...
+git push -u origin ai/v2-dataset            # 3. push
+gh pr create --fill                         # 4. PR (제목·본문은 커밋 메시지로)
+gh pr checks --watch                        # 5. CI 통과 확인
+gh pr merge --squash --delete-branch        # 6. 머지 (contracts/·server/sql/ 이면 상대 승인 후)
+git switch main && git pull                 # 7. 로컬 main 갱신
+```
+
+Claude Code 에 "PR 올리고 CI 통과하면 머지해줘"라고 하면 위 순서대로 한다 (CLAUDE.md).
 
 ## 3. 커밋 메시지
 
@@ -56,7 +73,7 @@
 
 ### 계약 (`contracts/`)
 1. 바꾸려는 이유와 내용을 먼저 상대에게 말한다.
-2. PR 로 올리고 상대가 승인하면 merge.
+2. PR 로 올리고 CI 통과 + 상대 승인 후 merge.
 3. `CLASS_NAMES` 순서 변경 = 모델 재학습. 11/18 이후에는 하지 않는다.
 
 ### PRD·계획
@@ -91,4 +108,4 @@
 ## 7. Claude Code 를 쓸 때
 
 - 레포 루트의 [CLAUDE.md](CLAUDE.md) 를 Claude 가 자동으로 읽는다. 담당 폴더 규칙도 거기 있다.
-- Claude 가 만든 변경도 내가 만든 것과 같이 취급한다: 테스트 통과, 담당 폴더 규칙, 공동 파일은 PR.
+- Claude 가 만든 변경도 내가 만든 것과 같이 취급한다: 테스트 통과, 담당 폴더 규칙, 브랜치 → PR → CI → 머지.

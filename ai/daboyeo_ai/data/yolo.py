@@ -169,6 +169,25 @@ class YoloDetWriter:
         return split
 
 
+def facility_crop(
+    img: np.ndarray, box: Box, pad: float = 0.1, size: int = 224, min_side_px: int = 24,
+) -> np.ndarray | None:
+    """시설물 박스(원본 픽셀 좌표) → 파손 분류 크롭. 학습 크롭(`CropWriter`)과 추론(`DamageClassifier`)이 같이 쓴다.
+
+    박스 가로·세로를 각각 pad 비율만큼 넓히고 이미지 안으로 자른 뒤, 긴 변이 size 보다 크면 줄인다(INTER_AREA).
+    짧은 변이 min_side_px 보다 작거나 잘린 영역이 비면 None.
+    """
+    h, w = img.shape[:2]
+    if min(box.width, box.height) < min_side_px:
+        return None
+    px, py = box.width * pad, box.height * pad
+    b = Box(box.cls, box.x1 - px, box.y1 - py, box.x2 + px, box.y2 + py).clipped(w, h)
+    crop = img[int(b.y1):int(b.y2), int(b.x1):int(b.x2)]
+    if crop.size == 0:
+        return None
+    return resize_max(crop, size)
+
+
 class CropWriter:
     """시설물 파손 분류용 크롭. label 은 'normal' 또는 'damaged'."""
 
@@ -178,19 +197,16 @@ class CropWriter:
         self.stats: Counter[str] = Counter()
 
     def write(self, name: str, img: np.ndarray, box: Box, label: str, group: str) -> bool:
-        h, w = img.shape[:2]
         if min(box.width, box.height) < self.min_side_px:
             self.stats["crop_dropped_small"] += 1
             return False
-        px, py = box.width * self.pad, box.height * self.pad
-        b = Box(box.cls, box.x1 - px, box.y1 - py, box.x2 + px, box.y2 + py).clipped(w, h)
-        crop = img[int(b.y1):int(b.y2), int(b.x1):int(b.x2)]
-        if crop.size == 0:
+        crop = facility_crop(img, box, self.pad, self.size, self.min_side_px)
+        if crop is None:
             return False
         split = split_for(group)
         out = self.root / split / label
         out.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(out / f"{name}.jpg"), resize_max(crop, self.size))
+        cv2.imwrite(str(out / f"{name}.jpg"), crop)
         self.stats[f"crop_{CLASS_NAMES[box.cls]}_{label}"] += 1
         return True
 

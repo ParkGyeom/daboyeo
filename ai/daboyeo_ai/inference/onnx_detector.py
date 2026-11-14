@@ -5,6 +5,9 @@
     det = OnnxDetector("ai/models/detector_v1.onnx", threads=1)
     detections = det.detect(frame_bgr)   # list[Detection], bbox 는 0~1 정규화
 
+    # 시설물 파손 분류도 켜려면 (계획 2.7): guardrail·sign 탐지에 damage / damage_conf 가 채워진다
+    det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, damage_model="ai/models/damage_cls_v1.onnx")
+
 전처리(letterbox)와 후처리(NMS)는 여기서 끝낸다. Ultralytics YOLO(v8/11) detect 모델을
 `format="onnx"` 로 내보낸 기본 출력 `(1, 4 + nc, N)` 형식을 가정한다.
 """
@@ -13,11 +16,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 
 from daboyeo_contracts import CLASS_NAMES, Detection
+
+if TYPE_CHECKING:
+    from .damage_classifier import DamageClassifier
+
+FACILITY_CLASSES = ("guardrail", "sign")  # 파손 분류 대상 (계약: Detection.damage 는 이 둘만)
 
 
 @dataclass(frozen=True)
@@ -72,7 +81,14 @@ def decode_yolo(
 class OnnxDetector:
     """`Detector` 프로토콜 구현. threads 로 CPU 코어 사용을 제한한다 (PRD FR-1.6, 1~2코어)."""
 
-    def __init__(self, model_path: str | Path, threads: int = 1, conf: float = 0.25, iou: float = 0.45):
+    def __init__(
+        self,
+        model_path: str | Path,
+        threads: int = 1,
+        conf: float = 0.25,
+        iou: float = 0.45,
+        damage_model: str | Path | DamageClassifier | None = None,
+    ):
         import onnxruntime as ort  # 학습 환경 등 추론이 필요 없는 곳에서는 import 하지 않도록
 
         so = ort.SessionOptions()
@@ -87,6 +103,13 @@ class OnnxDetector:
         if nc != len(CLASS_NAMES):
             raise ValueError(f"model has {nc} classes, contract expects {len(CLASS_NAMES)} {CLASS_NAMES}")
         self.conf, self.iou = conf, iou
+        # 파손 분류기: 경로면 같은 threads 로 연다. 탐지 → 분류가 차례로 돌아서 코어를 더 쓰지 않는다
+        if damage_model is None or not isinstance(damage_model, (str, Path)):
+            self.damage = damage_model
+        else:
+            from .damage_classifier import DamageClassifier
+
+            self.damage = DamageClassifier(damage_model, threads=threads)
 
     def raw(self, frame_bgr: np.ndarray) -> list[tuple[int, float, float, float, float, float]]:
         h, w = frame_bgr.shape[:2]
@@ -97,7 +120,12 @@ class OnnxDetector:
 
     def detect(self, frame_bgr: np.ndarray) -> list[Detection]:
         h, w = frame_bgr.shape[:2]
-        return [
-            Detection.from_class_id(c, conf=min(s, 1.0), bbox=(x1 / w, y1 / h, x2 / w, y2 / h))
-            for c, s, x1, y1, x2, y2 in self.raw(frame_bgr)
-        ]
+        out = []
+        for c, s, x1, y1, x2, y2 in self.raw(frame_bgr):
+            extra = {}
+            if self.damage is not None and CLASS_NAMES[c] in FACILITY_CLASSES:
+                p = self.damage.prob_damaged(frame_bgr, (x1, y1, x2, y2))
+                if p is not None:  # 너무 작은 박스는 분류하지 않는다 (학습 크롭에도 없었음) → None 그대로
+                    extra = {"damage": self.damage.label(p), "damage_conf": p}
+            out.append(Detection.from_class_id(c, conf=min(s, 1.0), bbox=(x1 / w, y1 / h, x2 / w, y2 / h), **extra))
+        return out

@@ -111,17 +111,20 @@ daboyeo/
 │   │   ├── aihub.py              # AI Hub 파일 트리·다운로드·분할 병합 (aihubshell 과 같은 API)
 │   │   ├── sources.py            # 라벨 파서: KRID(폴리곤→박스, 정상/파손), 도로장애물(COCO형, 보수완료 포트홀·맨홀=배경), RDD2022(XML)
 │   │   ├── yolo.py               # YOLO 탐지·분류 데이터셋 쓰기, 640 축소, 영상 구간 단위 train/val/test 분할
-│   │   └── pipeline.py           # zip 단위 변환 + 라벨 집계(count_label_zip). 파손 프레임은 stride 로 버리지 않음
+│   │   ├── pipeline.py           # zip 단위 변환 + 라벨 집계(count_label_zip). 파손 프레임은 stride 로 버리지 않음
+│   │   ├── damage_cls.py         # ★ 구현됨 — 파손 크롭 → 시설물 종류 복원(KRID 라벨), normal 해시 줄이기 + 정사각형 PNG(subsample_cls)
+│   │   └── krid_crop_types.csv.gz # 크롭 이미지 stem → 시설물 종류 코드열 (Mac 에서 라벨로 생성, 54 KB)
 │   ├── notebooks/
 │   │   ├── 01_data_prep.ipynb    # ★ 구현됨 — Colab: 라벨 먼저 → 집계 → 이미지 zip 하나씩 변환 → Drive parts/*.zip
 │   │   ├── 02_train_detector.ipynb # ★ 구현됨 — Colab GPU: parts 풀기 → YOLO 학습(끊기면 이어서) → 평가 → ONNX + 일치 확인 → Drive models/
-│   │   └── 03_train_damage_cls.ipynb # 예정
+│   │   └── 03_train_damage_cls.ipynb # ★ 구현됨 — Colab GPU: krid.zip cls/ 풀기 → normal 줄이기 → YOLO11n-cls 학습(이어하기) → ONNX → val 최대 F1 임계값 → test 시설물별 지표 → 일치 확인 → Drive models/
 │   ├── daboyeo_ai/inference/onnx_detector.py # ★ 구현됨 — OnnxDetector (Detector 계약, letterbox·NMS, 스레드 제한). Ultralytics 와 박스·신뢰도 일치 확인
-│   ├── daboyeo_ai/inference/damage_classifier.py # 예정
+│   ├── daboyeo_ai/inference/damage_classifier.py # ★ 구현됨 — DamageClassifier (카드 .json 의 클래스 순서·임계값). OnnxDetector(damage_model=...) 가 guardrail·sign 에 damage 채움
+│   ├── daboyeo_ai/eval/damage_metrics.py # ★ 구현됨 — 임계값(val 최대 F1), precision·recall·F1·normal 오탐률, 시설물별
 │   ├── daboyeo_ai/lane_wear.py   # ★ 구현됨 — LaneWearMeter: 하단 ROI → 노면 대비 top-hat·노랑 마스크 → Hough 선분 → 차선/노면 밝기 대비 (기준값 TBD, #6)
 │   ├── daboyeo_ai/eval/lane_wear_calib.py # ★ 구현됨 — 실제 프레임 contrast 분포 CSV·백분위수 (#6 기준값 보정용)
 │   ├── daboyeo_ai/eval/{eval_detector,bench_cpu,interval_sweep}.py # 예정
-│   └── models/                   # .gitignore — detector_vN.onnx + detector_vN.json
+│   └── models/                   # .gitignore — detector_vN.onnx + .json, damage_cls_vN.onnx + .json
 ├── edge/blackbox/                # 정현우 — 가상 블랙박스
 │   ├── main.py                   # --video --gps --vehicle --detector {fake,onnx,replay} --gps-noise-m
 │   ├── frame_source.py
@@ -237,7 +240,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | 2.4 | 정현우 | `clustering.py` — `ST_DWithin(20m)` 같은 유형에 붙이거나 신규, `vehicle_count`·대표 좌표 갱신. 한 트랜잭션 + `FOR UPDATE` | 테스트: 3대 같은 지점 → 결함 1건, vehicle_count=3 |
 | 2.5 | 정현우 | `risk.py` | 모든 결함에 risk_level (F4) |
 | 2.6 | 박겸 | `lane_wear.py` — 하단 ROI → 흰/노랑 마스크 → 차선 대 노면 밝기 대비 | 선정 영상 수동 라벨 대비 정확도 |
-| 2.7 | 박겸 | 01 노트북이 만든 **KRID 파손 크롭**(`cls/{train,val,test}/{normal,damaged}`)으로 → 분류 학습. 파손이 부족할 때만 공개 영상 프레임·공개 이미지로 보충 (`PRD.md:371`) | 클래스별 크롭 수, 홀드아웃 정확도·F1 |
+| 2.7 | 박겸 | Mac `prepare_local` 이 만든 **KRID 파손 크롭**(`krid.zip` 의 `cls/{train,val,test}/{normal,damaged}`)으로 → `03_train_damage_cls.ipynb` 에서 가드레일+표지판 하나의 이진 분류(YOLO11n-cls, 224). normal 은 train 5배·val/test 10배로 줄임, 임계값은 val 최대 F1. 파손이 부족할 때만 공개 영상 프레임·공개 이미지로 보충 (`PRD.md:371`). 크롭 수(파손): train 107 / val 15 / test 17 — 가드레일 55·표지판 84 | test precision·recall·F1·normal 오탐률 (시설물별), `damage_cls_v1.json` |
 | 2.8 | 공동 | **11/21 첫 end-to-end** — `e2e_smoke.py` | 영상 2개(또는 노이즈 3대) → DB에서 공통 결함이 묶임, 라벨 대비 결함 수 출력 |
 
 **11/20 Go/No-go** (`PRD.md:642`): 파손 크롭(KRID + 보충)이 클래스당 100장 미만(제안값)이면 위치 탐지만으로 확정. 0.2b 집계에서 이미 넉넉하면 사실상 유지 확정.
@@ -350,6 +353,8 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 ---
 
 ## 변경 이력
+
+- **r3.4 (2026-11-15)** — 시설물 파손 분류 (2.7) 구현: `ai/daboyeo_ai/data/damage_cls.py`(크롭 → 시설물 종류 표 `krid_crop_types.csv.gz`, normal 줄이기), `ai/daboyeo_ai/eval/damage_metrics.py`, `ai/daboyeo_ai/inference/damage_classifier.py`, `OnnxDetector(damage_model=...)`, `ai/notebooks/03_train_damage_cls.ipynb`. 학습 크롭과 추론 크롭은 같은 `facility_crop`(CropWriter 에서 분리) + `square_input`(정사각형, Ultralytics 가운데 자르기에 가드레일이 잘리지 않게). 로컬 Mac 에서 2 epoch 모의 학습·ONNX 일치 확인. 사용법은 `docs/ai-handoff.md` 9장(정현우 확인 필요).
 
 - **r3.3 (2026-11-14)** — 차선 마모 측정 `ai/daboyeo_ai/lane_wear.py`(`LaneWearMeter.measure(frame) -> LaneWearResult`)와 보정 도구 `ai/daboyeo_ai/eval/lane_wear_calib.py` 구현 (2.6). 합성 프레임 시험 통과, 1280×720 에서 약 1.5 ms. 기준값은 잠정 0.3 — 실제 프레임 분포로 #6 에서 결정. 사용법은 `docs/ai-handoff.md` 8장(정현우 확인 필요). 3장 레포 구조의 경로를 실제 위치로 갱신.
 - **r3.2 (2026-11-13)** — 탐지 학습 노트북 `02_train_detector.ipynb`·`OnnxDetector` 구현 (1.4·1.5). 확인: 사전학습 YOLO11n ONNX 로 Ultralytics 와 박스·신뢰도 완전 일치, 노트북 전체를 CPU 1 epoch 로 모의 실행, 중단된 학습 이어하기·끝난 학습 건너뛰기 (끝난 last.pt 를 resume 하면 Ultralytics 가 COCO 샘플로 새 학습을 시작하는 문제를 막음).

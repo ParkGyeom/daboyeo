@@ -64,7 +64,7 @@ v1 에서는 guardrail·sign 이 거의 나오지 않는 게 정상이다.
 | 이름 | 내용 |
 |---|---|
 | `CLASS_NAMES` | `("pothole", "crack", "guardrail", "sign")` — 모델 class_id 순서. 바꾸면 재학습 필요 |
-| `Detection` | 탐지 1건 (위 1장). `damage`·`damage_conf` 는 시설물 파손 분류용으로 **v1 에서는 항상 `None`** |
+| `Detection` | 탐지 1건 (위 1장). `damage`·`damage_conf` 는 시설물 파손 분류용 — **파손 모델을 켰을 때만** guardrail·sign 에 채워진다 (9장). 안 켜면 항상 `None` |
 | `Detector` | `detect(frame_bgr) -> list[Detection]` 프로토콜. 가짜·재생(replay) 탐지기를 만들 때 이 모양만 맞추면 `OnnxDetector` 와 바꿔 끼울 수 있다 |
 | `DefectType`, `DETECTOR_TO_DEFECT` | 탐지 클래스 → 서버 결함 유형 (`guardrail` → `guardrail_damage`, `sign` → `sign_damage`) |
 | `RISK_BY_TYPE` | 유형별 위험도 (PRD F4 표) |
@@ -122,16 +122,44 @@ r.n_segments        # 진단용: 차선으로 인정된 선분 수
 - ROI 기본값은 카메라가 정면·수평이고 지평선이 화면 가운데쯤이라고 가정한다. 영상 화각이 다르면 `LaneWearMeter(roi=...)` 로 바꾼다 (정규화 좌표 사다리꼴).
 - 보정 도구: `uv run python -m daboyeo_ai.eval.lane_wear_calib <프레임 폴더|영상> --overlay-dir out/` — 프레임별 contrast CSV, 백분위수, ROI·선분 오버레이.
 
-## 9. 아직 AI 쪽에서 안 넘긴 것
+## 9. 시설물 파손 분류 (제안 — 정현우 확인 필요)
+
+> 계획 2.7, PRD FR-1.2. `OnnxDetector` 에 **선택 인자 하나**가 늘었다. 안 쓰면 지금과 완전히 같다.
+> 블랙박스에서 켤지, 서버·화면에서 `damage` 를 어떻게 쓸지는 11/18 인터페이스 맞춤 때 같이 정한다.
+
+```python
+from daboyeo_ai.inference import OnnxDetector
+
+det = OnnxDetector("ai/models/detector_v2.onnx", threads=1,
+                   damage_model="ai/models/damage_cls_v1.onnx")   # 옆에 damage_cls_v1.json 이 꼭 있어야 한다
+for d in det.detect(frame_bgr):
+    if d.class_name in ("guardrail", "sign"):
+        d.damage       # "suspected"(파손 의심) | "normal" | None(박스가 너무 작아 분류 안 함)
+        d.damage_conf  # P(damaged) 0~1 — "normal" 이어도 채워진다 (판정 신뢰도가 아니라 파손 확률)
+```
+
+| 항목 | 내용 |
+|---|---|
+| 대상 | guardrail·sign 탐지만. pothole·crack 은 항상 `damage=None` (계약이 막음) |
+| `"suspected"` 뜻 | `damage_conf >= threshold` (임계값은 `damage_cls_v1.json` 의 `threshold`, val 최대 F1). **확정이 아니라 '파손 의심'** — 화면에도 그렇게만 표시 (FR-1.2) |
+| 신고 제안 | 한 대·한 프레임의 `suspected` 로 하지 않는다. **여러 차량이 같은 판단일 때만** (FR-7.2). 몇 대·몇 % 로 할지는 서버 쪽 규칙 (제안: 같은 결함 군집의 관측 중 suspected 비율) |
+| 너무 작은 박스 | 짧은 변 24 px 미만이면 분류하지 않고 `None` (학습 크롭에도 없던 크기) |
+| CPU | 탐지 → 분류가 같은 스레드 수(`threads`)로 **차례로** 돈다. 코어를 더 쓰지 않지만 시설물 박스 1개마다 시간이 늘어난다 (크롭 1장당 ms 는 `damage_cls_v1.json` 의 `colab_cpu_speed`) |
+| 파일 | `damage_cls_v1.onnx` + `damage_cls_v1.json` 둘 다 `ai/models/` 에. json 에 클래스 순서·임계값·크롭 규칙이 있어서 **json 없이는 열리지 않는다** |
+
+- 서버로 보낼 때 `ObservationIn` 에 `damage` 를 넣을 필드는 아직 없다. 넣으려면 `contracts/` 변경이라 둘이 같이 정한다 (제안: `damage: Literal["normal","suspected"] | None = None` 기본값 추가).
+- 직접 부를 수도 있다: `DamageClassifier("ai/models/damage_cls_v1.onnx").prob_damaged(frame_bgr, (x1, y1, x2, y2))` (픽셀 좌표).
+
+## 10. 아직 AI 쪽에서 안 넘긴 것
 
 | 항목 | 예정 | 비고 |
 |---|---|---|
 | v1 모델 파일 | 11/13~14 | 학습 끝나면 Drive 공유 |
-| 시설물 파손 분류 (`Detection.damage` 채우기) | 11/19~20 (P1) | KRID 파손 라벨 사용. 11/20 유지 여부 결정 |
+| 시설물 파손 분류 모델 파일 (`damage_cls_v1.onnx` + `.json`) | 11/17 목표 (P1) | 코드는 9장 (형식은 제안 상태). 11/20 유지 여부 결정 |
 | 차선 마모 기준값·확정 규칙 | 11/22 (#6) | 측정 코드는 8장 (형식은 제안 상태). 기준값은 실제 프레임으로 보정 |
 | v2 모델 (4클래스) | AI Hub 데이터 확보 후 | 파일만 교체 |
 
-## 10. AI 쪽이 받아야 하는 것 (계획 4장)
+## 11. AI 쪽이 받아야 하는 것 (계획 4장)
 
 - **속도 측정 로그 형식**: 프레임·단계별 `{"frame", "t", "stage", "ran", "ms"}` JSONL — `bench_cpu`·`interval_sweep` 실험이 이 로그를 읽는다. 형식이 바뀌면 알려주기.
 - **프레임 샘플링 방식**: 분석 주기(N프레임마다 탐지 등)를 어떻게 적용하는지.

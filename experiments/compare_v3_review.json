@@ -1,0 +1,486 @@
+{
+ "date": "2026-11-16",
+ "note": "compare_v3 의 같은 프레임 (로드마크 654 VS4 must-keep 58장 + recall_res 표본 300장) 을 v2·v3 ONNX 로 다시 돌려 기준만 바꿔 본 것과 눈으로 분류한 결과. 이미지는 레포 밖 data/compare_v3/{new_crops,lost_crops,gained_gs}.",
+ "conf_sets": {
+  "v2conf": "v2 카드 class_conf_draft (두 모델 모두)",
+  "v3conf": "v3 는 v3 카드 class_conf_draft (0.31/0.30/0.21/0.21), v2 는 v2 카드",
+  "v3conf_p08": "v3 는 정밀도 ≥0.8 기준 (0.40/0.42/0.31/0.34), v2 는 v2 카드"
+ },
+ "runs": {
+  "base|v2conf": {
+   "new": {
+    "pothole": 0.0,
+    "crack": 0.223,
+    "guardrail": 0.111,
+    "sign": 0.236
+   },
+   "old": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.111,
+    "sign": 0.264
+   },
+   "gained": {
+    "pothole": 0.0,
+    "crack": 0.223,
+    "guardrail": 0.047,
+    "sign": 0.084
+   },
+   "lost": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.047,
+    "sign": 0.108
+   },
+   "lost_but_present_below_conf": {
+    "guardrail": 0.03,
+    "sign": 0.044
+   },
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": [
+     "pothole",
+     0.315,
+     true,
+     1
+    ],
+    "0401_light_rainy_smooth_03000120": [
+     "crack",
+     0.172,
+     false,
+     0
+    ],
+    "0401_light_rainy_smooth_03000130": [
+     "crack",
+     0.063,
+     false,
+     1
+    ],
+    "0401_light_clear_smooth_07000023": [
+     "crack",
+     0.634,
+     true,
+     6
+    ]
+   },
+   "crack_hits": 1,
+   "new_pc": 0.223,
+   "lost_gs": 0.155
+  },
+  "base|v3conf": {
+   "new": {
+    "pothole": 0.0,
+    "crack": 0.213,
+    "guardrail": 0.166,
+    "sign": 0.264
+   },
+   "old": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.111,
+    "sign": 0.264
+   },
+   "gained": {
+    "pothole": 0.0,
+    "crack": 0.213,
+    "guardrail": 0.091,
+    "sign": 0.108
+   },
+   "lost": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.037,
+    "sign": 0.105
+   },
+   "lost_but_present_below_conf": {
+    "guardrail": 0.02,
+    "sign": 0.041
+   },
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": [
+     "pothole",
+     0.315,
+     true,
+     1
+    ],
+    "0401_light_rainy_smooth_03000120": [
+     "crack",
+     0.172,
+     false,
+     0
+    ],
+    "0401_light_rainy_smooth_03000130": [
+     "crack",
+     0.063,
+     false,
+     0
+    ],
+    "0401_light_clear_smooth_07000023": [
+     "crack",
+     0.634,
+     true,
+     6
+    ]
+   },
+   "crack_hits": 1,
+   "new_pc": 0.213,
+   "lost_gs": 0.142
+  },
+  "base|v3conf_p08": {
+   "new": {
+    "pothole": 0.0,
+    "crack": 0.115,
+    "guardrail": 0.098,
+    "sign": 0.169
+   },
+   "old": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.111,
+    "sign": 0.264
+   },
+   "gained": {
+    "pothole": 0.0,
+    "crack": 0.115,
+    "guardrail": 0.034,
+    "sign": 0.03
+   },
+   "lost": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.047,
+    "sign": 0.122
+   },
+   "lost_but_present_below_conf": {
+    "guardrail": 0.03,
+    "sign": 0.057
+   },
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": [
+     "pothole",
+     0.315,
+     false,
+     0
+    ],
+    "0401_light_rainy_smooth_03000120": [
+     "crack",
+     0.172,
+     false,
+     0
+    ],
+    "0401_light_rainy_smooth_03000130": [
+     "crack",
+     0.063,
+     false,
+     0
+    ],
+    "0401_light_clear_smooth_07000023": [
+     "crack",
+     0.634,
+     true,
+     2
+    ]
+   },
+   "crack_hits": 1,
+   "new_pc": 0.115,
+   "lost_gs": 0.169
+  },
+  "base+roi_t2|v2conf": {
+   "new": {
+    "pothole": 0.02,
+    "crack": 0.578,
+    "guardrail": 0.111,
+    "sign": 0.236
+   },
+   "old": {
+    "pothole": 0.02,
+    "crack": 0.007,
+    "guardrail": 0.111,
+    "sign": 0.264
+   },
+   "gained": {
+    "pothole": 0.014,
+    "crack": 0.574,
+    "guardrail": 0.047,
+    "sign": 0.084
+   },
+   "lost": {
+    "pothole": 0.014,
+    "crack": 0.003,
+    "guardrail": 0.047,
+    "sign": 0.108
+   },
+   "lost_but_present_below_conf": {
+    "guardrail": 0.03,
+    "sign": 0.044
+   },
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": [
+     "pothole",
+     0.421,
+     true,
+     5
+    ],
+    "0401_light_rainy_smooth_03000120": [
+     "crack",
+     0.252,
+     false,
+     3
+    ],
+    "0401_light_rainy_smooth_03000130": [
+     "crack",
+     0.232,
+     false,
+     4
+    ],
+    "0401_light_clear_smooth_07000023": [
+     "crack",
+     0.639,
+     true,
+     10
+    ]
+   },
+   "crack_hits": 1,
+   "new_pc": 0.588,
+   "lost_gs": 0.155
+  },
+  "base+roi_t2|v3conf": {
+   "new": {
+    "pothole": 0.014,
+    "crack": 0.574,
+    "guardrail": 0.166,
+    "sign": 0.264
+   },
+   "old": {
+    "pothole": 0.02,
+    "crack": 0.007,
+    "guardrail": 0.111,
+    "sign": 0.264
+   },
+   "gained": {
+    "pothole": 0.007,
+    "crack": 0.571,
+    "guardrail": 0.091,
+    "sign": 0.108
+   },
+   "lost": {
+    "pothole": 0.014,
+    "crack": 0.003,
+    "guardrail": 0.037,
+    "sign": 0.105
+   },
+   "lost_but_present_below_conf": {
+    "guardrail": 0.02,
+    "sign": 0.041
+   },
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": [
+     "pothole",
+     0.421,
+     true,
+     4
+    ],
+    "0401_light_rainy_smooth_03000120": [
+     "crack",
+     0.252,
+     false,
+     3
+    ],
+    "0401_light_rainy_smooth_03000130": [
+     "crack",
+     0.232,
+     false,
+     3
+    ],
+    "0401_light_clear_smooth_07000023": [
+     "crack",
+     0.639,
+     true,
+     10
+    ]
+   },
+   "crack_hits": 1,
+   "new_pc": 0.578,
+   "lost_gs": 0.142
+  },
+  "base+roi_t2|v3conf_p08": {
+   "new": {
+    "pothole": 0.007,
+    "crack": 0.328,
+    "guardrail": 0.098,
+    "sign": 0.169
+   },
+   "old": {
+    "pothole": 0.02,
+    "crack": 0.007,
+    "guardrail": 0.111,
+    "sign": 0.264
+   },
+   "gained": {
+    "pothole": 0.003,
+    "crack": 0.328,
+    "guardrail": 0.034,
+    "sign": 0.03
+   },
+   "lost": {
+    "pothole": 0.017,
+    "crack": 0.007,
+    "guardrail": 0.047,
+    "sign": 0.122
+   },
+   "lost_but_present_below_conf": {
+    "guardrail": 0.03,
+    "sign": 0.057
+   },
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": [
+     "pothole",
+     0.421,
+     true,
+     3
+    ],
+    "0401_light_rainy_smooth_03000120": [
+     "crack",
+     0.252,
+     false,
+     0
+    ],
+    "0401_light_rainy_smooth_03000130": [
+     "crack",
+     0.232,
+     false,
+     0
+    ],
+    "0401_light_clear_smooth_07000023": [
+     "crack",
+     0.639,
+     true,
+     5
+    ]
+   },
+   "crack_hits": 1,
+   "new_pc": 0.331,
+   "lost_gs": 0.169
+  }
+ },
+ "visual_new_crack_base_v2conf": {
+  "total": 66,
+  "frames": 300,
+  "real_crack": 16,
+  "ambiguous": 27,
+  "clear_false_positive": 23,
+  "real_crack_idx": [
+   0,
+   5,
+   8,
+   10,
+   12,
+   27,
+   29,
+   30,
+   31,
+   47,
+   53,
+   54,
+   55,
+   57,
+   58,
+   61
+  ],
+  "ambiguous_note": "곧은 세로 이음매(시공 줄눈)·실링한 선·패치 경계·흐린 선 — 균열인지 줄눈인지 사진으로 못 가림",
+  "clear_fp_note": "차선·노면 표시 9, 그림자·빛 반사 5, 새 포장/색 포장 경계 4, 연석·갓길 3, 젖은 노면 타이어 자국·얼룩 2",
+  "pothole_new": 0,
+  "clear_fp_idx": [
+   2,
+   3,
+   6,
+   13,
+   15,
+   22,
+   25,
+   26,
+   28,
+   32,
+   34,
+   35,
+   36,
+   41,
+   42,
+   43,
+   44,
+   48,
+   49,
+   50,
+   60,
+   62,
+   63
+  ]
+ },
+ "visual_guardrail_sign_base_v2conf": {
+  "lost": {
+   "sign": 32,
+   "sign_real": 26,
+   "guardrail": 14,
+   "guardrail_metal": 6,
+   "guardrail_concrete_barrier": 6,
+   "guardrail_fp": 2
+  },
+  "gained": {
+   "sign": 25,
+   "sign_real": 17,
+   "sign_back_or_gantry": 8,
+   "guardrail": 14,
+   "guardrail_metal": 6,
+   "guardrail_concrete_barrier": 4,
+   "guardrail_fp": 4
+  },
+  "net_real_lost_per_frame": 0.03,
+  "note": "compare_v3 의 '잃은 guardrail+sign 0.155/프레임' 은 박스 교체가 섞인 값. 진짜 표지판·금속 가드레일만 세면 잃은 32 − 새로 잡은 23 = 9 (0.03/프레임)."
+ },
+ "korean_crack_test_road_v3": {
+  "note": "참고: road_v3.zip test 523장 (179 크랙 라벨을 맞는 TOA 사진에 붙인 것, 크랙 박스 1,387) 을 conf_thresholds 와 같은 매칭(IoU 0.5)으로. v3 는 이 데이터의 train 으로 학습했다.",
+  "v3": {
+   "at_0.30": {
+    "P": 0.625,
+    "R": 0.154
+   },
+   "P>=0.7": {
+    "conf": 0.41,
+    "R": 0.104
+   },
+   "max_f1": {
+    "conf": 0.1,
+    "P": 0.366,
+    "R": 0.333
+   }
+  },
+  "v2": {
+   "at_0.29": {
+    "P": 0.5,
+    "R": 0.002
+   }
+  }
+ },
+ "bench_cpu_m4pro_1280x720_150frames": {
+  "note": "detect median ms, 같은 Mac 에서 v2·v3 번갈아 2번",
+  "v2": {
+   "1thread": [
+    20.44,
+    20.63
+   ],
+   "2thread": [
+    16.57,
+    16.61
+   ]
+  },
+  "v3": {
+   "1thread": [
+    20.53,
+    20.69
+   ],
+   "2thread": [
+    16.69,
+    16.46
+   ]
+  }
+ }
+}

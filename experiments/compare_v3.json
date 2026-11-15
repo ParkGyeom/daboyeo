@@ -1,0 +1,233 @@
+{
+ "old": "detector_v2.onnx",
+ "new": "detector_v3.onnx",
+ "class_conf": {
+  "pothole": 0.27,
+  "crack": 0.29,
+  "guardrail": 0.26,
+  "sign": 0.24
+ },
+ "conf_card": "detector_v2.json",
+ "window": 6,
+ "variants": {
+  "base": {
+   "old": {
+    "mustkeep": {
+     "0401_light_rainy_smooth_03000136": {
+      "class": "pothole",
+      "target_best_conf": 0.257,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 1
+     },
+     "0401_light_rainy_smooth_03000120": {
+      "class": "crack",
+      "target_best_conf": null,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 0
+     },
+     "0401_light_rainy_smooth_03000130": {
+      "class": "crack",
+      "target_best_conf": null,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 0
+     },
+     "0401_light_clear_smooth_07000023": {
+      "class": "crack",
+      "target_best_conf": null,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 0
+     }
+    }
+   },
+   "new": {
+    "mustkeep": {
+     "0401_light_rainy_smooth_03000136": {
+      "class": "pothole",
+      "target_best_conf": 0.315,
+      "target_hit": true,
+      "window_frames": 13,
+      "window_hits": 1
+     },
+     "0401_light_rainy_smooth_03000120": {
+      "class": "crack",
+      "target_best_conf": 0.172,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 0
+     },
+     "0401_light_rainy_smooth_03000130": {
+      "class": "crack",
+      "target_best_conf": 0.063,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 1
+     },
+     "0401_light_clear_smooth_07000023": {
+      "class": "crack",
+      "target_best_conf": 0.634,
+      "target_hit": true,
+      "window_frames": 13,
+      "window_hits": 6
+     }
+    }
+   },
+   "sample": {
+    "frames": 300,
+    "dets_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.22,
+     "guardrail": 0.11,
+     "sign": 0.233
+    },
+    "old_dets_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.11,
+     "sign": 0.26
+    },
+    "new_vs_old_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.22,
+     "guardrail": 0.047,
+     "sign": 0.083
+    },
+    "lost_vs_old_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.047,
+     "sign": 0.107
+    },
+    "frames_with_new": 84
+   }
+  },
+  "base+roi_t2": {
+   "old": {
+    "mustkeep": {
+     "0401_light_rainy_smooth_03000136": {
+      "class": "pothole",
+      "target_best_conf": 0.45,
+      "target_hit": true,
+      "window_frames": 13,
+      "window_hits": 5
+     },
+     "0401_light_rainy_smooth_03000120": {
+      "class": "crack",
+      "target_best_conf": null,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 0
+     },
+     "0401_light_rainy_smooth_03000130": {
+      "class": "crack",
+      "target_best_conf": null,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 0
+     },
+     "0401_light_clear_smooth_07000023": {
+      "class": "crack",
+      "target_best_conf": null,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 0
+     }
+    }
+   },
+   "new": {
+    "mustkeep": {
+     "0401_light_rainy_smooth_03000136": {
+      "class": "pothole",
+      "target_best_conf": 0.421,
+      "target_hit": true,
+      "window_frames": 13,
+      "window_hits": 5
+     },
+     "0401_light_rainy_smooth_03000120": {
+      "class": "crack",
+      "target_best_conf": 0.252,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 3
+     },
+     "0401_light_rainy_smooth_03000130": {
+      "class": "crack",
+      "target_best_conf": 0.232,
+      "target_hit": false,
+      "window_frames": 13,
+      "window_hits": 4
+     },
+     "0401_light_clear_smooth_07000023": {
+      "class": "crack",
+      "target_best_conf": 0.639,
+      "target_hit": true,
+      "window_frames": 13,
+      "window_hits": 10
+     }
+    }
+   },
+   "sample": {
+    "frames": 300,
+    "dets_per_frame": {
+     "pothole": 0.027,
+     "crack": 0.577,
+     "guardrail": 0.11,
+     "sign": 0.233
+    },
+    "old_dets_per_frame": {
+     "pothole": 0.023,
+     "crack": 0.007,
+     "guardrail": 0.11,
+     "sign": 0.26
+    },
+    "new_vs_old_per_frame": {
+     "pothole": 0.017,
+     "crack": 0.573,
+     "guardrail": 0.047,
+     "sign": 0.083
+    },
+    "lost_vs_old_per_frame": {
+     "pothole": 0.013,
+     "crack": 0.003,
+     "guardrail": 0.047,
+     "sign": 0.107
+    },
+    "frames_with_new": 144
+   }
+  }
+ },
+ "go": {
+  "checks": {
+   "mustkeep_crack_hits": {
+    "value": 1,
+    "need": ">= 2 of 3",
+    "ok": false
+   },
+   "sample_new_pothole_crack_per_frame": {
+    "value": 0.22,
+    "need": "<= 0.1",
+    "ok": false
+   },
+   "sample_lost_guardrail_sign_per_frame": {
+    "value": 0.154,
+    "need": "<= 0.03",
+    "ok": false
+   },
+   "rdd2022_test_crack_mAP50_drop": {
+    "value": 0.002,
+    "need": "<= 0.02",
+    "ok": true
+   },
+   "rdd2022_test_pothole_mAP50_drop": {
+    "value": -0.007,
+    "need": "<= 0.02",
+    "ok": true
+   }
+  },
+  "go": false,
+  "all_known_ok": false
+ }
+}

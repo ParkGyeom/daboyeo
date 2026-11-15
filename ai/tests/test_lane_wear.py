@@ -127,6 +127,66 @@ def test_bad_args_raise():
         LaneWearMeter(roi=((0, 0), (1, 1)))
 
 
+def test_dark_crack_lines_are_not_lanes(meter):
+    """균열·이음매는 노면보다 어두운 선이다. 차선처럼 원근으로 모여도 차선으로 잡으면 안 된다 (극성)."""
+    r = meter.measure(draw_lanes(road_frame(13), (30, 30, 30), thickness=6))
+    assert not r.lane_found and r.contrast is None
+
+
+def test_crack_next_to_lane_does_not_make_contrast_negative(meter):
+    """실제 프레임에서 균열이 차선으로 섞여 contrast 가 음수로 나오던 문제 (2026-11-15)."""
+    img = draw_lanes(road_frame(14), (210, 210, 210))
+    for (xb, yb), (xt, yt) in [((330, 690), (600, 440)), ((950, 690), (680, 440))]:
+        cv2.line(img, (xb, yb), (xt, yt), (25, 25, 25), 6)  # 차선 안쪽에 나란한 어두운 균열
+    r = meter.measure(img)
+    assert r.lane_found and r.contrast > 1.0
+
+
+def test_contrast_uses_adjacent_road_not_whole_roi(meter):
+    """그늘 속 차선은 그늘 노면과 비교해야 한다. ROI 전체(햇빛 받은 노면 포함)와 비교하면 음수가 된다."""
+    img = road_frame(19, road=40)
+    img[H // 2:, 640:] = np.clip(img[H // 2:, 640:].astype(np.int16) + 90, 0, 255).astype(np.uint8)  # 오른쪽 햇빛
+    cv2.line(img, (100, 690), (560, 400), (62, 62, 62), 12)  # 그늘 속 차선 (그늘 노면보다 약 50% 밝음)
+    cv2.line(img, (380, 690), (600, 400), (62, 62, 62), 12)
+    r = meter.measure(img)
+    assert r.lane_found
+    assert 0.3 < r.contrast < 0.8
+
+
+def test_one_sided_edge_is_not_a_lane(meter):
+    """연석·그림자 경계처럼 한쪽만 밝은 가장자리는 줄무늬가 아니다."""
+    img = road_frame(15)
+    pts = np.array([[0, 720], [0, 600], [560, 380], [600, 380], [260, 720]], np.int32)
+    cv2.fillPoly(img, [pts], (170, 170, 170))  # 왼쪽 보도: 노면보다 넓고 밝은 면
+    assert not meter.measure(img).lane_found
+
+
+def test_contrast_is_positive_on_real_like_noise(meter):
+    rng = np.random.default_rng(16)
+    img = draw_lanes(road_frame(16), (ROAD + 25,) * 3)
+    tex = cv2.GaussianBlur(rng.normal(0, 10, (H, W)).astype(np.float32), (5, 5), 0)
+    img = np.clip(img.astype(np.float32) + tex[..., None], 0, 255).astype(np.uint8)
+    r = meter.measure(img)
+    assert r.lane_found and r.contrast > 0
+
+
+def test_vertical_pole_above_road_is_not_a_lane(meter):
+    img = road_frame(17)
+    cv2.line(img, (660, 260), (660, 480), (230, 230, 230), 8)  # 화면 가운데 위쪽 수직 기둥
+    assert not meter.measure(img).lane_found
+
+
+@pytest.mark.parametrize("size", [(640, 360), (1280, 720), (1920, 1080)])
+def test_resolution_independent(size):
+    """화소 단위 값이 작업 해상도에 맞춰 줄어들어, 같은 장면이면 해상도가 달라도 결과가 같다."""
+    m = LaneWearMeter()
+    base = draw_lanes(road_frame(18), (ROAD + 40,) * 3, thickness=14)
+    ref = m.measure(cv2.resize(base, (1280, 720), interpolation=cv2.INTER_AREA))
+    r = m.measure(cv2.resize(base, size, interpolation=cv2.INTER_AREA if size[0] <= W else cv2.INTER_LINEAR))
+    assert r.lane_found
+    assert r.contrast == pytest.approx(ref.contrast, abs=0.1)
+
+
 def test_debug_segments_in_frame_pixels(meter):
     r, segs = meter.measure_debug(draw_lanes(road_frame(10), (210, 210, 210)))
     assert len(segs) == r.n_segments

@@ -17,6 +17,7 @@ docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 ```bash
 scripts/demo.sh up                                  # DB → 서버(8000) → 화면(8501)
 uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 관측 보내기 (주행을 닫으면 시민 확인 목록이 생긴다)
+# 주행이 끝나면 모의 문자(링크 포함)가 생긴다. 화면 > 시연 > 메시지함 (모의)에서 보고, 링크(http://localhost:8501/?t=토큰)를 누르면 로그인 없이 확인·신고 화면이 열린다. 실제 문자는 보내지 않는다 (docs/notify-link-plan.md)
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --detect-every 10 --speed 4
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3

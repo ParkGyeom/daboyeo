@@ -382,8 +382,12 @@ def main(argv=None) -> int:
             dest = parts_dir / f"{kind}{sfx}.zip"
             stats = build_part_zip(dirs, dest)
             print(f"  {dest}  {dest.stat().st_size / 1024**2:.0f} MB  {dict(stats)}")
-        print(f"\nUpload everything in {parts_dir} to Google Drive daboyeo_data/parts/, then run "
-              f"02_train_detector with PARTS = None.")
+        if sfx:
+            print(f"\nUpload the new parts/*{sfx}.zip to Google Drive daboyeo_data/parts/ and list it in "
+                  f"02_train_detector PARTS (not together with the untagged zip of the same kind).")
+        else:
+            print(f"\nUpload everything in {parts_dir} to Google Drive daboyeo_data/parts/, then run "
+                  f"02_train_detector with PARTS = None.")
         print(f"Label counts: {out / 'label_counts_krid.csv'}"
               + (f", {out / 'label_counts_road.csv'}" if (out / "label_counts_road.csv").exists() else ""))
 

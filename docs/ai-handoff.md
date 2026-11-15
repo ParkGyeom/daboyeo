@@ -110,10 +110,10 @@ DB enum(`server/sql/001_init.sql`)과 `DefectType`·`RiskLevel` 이 어긋나면
 ```python
 from daboyeo_ai.lane_wear import LaneWearMeter
 
-meter = LaneWearMeter()               # 한 번 만들어 재사용 (threshold=0.3 잠정, roi=하단 사다리꼴)
-r = meter.measure(frame_bgr)          # OpenCV BGR 프레임 그대로, 1280×720 에서 약 1.5 ms
+meter = LaneWearMeter()               # 한 번 만들어 재사용 (threshold=0.3 잠정, roi=하단 육각형)
+r = meter.measure(frame_bgr)          # OpenCV BGR 프레임 그대로, 1280×720 에서 약 4 ms (CPU)
 r.lane_found        # 차선 선분을 찾았나
-r.contrast          # (차선 밝기 − 노면 밝기) / 노면 밝기. 못 찾으면 None
+r.contrast          # (차선 밝기 − 바로 옆 노면 밝기) / 노면 밝기, 항상 > 0. 못 찾으면 None
 r.is_worn           # lane_found 이고 contrast < threshold
 r.confidence        # 0~1, 판정 신뢰도 → ObservationIn.confidence
 r.lane_pixel_ratio  # 진단용: ROI 중 차선 화소 비율
@@ -129,7 +129,8 @@ r.n_segments        # 진단용: 차선으로 인정된 선분 수
 
 주의:
 - 야간·비·역광·그림자에서는 밝기 대비가 크게 흔들린다. 낮·맑은 품질 통과 프레임만 쓰는 걸 권장.
-- ROI 기본값은 카메라가 정면·수평이고 지평선이 화면 가운데쯤이라고 가정한다. 영상 화각이 다르면 `LaneWearMeter(roi=...)` 로 바꾼다 (정규화 좌표 사다리꼴).
+- ROI 기본값(11/15 변경)은 화면 높이 0.35~0.92 의 육각형 — 지평선이 화면 0.2~0.5 사이인 블랙박스(KRID·AI Hub 도로장애물 실제 프레임)에 맞췄고, 아래 8% 는 보닛·대시보드로 뺀다. 영상 화각이 다르면 `LaneWearMeter(roi=...)` 로 바꾼다 (정규화 좌표 다각형).
+- 11/15 실제 프레임 300장 기준 차선을 찾는 비율은 약 73% (교차로·차선 없는 도로·앞차에 가려진 프레임은 `lane_found=False`). 1280×720 과 1920×1080 은 폭 640 으로 줄여서 재므로 결과가 같다.
 - 보정 도구: `uv run python -m daboyeo_ai.eval.lane_wear_calib <프레임 폴더|영상> --overlay-dir out/` — 프레임별 contrast CSV, 백분위수, ROI·선분 오버레이.
 
 ## 9. 시설물 파손 분류 — **사용 안 함 (11/15 대체안 확정)**

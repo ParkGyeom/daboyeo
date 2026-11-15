@@ -7,28 +7,40 @@
     if r.lane_found and r.is_worn:
         ...  # ObservationIn(defect_type=DefectType.LANE_WEAR, bbox=None, confidence=r.confidence, ...)
 
-방법 (CPU 몇 ms, 1280×720 기준):
-1. 프레임을 폭 `work_width`(640) 로 줄이고, 아래쪽 사다리꼴 ROI 만 본다.
-2. HLS 밝기(L)를 흐리게 한 뒤 **가로 방향 top-hat** 을 한다. top-hat = L − (주변 노면 밝기 추정).
-   주변 노면보다 `rel_delta` 비율 이상 밝은 화소를 차선 후보로 둔다 → 절대 밝기 기준이 아니라서
-   흐려진 차선도 후보가 된다. 노란 차선은 색상(H)·채도(S) 로 따로 후보에 더한다.
-3. 후보 마스크에서 확률적 Hough 로 선분을 찾고, 기울기가 차선다운 것(수평에서 25° 이상)만 남긴다.
-   점 잡음·정지선·횡단보도 가로줄은 여기서 빠진다.
-4. 남은 선분 근처의 후보 화소 = 차선, 차선에서 떨어진 ROI 화소 = 노면.
-   **contrast = (차선 L 중앙값 − 노면 L 중앙값) / 노면 L 중앙값** (노면 대비 몇 배 더 밝은지).
-   비율로 쓰는 이유: 낮·흐림처럼 전체 밝기가 달라져도 값이 덜 흔들린다.
+방법 (CPU 약 4 ms, 1280×720 기준. 화소 단위 값은 모두 작업 해상도 폭 640 기준이라 해상도와 무관하게 같게 동작):
+1. 프레임을 폭 `work_width`(640) 로 줄이고, 아래쪽 육각형 ROI 만 본다.
+2. 밝기 V = max(R,G,B). **극성**: 차선은 양옆 노면보다 밝은 줄무늬다. 행마다 x 의 밝기를 같은 행 x±d 와
+   비교해 **양쪽 모두**보다 `rel_delta` 비율 이상 밝은 화소만 후보로 둔다. d 는 그 행에서의 차선 폭 상한
+   (원근 때문에 위로 갈수록 좁다). 균열·이음매(어두운 선)와 연석·그림자 경계(한쪽만 밝음), 차선보다 넓은
+   밝은 덩어리(차 뒷면·하늘)는 여기서 빠진다. 노란 차선은 색상·채도로 후보에 더한다.
+3. 후보 마스크에서 확률적 Hough 로 선분을 찾고, 기하 조건으로 거른다:
+   - 수평에서 20° 이상 (정지선·횡단보도 가로줄 제외)
+   - 원근: 가운데에서 떨어진 선분은 늘였을 때 선분 위쪽, 지평선 높이쯤에서 화면 가운데와 만나야 한다
+     (반대로 기운 선 제외). 가운데의 거의 수직인 선분은 화면 아래쪽에 있을 때만 (기둥·사람 제외).
+     화면 맨 아래까지 늘인 x 가 화면에서 멀리 벗어나면 노면보다 높은 가드레일이다.
+   - 선분을 따라 재 봐도 양옆보다 밝아야 하고, 양옆 밝기가 비슷해야 한다 (한쪽이 풀·보도인 연석·가드레일 제외)
+   - **소실점 투표**: 남은 선분들이 가장 많이 모이는 한 점을 찾고, 그 점을 향하지 않는 선분은 버린다
+     (노면 질감·물웅덩이 테두리 조각은 방향이 제각각이라 빠진다).
+   남은 선분 길이 합이 `min_total_len` 보다 짧으면 못 찾은 것으로 둔다.
+4. **contrast = (차선 V 중앙값 − 바로 옆 노면 V 중앙값) / 노면 V 중앙값.** 노면은 선분과 같은 행에서
+   차선 폭의 2배 떨어진 양옆이다 (ROI 전체 노면과 비교하면 그림자·다른 차로 때문에 크게 흔들린다).
+   극성 조건 때문에 contrast 는 항상 양수다.
 5. contrast < threshold 이면 마모(is_worn).
 
 한계 (판정에 반드시 반영할 것):
 - **차선이 완전히 지워진 도로와 차선이 원래 없는 도로는 구별할 수 없다.** 그래서 차선 선분을 못 찾으면
-  `lane_found=False, is_worn=False` 를 준다. 마모로 보고하지 않는다.
-- 후보는 "노면보다 조금이라도 밝은 화소"라서, 일부만 남은 차선은 남은 페인트 위주로 재진다
+  `lane_found=False, is_worn=False` 를 준다. 마모로 보고하지 않는다. 노면보다 `rel_delta`(8%) 이상 밝지 않은
+  차선(밝기로는 노면과 같고 색만 남은 노란 차선 등)도 여기에 들어간다.
+- 후보는 "양옆 노면보다 밝은 화소"라서, 일부만 남은 차선은 남은 페인트 위주로 재진다
   (contrast 가 실제보다 덜 낮게 나올 수 있음). 남은 양은 `lane_pixel_ratio` 로 참고한다.
+- 노면보다 높은 줄무늬(가드레일 레일, 연석 위 경계)가 소실점을 향하면 차선으로 섞일 수 있다.
+  햇빛 받은 밝은 노면에서는 선명한 차선도 contrast 가 0.2 안팎으로 낮게 나온다.
 - **야간·비·역광**: 전조등·젖은 노면 반사·그림자가 밝기 대비를 크게 바꾼다. 품질 판별(F1 품질 단계)을
   통과한 낮 프레임에서만 부르고, 한 프레임 결과로 확정하지 말고 **같은 지점 여러 번 관측**으로 확정한다
   (오픈 이슈 #6, 기준값·확정 규칙은 실측 분포로 11/22 결정).
-- ROI 기본값은 카메라가 차량 정면·수평에 달려 있고 지평선이 화면 가운데쯤이라고 가정한다. 보닛이
-  크게 보이거나 각도가 다르면 `roi` 를 바꾼다. 앞차가 ROI 를 가리면 차선을 못 찾을 수 있다.
+- ROI 기본값은 카메라가 차량 정면에 달려 있고 지평선이 화면 높이 0.2~0.5 사이라고 가정한다 (KRID·AI Hub
+  도로장애물 프레임 300장으로 맞춤). 보닛이 화면 아래 8% 보다 크게 보이거나 각도가 다르면 `roi` 를 바꾼다.
+  앞차가 ROI 를 가리면 차선을 못 찾을 수 있다.
 """
 
 from __future__ import annotations
@@ -39,39 +51,55 @@ import cv2
 import numpy as np
 
 # 잠정값 (TBD) — 오픈 이슈 #6. 실제 프레임 분포(`python -m daboyeo_ai.eval.lane_wear_calib`)를 보고
-# 11/22 에 다시 정한다. 합성 시험에서 선명한 흰 차선은 1 이상, 흐린 차선은 0.1~0.2 정도.
+# 11/22 에 다시 정한다. 실제 프레임 300장(2026-11-15) 분포: p5 0.22 / p50 0.50 / p95 1.2.
 PROVISIONAL_THRESHOLD = 0.3
 
-# 정규화 좌표 (x, y), 시계 방향: 위-왼, 위-오, 아래-오, 아래-왼. 아래 5% 는 보닛 대비로 뺀다.
-DEFAULT_ROI: tuple[tuple[float, float], ...] = ((0.40, 0.60), (0.60, 0.60), (1.00, 0.95), (0.00, 0.95))
+# 정규화 좌표 (x, y), 시계 방향 육각형. 위는 지평선이 높은(카메라가 아래로 기운) 블랙박스까지 덮도록 0.35,
+# 아래 8% 는 보닛·대시보드 반사로 뺀다. 위쪽이 좁아 길가·건물을 덜 본다.
+DEFAULT_ROI: tuple[tuple[float, float], ...] = (
+    (0.30, 0.35), (0.70, 0.35), (1.00, 0.60), (1.00, 0.92), (0.00, 0.92), (0.00, 0.60))
+# 줄무늬 폭 상한 d(y) 가 0 이 되는 높이. 실제 지평선은 블랙박스마다 0.2~0.5 라서 낮은 쪽(위쪽)으로 잡는다
+# — 폭 상한이 실제보다 넉넉한 것은 괜찮지만 모자라면 가까운 차선을 놓친다.
+HORIZON_Y = 0.2
 
 
 @dataclass(frozen=True)
 class LaneWearResult:
     lane_found: bool
-    contrast: float | None  # (차선 L − 노면 L) / 노면 L. lane_found=False 면 None
+    contrast: float | None  # (차선 V − 바로 옆 노면 V) / 노면 V. 항상 > 0. lane_found=False 면 None
     is_worn: bool  # lane_found 이고 contrast < threshold 일 때만 True
     confidence: float  # 0~1, is_worn 판정의 신뢰도 (ObservationIn.confidence 로 쓴다)
     lane_pixel_ratio: float  # 차선 화소 / ROI 화소 (진단용)
-    n_segments: int  # 기울기 조건을 통과한 Hough 선분 수 (진단용)
+    n_segments: int  # 모든 조건을 통과한 Hough 선분 수 (진단용)
 
 
 _NOT_FOUND = {"lane_found": False, "contrast": None, "is_worn": False, "confidence": 0.0}
 
 
 class LaneWearMeter:
-    """차선 대 노면 밝기 대비를 재서 마모를 판정한다. 상태가 없어 프레임마다 독립이다."""
+    """차선 대 노면 밝기 대비를 재서 마모를 판정한다. 상태가 없어 프레임마다 독립이다.
+
+    화소 단위 값(줄무늬 폭, Hough 길이·간격, 최소 화소 수)은 모두 작업 해상도 폭 640 기준이고,
+    작업 해상도가 그보다 작으면(입력이 640 보다 작을 때) 같은 비율로 줄인다.
+    """
 
     def __init__(
         self,
         threshold: float = PROVISIONAL_THRESHOLD,
         roi: tuple[tuple[float, float], ...] = DEFAULT_ROI,
         work_width: int = 640,
-        rel_delta: float = 0.08,  # 노면보다 8% 이상 밝으면 차선 후보
-        min_delta: float = 4.0,  # 단, 최소 L 4 단계 (잡음 방지)
-        min_angle_deg: float = 25.0,  # 수평에서 이 각도 미만인 선분은 차선이 아님
-        min_lane_pixels: int = 150,  # 작업 해상도 기준 차선 화소가 이보다 적으면 못 찾은 것으로
+        rel_delta: float = 0.08,  # 양옆 노면보다 8% 이상 밝으면 차선 후보
+        min_delta: float = 4.0,  # 단, 최소 밝기 4 단계 (잡음 방지)
+        min_angle_deg: float = 20.0,  # 수평에서 이 각도 미만인 선분은 차선이 아님
+        min_lane_pixels: int = 150,  # 작업 해상도(폭 640) 기준 차선 화소가 이보다 적으면 못 찾은 것으로
         min_coverage: float = 0.7,  # Hough 선분 위 화소 중 후보 비율 최소값
+        min_total_len: float = 160.0,  # 작업 해상도(폭 640) 기준 채택 선분 길이 합이 이보다 짧으면 못 찾은 것으로
+        horizon_y: float = HORIZON_Y,  # 줄무늬 폭 상한이 0 이 되는 높이 (정규화)
+        max_stripe: float = 0.035,  # 화면 맨 아래에서 차선 폭 상한 (프레임 폭 비율). 위로 갈수록 원근으로 줄어든다
+        center_band: float = 0.08,  # 화면 가운데 ± 이 비율 안의 선분은 기울기 방향을 따지지 않는다
+        bottom_reach: float = 0.3,  # 선분을 맨 아래까지 늘인 x 가 화면 밖으로 이 비율 넘게 나가면 차선 아님
+        vp_tol_deg: float = 3.0,  # 선분 방향과 (선분 → 소실점) 방향의 허용 각도 차
+        max_flank_diff: float = 0.25,  # 양옆 노면 밝기 차가 밝은 쪽의 이 비율을 넘으면 차선 아님
     ):
         if threshold <= 0:
             raise ValueError("threshold 는 0보다 커야 한다")
@@ -85,6 +113,13 @@ class LaneWearMeter:
         self.min_angle_deg = min_angle_deg
         self.min_lane_pixels = min_lane_pixels
         self.min_coverage = min_coverage
+        self.min_total_len = min_total_len
+        self.horizon_y = horizon_y
+        self.max_stripe = max_stripe
+        self.center_band = center_band
+        self.bottom_reach = bottom_reach
+        self.vp_tol_deg = vp_tol_deg
+        self.max_flank_diff = max_flank_diff
         self._mask_cache: dict[tuple[int, int], tuple[np.ndarray, tuple[int, int, int, int]]] = {}
 
     # ---- 공개 API ----------------------------------------------------------------
@@ -99,63 +134,117 @@ class LaneWearMeter:
         scale = min(1.0, self.work_width / w)
         small = cv2.resize(frame_bgr, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA) \
             if scale < 1.0 else frame_bgr
-        roi_mask, (x0, y0, x1, y1) = self._roi_mask(small.shape[1], small.shape[0])
+        sh, sw = small.shape[:2]
+        u = sw / 640.0  # 화소 단위 값의 배율
+        roi_mask, (x0, y0, x1, y1) = self._roi_mask(sw, sh)
         crop = small[y0:y1, x0:x1]
+        ch = crop.shape[0]
         n_roi = int(np.count_nonzero(roi_mask))
 
+        # 밝기 = HSV 의 V (= max(R,G,B)). HLS 의 L 로 재면 노란 차선이 햇빛 받은 노면과 밝기가 비슷해져 놓친다.
+        # 회색 노면·흰 차선은 V 와 L 이 거의 같다.
         hls = cv2.cvtColor(crop, cv2.COLOR_BGR2HLS)
-        raw_l = hls[:, :, 1]
-        light = cv2.GaussianBlur(raw_l, (5, 5), 0)  # 후보 찾기용 (잡음 억제). 대비 값은 raw_l 로 잰다
+        light = cv2.GaussianBlur(crop.max(2), (3, 3), 0).astype(np.float32)
 
-        # 가로 opening = 차선보다 넓은 창에서 본 주변 노면 밝기. top-hat = 그보다 밝은 정도.
-        k = max(9, (round(0.065 * small.shape[1]) | 1))
-        background = cv2.morphologyEx(light, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (k, 1)))
-        tophat = light.astype(np.int16) - background.astype(np.int16)
-        need = np.maximum(self.min_delta, self.rel_delta * background.astype(np.float32))
-        bright = tophat >= need
+        # 행마다 차선 폭 상한 d(y): 원근 때문에 지평선에서 0, 화면 맨 아래에서 max_stripe·폭.
+        yy = np.arange(y0, y1, dtype=np.float32)
+        d_row = np.clip(self.max_stripe * sw * (yy - self.horizon_y * sh) / ((1 - self.horizon_y) * sh),
+                        2.0, None).round().astype(np.int32)
+
+        # 극성: 차선은 **양옆** 노면보다 밝은 줄무늬다. x 의 밝기를 x±d 의 밝기와 비교해 둘 다보다 밝아야 후보.
+        # 균열·이음매(어두운 선)와 연석·그림자 경계(한쪽만 밝은 가장자리)는 여기서 빠진다.
+        left = np.empty_like(light)
+        right = np.empty_like(light)
+        for d in np.unique(d_row):
+            rows = d_row == d
+            band = light[rows]
+            lpad = np.concatenate([np.repeat(band[:, :1], d, 1), band[:, :-d]], 1)
+            rpad = np.concatenate([band[:, d:], np.repeat(band[:, -1:], d, 1)], 1)
+            left[rows], right[rows] = lpad, rpad
+        side = np.maximum(left, right)
+        ridge = light - side
+        need = np.maximum(self.min_delta, self.rel_delta * side)
+        bright = ridge >= need
         hue, sat = hls[:, :, 0], hls[:, :, 2]
-        yellow = (hue >= 15) & (hue <= 35) & (sat >= 70) & (tophat >= self.min_delta)
+        yellow = (hue >= 15) & (hue <= 35) & (sat >= 70) & (ridge >= self.min_delta)
         cand = ((bright | yellow) & roi_mask).astype(np.uint8) * 255
 
-        roi_h = y1 - y0
-        lines = cv2.HoughLinesP(cand, 1, np.pi / 180, threshold=max(15, roi_h // 6),
-                                minLineLength=max(10, roi_h // 8), maxLineGap=max(3, roi_h // 20))
+        lines = cv2.HoughLinesP(cand, 1, np.pi / 180, threshold=max(8, round(20 * u)),
+                                minLineLength=max(8, round(18 * u)), maxLineGap=max(3, round(8 * u)))
         segs: list[tuple[int, int, int, int]] = []
-        total_len = 0.0
-        if lines is not None:
-            for xa, ya, xb, yb in lines.reshape(-1, 4):
-                ang = np.degrees(np.arctan2(abs(yb - ya), abs(xb - xa)))
-                # 선분 위 화소의 대부분이 후보여야 한다 (거친 노면 질감의 흩어진 점이 이어진 가짜 선 제거)
-                if ang >= self.min_angle_deg and _coverage(cand, xa, ya, xb, yb) >= self.min_coverage:
-                    segs.append((int(xa), int(ya), int(xb), int(yb)))
-                    total_len += float(np.hypot(xb - xa, yb - ya))
+        lane_vals: list[np.ndarray] = []
+        road_vals: list[np.ndarray] = []
+        for xa, ya, xb, yb in (lines.reshape(-1, 4) if lines is not None else ()):
+            xa, ya, xb, yb = int(xa), int(ya), int(xb), int(yb)
+            if ya == yb or np.degrees(np.arctan2(abs(yb - ya), abs(xb - xa))) < self.min_angle_deg:
+                continue
+            # 원근: 차선은 위로 갈수록 화면 가운데로 모인다. 가운데에서 떨어진 선분은 늘였을 때 선분보다 위,
+            # 지평선 높이쯤(-0.2~0.7·높이)에서 화면 가운데 세로줄과 만나야 한다. 반대로 기운 선(그림자·균열·차
+            # 옆면)과 거의 수직인 기둥은 여기서 빠진다.
+            slope = (xb - xa) / (yb - ya)  # 아래로 1 화소 갈 때 x 변화
+            xm = (xa + xb) / 2 + x0 - sw / 2
+            if abs(xm) <= self.center_band * sw:
+                # 가운데의 거의 수직인 선분은 화면 아래쪽(지평선에서 먼 곳)에 있을 때만 차선. 위쪽이면 기둥·사람.
+                if abs(slope) < 0.18 and max(ya, yb) + y0 < 0.7 * sh:
+                    continue
+            else:
+                if slope == 0:
+                    continue
+                y_center = (ya + yb) / 2 + y0 - xm / slope
+                if not (-0.2 * sh <= y_center <= min(0.7 * sh, min(ya, yb) + y0)):
+                    continue
+            x_at_bottom = xa + x0 + (sh - (ya + y0)) * slope
+            if not (-self.bottom_reach * sw <= x_at_bottom <= (1 + self.bottom_reach) * sw):
+                continue
+            if _coverage(cand, xa, ya, xb, yb) < self.min_coverage:
+                continue
+            lv, rv = _stripe_samples(light, d_row, xa, ya, xb, yb)
+            if lv.size < 3:
+                continue
+            lf, rf = rv.reshape(2, -1)
+            if np.median(lv - np.maximum(lf, rf)) < self.min_delta:
+                continue  # 선분을 따라 재 봐도 양옆보다 밝지 않으면 차선이 아니다
+            # 차선은 양옆이 같은 노면이다. 한쪽이 풀·보도·그늘인 가드레일·연석은 양옆 밝기가 크게 다르다.
+            lm, rm = float(np.median(lf)), float(np.median(rf))
+            if abs(lm - rm) > self.max_flank_diff * max(lm, rm, 1.0):
+                continue
+            segs.append((xa, ya, xb, yb))
+            lane_vals.append(lv)
+            road_vals.append(rv)
+
+        # 소실점 투표: 차선(과 그 연장)은 한 점으로 모이고, 노면 질감·기둥·차 테두리 조각은 제각각이다.
+        # 선분 쌍의 교점 중 가장 많은(긴) 선분이 지나가는 점을 소실점으로 두고, 그 점을 향하지 않는 선분은 버린다.
+        keep = _vanishing_inliers(np.array(segs, np.float32).reshape(-1, 4) + [x0, y0, x0, y0], sw, sh,
+                                  self.vp_tol_deg)
+        segs = [segs[i] for i in keep]
+        lane_vals = [lane_vals[i] for i in keep]
+        road_vals = [road_vals[i] for i in keep]
+        total_len = float(sum(np.hypot(xb - xa, yb - ya) for xa, ya, xb, yb in segs))
 
         if not segs:
             return LaneWearResult(**_NOT_FOUND, lane_pixel_ratio=0.0, n_segments=0), []
 
         near = np.zeros_like(cand)
-        band = max(3, k // 4)  # 선분 주변 띠 폭: 차선 두께를 덮을 만큼
         for xa, ya, xb, yb in segs:
-            cv2.line(near, (xa, ya), (xb, yb), 255, band)
-        lane = (near > 0) & (cand > 0)
-        n_lane = int(np.count_nonzero(lane))
-        # 노면: 차선 후보와 그 주변을 넓게 뺀 나머지 ROI
-        excl = cv2.dilate(cv2.bitwise_or(cand, near), cv2.getStructuringElement(cv2.MORPH_RECT, (k, 3)))
-        road = roi_mask & (excl == 0)
+            cv2.line(near, (xa, ya), (xb, yb), 255, max(3, int(d_row[(ya + yb) // 2])))
+        n_lane = int(np.count_nonzero((near > 0) & (cand > 0)))
 
         segs_px = [(round((xa + x0) / scale), round((ya + y0) / scale), round((xb + x0) / scale),
                     round((yb + y0) / scale)) for xa, ya, xb, yb in segs]
         ratio = n_lane / max(1, n_roi)
-        if n_lane < self.min_lane_pixels or np.count_nonzero(road) < self.min_lane_pixels:
+        # 선 구조가 짧으면(거친 노면 질감의 짧은 조각 몇 개) 차선으로 보지 않는다
+        if n_lane < self.min_lane_pixels * u * u or total_len < self.min_total_len * u:
             return LaneWearResult(**_NOT_FOUND, lane_pixel_ratio=ratio, n_segments=len(segs)), segs_px
 
-        lane_l = float(np.median(raw_l[lane]))
-        road_l = float(np.median(raw_l[road]))
+        # 대비는 선분 바로 옆(같은 행, 차선 폭만큼 떨어진 곳)의 노면과 잰다. ROI 전체 노면과 비교하면
+        # 그림자·다른 차로 때문에 값이 크게 흔들린다.
+        lane_l = float(np.median(np.concatenate(lane_vals)))
+        road_l = float(np.median(np.concatenate(road_vals)))
         contrast = (lane_l - road_l) / max(road_l, 1.0)
         is_worn = contrast < self.threshold
 
         # 신뢰도 = (선 구조가 충분한가) × (기준값에서 얼마나 떨어져 있나). 기준값 바로 위아래면 0.5×support.
-        support = min(1.0, total_len / max(1.0, 1.5 * roi_h))
+        support = min(1.0, total_len / max(1.0, 1.5 * ch))
         certainty = min(1.0, abs(contrast - self.threshold) / self.threshold)
         confidence = support * (0.5 + 0.5 * certainty)
         return LaneWearResult(
@@ -178,6 +267,61 @@ class LaneWearMeter:
             cv2.fillPoly(m, [poly], 255)
             self._mask_cache[key] = (m[y0:y1, x0:x1] > 0, (int(x0), int(y0), int(x1), int(y1)))
         return self._mask_cache[key]
+
+
+def _vanishing_inliers(segs: np.ndarray, w: int, h: int, tol_deg: float, max_segs: int = 40) -> list[int]:
+    """선분(N×4, 프레임 좌표)들이 가장 많이 모이는 소실점을 찾아, 그 점을 향하는 선분 번호를 돌려준다.
+
+    소실점 후보 = 긴 선분 max_segs 개의 쌍별 교점 중 화면 가운데 위쪽 (x 0.2~0.8, y −0.1~0.65 · 높이).
+    점수 = 그 점을 tol_deg 안으로 향하는 선분 길이의 합. 후보가 없으면(선분 1개, 평행) 빈 목록.
+    """
+    if len(segs) < 2:
+        return []
+    length = np.hypot(segs[:, 2] - segs[:, 0], segs[:, 3] - segs[:, 1])
+    order = np.argsort(-length)[:max_segs]
+    s, ln = segs[order].astype(np.float64), length[order].astype(np.float64)
+    p = np.stack([s[:, 0], s[:, 1], np.ones(len(s))], 1)
+    q = np.stack([s[:, 2], s[:, 3], np.ones(len(s))], 1)
+    lines = np.cross(p, q)  # 동차 좌표 직선
+    i, j = np.triu_indices(len(s), 1)
+    pts = np.cross(lines[i], lines[j])
+    ok = np.abs(pts[:, 2]) > 1e-9
+    vp = pts[ok, :2] / pts[ok, 2:3]
+    inside = (vp[:, 0] > 0.2 * w) & (vp[:, 0] < 0.8 * w) & (vp[:, 1] > -0.1 * h) & (vp[:, 1] < 0.65 * h)
+    vp = vp[inside]
+    if len(vp) == 0:
+        return []
+    mid = (s[:, :2] + s[:, 2:]) / 2
+    direc = (s[:, 2:] - s[:, :2]) / ln[:, None]
+    to_vp = vp[:, None, :] - mid[None, :, :]  # (후보, 선분, 2)
+    dist = np.linalg.norm(to_vp, axis=2) + 1e-9
+    sin = np.abs(direc[None, :, 0] * to_vp[..., 1] - direc[None, :, 1] * to_vp[..., 0]) / dist
+    inl = sin <= np.sin(np.radians(tol_deg))
+    best = int(np.argmax((inl * ln[None, :]).sum(1)))
+    return sorted(int(order[k]) for k in np.flatnonzero(inl[best]))
+
+
+def _stripe_samples(light: np.ndarray, d_row: np.ndarray, xa: int, ya: int, xb: int, yb: int):
+    """선분을 따라 행마다 (차선 밝기, [왼쪽 노면..., 오른쪽 노면...]) 를 뽑는다.
+
+    차선 밝기는 선분 위치 ±d/3 안의 최대값 (Hough 위치가 줄무늬 가운데에서 1~2 화소 어긋나도 되게),
+    노면은 같은 행에서 ±2d 떨어진 곳. 프레임 밖으로 나가는 행은 뺀다.
+    """
+    hgt, wid = light.shape
+    lo, hi = sorted((ya, yb))
+    ys = np.arange(lo, hi + 1)
+    xs = np.round(xa + (ys - ya) * (xb - xa) / (yb - ya)).astype(np.int32)
+    d = d_row[ys]
+    ok = (xs - 2 * d >= 0) & (xs + 2 * d < wid)
+    ys, xs, d = ys[ok], xs[ok], d[ok]
+    if ys.size == 0:
+        return np.empty(0, np.float32), np.empty(0, np.float32)
+    r = np.maximum(1, d // 3)
+    offs = np.arange(-int(r.max()), int(r.max()) + 1)
+    cols = np.clip(xs[:, None] + np.clip(offs[None, :], -r[:, None], r[:, None]), 0, wid - 1)
+    lane = light[ys[:, None], cols].max(1)
+    road = np.concatenate([light[ys, xs - 2 * d], light[ys, xs + 2 * d]])
+    return lane, road
 
 
 def _coverage(mask: np.ndarray, xa: int, ya: int, xb: int, yb: int) -> float:

@@ -1,7 +1,7 @@
 """지도 대시보드 (관리자). 결함을 점으로 보여주고, 고른 결함의 상세와 상태 변경.
 
-지도 배경은 미리 받아 둔 오픈스트리트맵 도로선이다 (web/basemap.py, B10). 인터넷 없이 그린다.
-받아 둔 것이 없으면 배경 없이 점만 찍는다.
+지도는 네이버 지도다 (ui/naver_map.py, .env 의 NAVER_MAP_KEY_ID 필요, 인터넷 필요).
+키가 없으면 미리 받아 둔 오픈스트리트맵 도로선 위에 점을 찍는다 (ui/basemap.py, 인터넷 없이).
 5초마다 서버를 다시 불러 가상 블랙박스가 보내는 결함이 늘어나는 것이 보이게 한다.
 """
 
@@ -13,6 +13,7 @@ import streamlit as st
 
 import api
 import basemap
+import naver_map
 
 st.set_page_config(layout="wide")
 st.title("지도 대시보드")
@@ -47,6 +48,17 @@ def board():
     df["severity"] = df["risk_level"].map(api.RISK_KO)
     df["상태"] = df["status"].map(api.STATUS_KO)
     df["번호"] = df["id"].map(api.short)
+    if naver_map.key_id():
+        # 네이버 지도. 점을 누르면 지도 위에 상세 말풍선, 상태 변경은 아래 '결함 번호'에서
+        naver_map.render(rows)
+        st.caption("지도 © NAVER Corp. · 점을 누르면 상세가 뜹니다. 상태 변경은 아래에서 결함 번호를 고릅니다.")
+    else:
+        _altair_map(df)
+    _detail(df, rows)
+
+
+def _altair_map(df: pd.DataFrame) -> None:
+    """네이버 지도 키가 없을 때: 받아 둔 도로선 위에 점. 점을 누르면 아래 상세가 그 결함으로 바뀐다."""
     pick = alt.selection_point(fields=["id"], name="pick")
     # 보여줄 범위: 결함들 + 여유 300m. 가로세로 비율을 실제 거리에 맞춘다
     lat0 = df["lat"].mean()
@@ -94,6 +106,9 @@ def board():
     if sel:
         st.session_state["dash_pick"] = sel[0]["id"]
 
+
+def _detail(df: pd.DataFrame, rows: list[dict]) -> None:
+    """결함 표와 고른 결함의 상세·상태 변경."""
     left, right = st.columns([3, 2])
     left.dataframe(
         df[["번호", "유형", "severity", "상태", "vehicle_count", "observation_count", "confidence", "jurisdiction"]]

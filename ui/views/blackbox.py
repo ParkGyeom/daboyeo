@@ -69,9 +69,9 @@ def view() -> None:
                 state = "⏸ 멈춤"
             else:
                 state = "🔴 주행 중"
-            st.subheader(f"{s['device_id']} · {state}")
+            st.markdown(f"#### {s['device_id']}  \n{state}")
             if img:
-                st.image(img, use_container_width=True)
+                st.image(img, width="stretch")
             t = s.get("t")
             boxes = s.get("boxes") or []
             found = ", ".join(f"{LABELS.get(b['type'], b['type'])} {b['confidence']:.2f}" for b in boxes) or "없음"

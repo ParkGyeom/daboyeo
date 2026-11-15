@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 기반 | [PRD.md](../PRD.md) **v0.5** (v0.4 + 시설물 파손 판정 대체안 확정, 줄 번호는 v0.4 와 같음) |
-| 계획 버전 | r3.8 (2026-11-15) — r1은 PRD v0.2, r2는 v0.3 기준 |
+| 계획 버전 | r3.11 (2026-11-15) — r1은 PRD v0.2, r2는 v0.3 기준 |
 | 완성 기한 | 2026-11-27 (금), D-14 |
 | 상태 | 팀 검토 중 — 0.1(레포·`contracts/`)은 완료 |
 
@@ -146,7 +146,7 @@ daboyeo/
 ├── scripts/{run_fleet.py, e2e_smoke.py, reset_demo.py}
 ├── data/                         # .gitignore — 영상·GPS CSV·클립 (용량 큼)
 └── experiments/                  # 결과 CSV·그래프 (발표 원천)
-    └── gt_events/<video_id>.csv  # 수동 라벨: t_s, 유형, 메모 (평가 정답)
+    └── gt_events/<video_id>.csv  # 수동 라벨 (평가 정답). 형식 제안: docs/ai-handoff.md 12장
 ```
 
 ---
@@ -354,6 +354,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 
 ## 변경 이력
 
+- **r3.11 (2026-11-15)** — 실제 주행 영상 평가 도구 (4.1·4.3, 시연 영상·라벨이 오는 날 바로 돌리기 위해). `ai/daboyeo_ai/eval/eval_detector.py`: 영상을 N 프레임마다 탐지 → 유형별 이벤트로 묶어 정답 창과 맞춤 → conf 0.25~0.6(+ 클래스별 `--conf-json`) 마다 이벤트 단위 정밀도·재현율·F1·분당 이벤트 수, 차선 마모는 `LaneWearTracker.confirmed`, 시설물은 위치 찾기로 따로(결함 합계에서 뺌), 공개 테스트셋 지표(`detector_v2.json`)를 나란히 출력. `interval_sweep.py`: 모든 프레임 1번 탐지·캐시 후 간격 1/3/5/10/15 로 골라 누락률·분석 프레임 수 (`--with matplotlib` 이면 그래프). 공통 `video_events.py`. 수동 라벨 형식 `defect_id,t_start_s,t_end_s,defect_type,memo` 제안 (`docs/ai-handoff.md` 12장, 정현우 확인 필요 — 1.1 가짜 탐지기도 같은 파일을 읽음). 실제 영상·라벨로는 아직 안 돌림.
 - **r3.10 (2026-11-15)** — 클래스별 탐지 신뢰도 기준 초안 (#3 노출 기준 θ 준비). `ai/daboyeo_ai/eval/conf_thresholds.py`: test 이미지에서 정밀도·재현율 곡선을 내고 정밀도 ≥ 0.7 인 가장 낮은 기준을 고름 (없으면 F1 최대) → `experiments/conf_thresholds.{csv,json}`. 결과 pothole 0.22 · guardrail 0.26 · sign 0.24 (0.25 와 거의 같음, 0.8 목표면 0.33 · 0.42 · 0.37), crack 은 RDD2022 test 가 로컬에 없어 0.25 그대로. `OnnxDetector(conf={...})` 로 클래스별 기준 지원(기본값 그대로), 모델 카드에 `class_conf_draft` 키 추가. 블랙박스 기록 기준으로 쓸지 서버 θ 로 쓸지는 정현우와 정할 것 — `docs/ai-handoff.md` 4-1.
 - **r3.9 (2026-11-15)** — CPU 처리 시간 측정 `ai/daboyeo_ai/eval/bench_cpu.py` (4.2, AC-2) 와 첫 결과 `experiments/bench_cpu.csv`·`.json`. `run`: 탐지(`OnnxDetector.detect`, v2)·차선 마모(`measure`+`tracker.update`, 1스레드)를 threads 1·2 × 640×360·1280×720 로 재고, 30 fps 영상 1분을 1·3·5·10·15 프레임마다 분석할 때의 계산 시간을 계산(실제 주기 스케줄러는 정현우). `log`: 정현우 측정 로그 JSONL 을 주기 적용 전/후로 요약 (사용법 `docs/ai-handoff.md` 11장). Mac M4 Pro 참고값(실제 프레임 300장 × 3회, 다른 작업 부하 있음): 탐지 median 1스레드 21~23 ms · 2스레드 17~18 ms, 차선 마모 4~5 ms, 탐지+차선 1스레드 매 프레임이면 영상 1분당 51~53 초(실시간 이내), 5 프레임마다 약 11 초. Colab CPU(1스레드 134 ms)보다 약 6배 빠르므로 **공식 수치는 노트북에서 같은 명령으로** 다시 잰다 (Linux 는 코어 고정까지, macOS·Windows 는 스레드 수 제한만).
 - **r3.8 (2026-11-15)** — 차선 마모 판정을 엄격하게 (2.6, #6). 기준 1.7 에서 차선 찾은 프레임의 41% 를 마모로, 선명 차선의 18% 를 마모로 봤음. 1단계: 잠정 기준 `PROVISIONAL_WEAR_SCORE` 1.7 → **1.0** (마모 비율 28%, 선명→마모 12%; 한 프레임 정밀도는 기준값과 상관없이 ~0.5). 2단계: `LaneWearTracker` 에 연속 프레임 투표 — 최근 판정 프레임 5 개 중 3 개 이상 마모면 `WearJudgement.confirmed=True` (관측 1건), 확정 뒤 창이 비워질 때까지(또는 `cooldown`) 다시 내지 않음, 차선 못 찾은 프레임은 건너뜀, `t` 로 5 초 넘는 끊김 뒤 창 비움 (`votes`·`n_voted`·`confirmed` 필드 추가, 기본값 있음). 블랙박스는 `j.confirmed` 일 때만 `ObservationIn(LANE_WEAR)` 1건. 3단계(제안, 정현우 확인 필요): 서버는 한 지점에 차량 2대 이상 · 관측 3건 이상일 때 확정. `lane_wear_eval` 에 기준값별 마모 비율·선명→마모 비율 표 추가. 투표 효과는 독립 프레임 라벨로 잴 수 없어 시연 영상으로 확인 (11/22).

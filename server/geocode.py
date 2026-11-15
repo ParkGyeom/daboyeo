@@ -2,7 +2,8 @@
 
 결함이 처음 생기면 한 번 주소를 받아 defects.address 에 저장한다(server/sql/002_address.sql).
 시연장에 인터넷이 없어도 저장해 둔 주소가 화면·신고서에 보인다.
-받지 못하면(키 없음, 권한 없음, 인터넷 없음) 주소 없이 진행하고 RETRY_S 초 뒤에 다시 시도한다.
+받지 못하면(키 없음, 권한 없음, 인터넷 없음) 주소 없이(NULL) 진행하고 RETRY_S 초 뒤에 다시 시도한다.
+네이버가 '결과 없음'으로 답한 곳(바다 위 등, GPS 오차로 생긴다)은 빈 문자열을 저장하고 다시 묻지 않는다.
 
 필요한 값(.env, 저장소에 올리지 않는다):
   NAVER_MAP_KEY_ID         지도와 같은 Client ID
@@ -63,7 +64,7 @@ def format_address(body: dict) -> str | None:
 
 
 def reverse(lat: float, lon: float) -> str | None:
-    """위치의 주소. 받지 못하면 None (예외를 내지 않는다)."""
+    """위치의 주소. 주소가 없는 곳이면 "", 받지 못하면 None (예외를 내지 않는다)."""
     global _good_url
     k = keys()
     if k is None:
@@ -83,10 +84,13 @@ def reverse(lat: float, lon: float) -> str | None:
             continue
         _good_url = url
         body = r.json()
-        if body.get("status", {}).get("code") not in (0, 3):  # 3 = 결과 없음(바다 등)
+        code = body.get("status", {}).get("code")
+        if code == 3:  # 결과 없음(바다 등). 다시 물어도 같다
+            return ""
+        if code != 0:
             log.info("주소 받기 실패(%s): %s", url, body.get("status"))
             return None
-        return format_address(body)
+        return format_address(body) or ""
     return None
 
 
@@ -125,7 +129,7 @@ def fill_missing() -> int:
                 conn.execute("UPDATE defects SET address = %s, address_tried_at = now() WHERE id = %s",
                              (addr, d["id"]))
                 conn.commit()
-                n += addr is not None
+                n += bool(addr)
             return n
     except psycopg.Error as e:
         log.warning("주소 저장 실패: %s", e)

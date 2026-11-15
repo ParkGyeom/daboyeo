@@ -58,3 +58,17 @@ def test_failed_lookup_is_retried_later(client, monkeypatch):
         conn.execute("UPDATE defects SET address_tried_at = now() - interval '1 hour'")
     assert geocode.fill_missing() == 1
     assert client.get("/api/v1/defects").json()[0]["address"] == "서울 강남구 강남대로 396"
+
+
+@needs_db
+def test_no_result_place_is_not_asked_again(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(geocode, "keys", lambda: ("id", "secret"))
+    monkeypatch.setattr(geocode, "reverse", lambda lat, lon: calls.append(1) or "")  # 바다 위: 결과 없음
+    trip = start(client)
+    observe(client, trip)
+    with db.connect() as conn:
+        conn.execute("UPDATE defects SET address_tried_at = now() - interval '1 hour'")
+    [d] = client.get("/api/v1/defects").json()
+    assert d["address"] == ""
+    assert len(calls) == 1

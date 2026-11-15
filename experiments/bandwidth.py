@@ -36,7 +36,7 @@ def main() -> None:
         raw = sum(f.image_path.stat().st_size + (f.gps_path.stat().st_size if f.gps_path.exists() else 0) for f in frames)
         jpg = sum(len(cv2.imencode(".jpg", cv2.imread(str(f.image_path)), [cv2.IMWRITE_JPEG_QUALITY, 80])[1]) for f in frames)
         with contextlib.redirect_stdout(io.StringIO()):
-            r = drive(parse_args(["--segment", seg, "--model", a.model, "--speed", "0", "--dry-run"]))
+            r = drive(parse_args(["--segment", seg, "--model", a.model, "--speed", "0", "--dry-run", "--live-fps", "0"]))
         tot_raw += raw
         tot_jpg += jpg
         tot_sent += r["bytes_sent"]

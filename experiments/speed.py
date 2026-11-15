@@ -30,7 +30,7 @@ SEGMENT = "0401_light_rainy_smooth:03000071-03000182"
 def measure(model: str, threads: int | None, every: int, repeats: int) -> tuple[list[float], float, int]:
     fps, det_ms, frames = [], [], 0
     for _ in range(repeats):
-        argv = ["--segment", SEGMENT, "--model", model, "--speed", "0", "--dry-run", "--lane-every", "0",
+        argv = ["--segment", SEGMENT, "--model", model, "--speed", "0", "--dry-run", "--live-fps", "0", "--lane-every", "0",
                 "--detect-every", str(every)]
         argv += ["--threads", str(threads or 0)]  # 0 은 ONNX Runtime 기본값(제한 없음)
         t0 = time.perf_counter()

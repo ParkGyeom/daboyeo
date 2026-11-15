@@ -21,6 +21,7 @@ uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive  
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --detect-every 10 --speed 4
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3
 scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+# 블랙박스가 보는 프레임과 탐지 박스: 화면의 관리자 → 블랙박스 화면 (server_data/live/, --live-fps 0 이면 끔)
 scripts/demo.sh down
 ```
 

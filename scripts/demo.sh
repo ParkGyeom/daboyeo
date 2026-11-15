@@ -106,8 +106,8 @@ cmd_status() {
     n=$({ pgrep -f "edge.blackbox.run" 2>/dev/null || true; } | wc -l | tr -d ' ')
     say "블랙박스 ${n}대 실행 중"
     if curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null 2>&1; then
-        curl -fs "http://localhost:$SERVER_PORT/api/defects" | "$PY" -c \
-            'import json,sys; d=json.load(sys.stdin); n=sum(x["status"]=="미신고" for x in d); print(f"결함 {len(d)}건 (미신고 {n})")'
+        curl -fs "http://localhost:$SERVER_PORT/api/v1/defects" | "$PY" -c \
+            'import json,sys; d=json.load(sys.stdin); n=sum(x["status"]=="unreported" for x in d); print(f"결함 {len(d)}건 (미신고 {n})")'
     fi
 }
 

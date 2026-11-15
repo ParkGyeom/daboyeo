@@ -146,5 +146,12 @@
     "crack_R": 0.0
    }
   }
- }
+ },
+ "class_conf_draft": {
+  "pothole": 0.22,
+  "crack": 0.25,
+  "guardrail": 0.26,
+  "sign": 0.24
+ },
+ "class_conf_draft_note": "2026-11-15 초안 (제안 — 정현우 확인 필요, 오픈 이슈 #3). experiments/conf_thresholds.json 의 class_conf: test 에서 정밀도 ≥ 0.7 인 가장 낮은 기준 (IoU 0.5). pothole = 도로장애물(179) test 만 (RDD2022 미포함), crack = 데이터 없어 0.25 그대로, guardrail·sign = KRID test. 더 엄격한 목표(0.8·0.9)는 그 파일의 alternatives. recommended_conf 는 그대로."
 }

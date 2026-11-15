@@ -5,6 +5,10 @@
     det = OnnxDetector("ai/models/detector_v1.onnx", threads=1)
     detections = det.detect(frame_bgr)   # list[Detection], bbox 는 0~1 정규화
 
+    # 클래스별 신뢰도 기준 (오픈 이슈 #3 초안, 정현우 확인 필요): 없는 클래스는 0.25
+    det = OnnxDetector("ai/models/detector_v2.onnx", conf={"pothole": 0.3, "crack": 0.25, "guardrail": 0.4, "sign": 0.45})
+    det = OnnxDetector("ai/models/detector_v2.onnx", conf=load_class_conf("experiments/conf_thresholds.json"))
+
     # 시설물 파손 분류도 켜려면 (계획 2.7): guardrail·sign 탐지에 damage / damage_conf 가 채워진다
     det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, damage_model="ai/models/damage_cls_v1.onnx")
 
@@ -14,6 +18,8 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -27,6 +33,26 @@ if TYPE_CHECKING:
     from .damage_classifier import DamageClassifier
 
 FACILITY_CLASSES = ("guardrail", "sign")  # 파손 분류 대상 (계약: Detection.damage 는 이 둘만)
+DEFAULT_CONF = 0.25
+
+
+def class_conf_list(conf: float | Mapping[str, float], default: float = DEFAULT_CONF) -> list[float]:
+    """`0.3` 또는 `{"pothole": 0.3, ...}` → CLASS_NAMES 순서의 클래스별 기준. 빠진 클래스는 default."""
+    if not isinstance(conf, Mapping):
+        return [float(conf)] * len(CLASS_NAMES)
+    unknown = set(conf) - set(CLASS_NAMES)
+    if unknown:
+        raise ValueError(f"unknown classes in conf: {sorted(unknown)} (expected {CLASS_NAMES})")
+    return [float(conf.get(n, default)) for n in CLASS_NAMES]
+
+
+def load_class_conf(path: str | Path) -> dict[str, float]:
+    """`conf_thresholds.json`(`class_conf` 키) 또는 모델 카드(`class_conf_draft` 키) → {클래스: 기준}."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    for key in ("class_conf", "class_conf_draft"):
+        if key in data:
+            return {k: float(x) for k, x in data[key].items()}
+    raise KeyError(f"{path}: no 'class_conf' or 'class_conf_draft' key")
 
 
 @dataclass(frozen=True)
@@ -50,14 +76,22 @@ def letterbox(img_bgr: np.ndarray, size: int) -> tuple[np.ndarray, Letterbox]:
 
 
 def decode_yolo(
-    output: np.ndarray, lb: Letterbox, orig_w: int, orig_h: int, conf: float = 0.25, iou: float = 0.45,
+    output: np.ndarray, lb: Letterbox, orig_w: int, orig_h: int,
+    conf: float | Sequence[float] = DEFAULT_CONF, iou: float = 0.45,
 ) -> list[tuple[int, float, float, float, float, float]]:
-    """YOLO 출력 `(1, 4+nc, N)` → [(cls, score, x1, y1, x2, y2)] (원본 이미지 픽셀 좌표), 클래스별 NMS."""
+    """YOLO 출력 `(1, 4+nc, N)` → [(cls, score, x1, y1, x2, y2)] (원본 이미지 픽셀 좌표), 클래스별 NMS.
+
+    conf 는 숫자 하나 또는 class_id 순서의 클래스별 기준. NMS 가 클래스별이라 NMS 전에 클래스별로 거르든
+    낮은 기준으로 NMS 한 뒤 거르든 결과가 같다 (박스를 지우는 박스는 항상 점수가 더 높으므로).
+    """
     pred = output[0].T  # (N, 4+nc)
     scores_all = pred[:, 4:]
     cls = scores_all.argmax(1)
     score = scores_all[np.arange(len(pred)), cls]
-    keep = score >= conf
+    thr = np.full(scores_all.shape[1], float(conf)) if np.isscalar(conf) else np.asarray(conf, float)
+    if len(thr) != scores_all.shape[1]:
+        raise ValueError(f"{len(thr)} class thresholds for {scores_all.shape[1]} classes")
+    keep = score >= thr[cls]
     if not keep.any():
         return []
     pred, cls, score = pred[keep], cls[keep], score[keep]
@@ -69,7 +103,8 @@ def decode_yolo(
     x1, x2 = np.clip(x1, 0, orig_w), np.clip(x2, 0, orig_w)
     y1, y2 = np.clip(y1, 0, orig_h), np.clip(y2, 0, orig_h)
     rects = [[float(a), float(b), float(c - a), float(d - b)] for a, b, c, d in zip(x1, y1, x2, y2)]
-    idx = cv2.dnn.NMSBoxesBatched(rects, score.astype(float).tolist(), cls.astype(int).tolist(), conf, iou)
+    idx = cv2.dnn.NMSBoxesBatched(rects, score.astype(float).tolist(), cls.astype(int).tolist(),
+                                   float(thr.min()), iou)
     out = []
     for i in np.asarray(idx).reshape(-1):
         if x2[i] > x1[i] and y2[i] > y1[i]:
@@ -79,13 +114,17 @@ def decode_yolo(
 
 
 class OnnxDetector:
-    """`Detector` 프로토콜 구현. threads 로 CPU 코어 사용을 제한한다 (PRD FR-1.6, 1~2코어)."""
+    """`Detector` 프로토콜 구현. threads 로 CPU 코어 사용을 제한한다 (PRD FR-1.6, 1~2코어).
+
+    conf: 숫자 하나(모든 클래스) 또는 `{"pothole": 0.3, ...}` 클래스별 기준 (빠진 클래스는 0.25).
+    `self.class_conf` 는 class_id 순서 리스트, `self.conf` 는 그 최솟값 (예전 코드 호환).
+    """
 
     def __init__(
         self,
         model_path: str | Path,
         threads: int = 1,
-        conf: float = 0.25,
+        conf: float | Mapping[str, float] = DEFAULT_CONF,
         iou: float = 0.45,
         damage_model: str | Path | DamageClassifier | None = None,
     ):
@@ -102,7 +141,8 @@ class OnnxDetector:
         nc = int(self.session.get_outputs()[0].shape[1]) - 4
         if nc != len(CLASS_NAMES):
             raise ValueError(f"model has {nc} classes, contract expects {len(CLASS_NAMES)} {CLASS_NAMES}")
-        self.conf, self.iou = conf, iou
+        self.class_conf = class_conf_list(conf)
+        self.conf, self.iou = min(self.class_conf), iou
         # 파손 분류기: 경로면 같은 threads 로 연다. 탐지 → 분류가 차례로 돌아서 코어를 더 쓰지 않는다
         if damage_model is None or not isinstance(damage_model, (str, Path)):
             self.damage = damage_model
@@ -116,7 +156,7 @@ class OnnxDetector:
         img, lb = letterbox(frame_bgr, self.size)
         x = np.ascontiguousarray(img[:, :, ::-1].transpose(2, 0, 1), dtype=np.float32)[None] / 255.0
         out = self.session.run(None, {self.input_name: x})[0]
-        return decode_yolo(out, lb, w, h, self.conf, self.iou)
+        return decode_yolo(out, lb, w, h, self.class_conf, self.iou)
 
     def detect(self, frame_bgr: np.ndarray) -> list[Detection]:
         h, w = frame_bgr.shape[:2]

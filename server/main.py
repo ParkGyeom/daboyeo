@@ -1,7 +1,11 @@
-"""FastAPI 서버. 실행: .venv/bin/python -m uvicorn server.main:app --port 8000
+"""FastAPI 서버. 실행: uv run python -m uvicorn server.main:app --port 8000
 
-탐지 결과 수신(B1), 중복 정리·신고 상태 API(B3).
+스키마는 server/sql/001_init.sql, 블랙박스가 보내는 관측 형식은 contracts 의 ObservationIn (PRD 9장).
+흐름: 블랙박스가 주행을 연다(POST /api/v1/trips) → 관측을 보낸다(POST /api/v1/observations)
+     → 주행을 닫는다(POST /api/v1/trips/{id}/end) → 시민의 확인 목록(findings)이 생긴다 → 신고·넘기기.
 서버는 torch, ultralytics 를 불러오지 않는다.
+
+DB 를 쓰는 엔드포인트는 async 로 두지 않는다. DB 작업이 동기라 async 면 처리하는 동안 서버 전체가 멈춘다.
 """
 
 from __future__ import annotations
@@ -9,16 +13,16 @@ from __future__ import annotations
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
+from uuid import UUID
 
 import psycopg
 import psycopg.types.json
-
+from daboyeo_contracts import DefectType, ObservationIn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
-from server import config, db, dedup, report, rules
-from server.schema import DetectionEvent
+from server import config, db, dedup, findings, report, rules
 
 
 @asynccontextmanager
@@ -32,6 +36,8 @@ app = FastAPI(title="다보여 서버", lifespan=lifespan)
 config.SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/snapshots", StaticFiles(directory=config.SNAPSHOT_DIR), name="snapshots")
 
+API = "/api/v1"
+
 
 @app.get("/health")
 def health():
@@ -40,228 +46,284 @@ def health():
     return {"ok": True}
 
 
-@app.post("/api/detections", status_code=201)
-def post_detection(event: str = Form(...), snapshot: UploadFile = File(...)):
-    """탐지 결과 한 건과 사진을 받아 저장한다. event 는 server/schema.py 의 JSON.
+# ---------- 공통 조회 ----------
 
-    async 로 두지 않는다. DB 작업이 동기라서 async 면 처리하는 동안 서버 전체가 멈춘다.
-    일반 함수면 FastAPI 가 별도 스레드에서 돌린다.
-    """
-    try:
-        ev = DetectionEvent.model_validate_json(event)
-    except ValidationError as e:
-        raise HTTPException(422, detail=e.errors(include_url=False, include_context=False))
-
-    photo = snapshot.file.read()
-    if len(photo) > config.MAX_SNAPSHOT_BYTES:
-        raise HTTPException(413, "사진이 너무 크다")
-    if not photo.startswith(b"\xff\xd8"):
-        raise HTTPException(422, "snapshot 은 JPEG 파일이어야 한다")
-
-    name = f"{uuid.uuid4().hex}.jpg"
-    path = config.SNAPSHOT_DIR / name
-    path.write_bytes(photo)
-    received = len(event.encode("utf-8")) + len(photo)
-
-    try:
-        with db.connect() as conn:
-            obs_id, defect_id, is_new = dedup.ingest(conn, ev, name, received)
-    except Exception:
-        path.unlink(missing_ok=True)  # 저장에 실패하면 사진도 남기지 않는다
-        raise
-    return {"observation_id": obs_id, "defect_id": defect_id, "is_new_defect": is_new}
-
-
-class UserBody(BaseModel):
-    user_id: int
-
-
-class StatusBody(BaseModel):
-    status: str
-
-
-def _user(conn, user_id: int) -> dict:
-    u = conn.execute("SELECT id, name, device_id FROM users WHERE id = %s", (user_id,)).fetchone()
+def _user(conn, user_id: UUID) -> dict:
+    u = conn.execute("SELECT id, name FROM users WHERE id = %s", (user_id,)).fetchone()
     if u is None:
         raise HTTPException(404, "없는 시민")
     return u
 
 
-def _defect(conn, defect_id: int) -> dict:
+def _defect(conn, defect_id: UUID) -> dict:
     d = conn.execute(f"SELECT {db.DEFECT_COLS} FROM defects d WHERE d.id = %s", (defect_id,)).fetchone()
     if d is None:
         raise HTTPException(404, "없는 결함")
     return d
 
 
-def _visible_defects(conn, u: dict, since: datetime | None = None) -> list[dict]:
-    """그 시민에게 보여줄 결함 (rules.is_visible_to_citizen 조건).
-    since 를 주면 그 시각 이후에 그 시민의 기기가 관측한 결함만 (이번 주행에서 발견한 것)."""
-    rows = conn.execute(
-        f"""
-        SELECT {db.DEFECT_COLS} FROM defects d
-        WHERE d.status = %s
-          AND EXISTS (SELECT 1 FROM observations o WHERE o.defect_id = d.id AND o.device_id = %s
-                      AND (%s::timestamptz IS NULL OR o.detected_at >= %s))
-          AND NOT EXISTS (SELECT 1 FROM skips k WHERE k.user_id = %s AND k.defect_id = d.id)
-        ORDER BY d.max_confidence DESC, d.id
-        """,
-        (rules.UNREPORTED, u["device_id"], since, since, u["id"]),
-    ).fetchall()
-    return [
-        d for d in rows
-        if rules.is_visible_to_citizen(d["status"], d["max_confidence"], d["device_count"], True, False)
-    ]
+def _view(d: dict) -> dict:
+    """화면용으로 관할을 붙인다 (스키마에 없는 값이라 위치로 계산)."""
+    return {**d, "jurisdiction": rules.jurisdiction(d["lat"], d["lon"])}
 
 
-@app.get("/api/users/{user_id}/pending")
-def pending(user_id: int):
-    """그 시민에게 보여줄 결함 목록 (rules.is_visible_to_citizen 조건)."""
+@app.get(f"{API}/users")
+def list_users():
+    """시민과 그 차량. 시연용 시민은 3명 (차량 bb-01~03)."""
     with db.connect() as conn:
-        return _visible_defects(conn, _user(conn, user_id))
-
-
-class DriveEndBody(BaseModel):
-    device_id: str
-    started_at: datetime | None = None  # 주어지면 이 시각 이후 관측만 "이번 주행"으로 센다
-
-
-@app.post("/api/drives", status_code=201)
-def end_drive(body: DriveEndBody):
-    """가상 블랙박스가 주행(구간 재생)을 끝냈다고 알린다.
-
-    주행 중에는 운전자에게 아무것도 알리지 않고, 끝난 뒤에만 시민 화면에 알림을 띄운다.
-    알림에 적을 결함 수는 지금 이 시각 그 시민에게 보여줄 결함 중 이번 주행에서 관측한 것.
-    """
-    if body.started_at is not None and body.started_at.tzinfo is None:
-        raise HTTPException(422, "started_at 에 시간대가 없다")
-    with db.connect() as conn:
-        u = conn.execute("SELECT id, name, device_id FROM users WHERE device_id = %s", (body.device_id,)).fetchone()
-        count = len(_visible_defects(conn, u, body.started_at)) if u else 0
-        row = conn.execute(
-            "INSERT INTO drives (device_id, started_at, defect_count) VALUES (%s, %s, %s) RETURNING id",
-            (body.device_id, body.started_at, count),
-        ).fetchone()
-    return {"drive_id": row["id"], "defect_count": count}
-
-
-@app.get("/api/users/{user_id}/notices")
-def notices(user_id: int):
-    """그 시민이 아직 확인하지 않은 주행 종료 알림. 최근 것부터."""
-    with db.connect() as conn:
-        u = _user(conn, user_id)
         return conn.execute(
-            """
-            SELECT id, device_id, started_at, ended_at, defect_count FROM drives
-            WHERE device_id = %s AND seen_at IS NULL ORDER BY ended_at DESC, id DESC
-            """,
-            (u["device_id"],),
+            """SELECT u.id, u.name, v.id AS vehicle_id, v.label AS vehicle_label
+               FROM users u LEFT JOIN vehicles v ON v.owner_user_id = u.id ORDER BY v.label NULLS LAST, u.name"""
         ).fetchall()
 
 
-@app.post("/api/users/{user_id}/notices/seen")
-def notices_seen(user_id: int):
-    """그 시민의 알림을 모두 확인한 것으로 표시한다."""
+# ---------- 주행 (블랙박스) ----------
+
+class TripStart(BaseModel):
+    vehicle_id: UUID | None = None
+    vehicle_label: str | None = None  # 둘 중 하나. 가상 블랙박스는 --device-id(bb-01) 를 그대로 보낸다
+    started_at: datetime | None = None
+
+
+@app.post(f"{API}/trips", status_code=201)
+def start_trip(body: TripStart):
+    if (body.vehicle_id is None) == (body.vehicle_label is None):
+        raise HTTPException(422, "vehicle_id 와 vehicle_label 중 하나만 준다")
+    if body.started_at is not None and body.started_at.tzinfo is None:
+        raise HTTPException(422, "started_at 에 시간대가 없다")
     with db.connect() as conn:
-        u = _user(conn, user_id)
-        n = conn.execute(
-            "UPDATE drives SET seen_at = now() WHERE device_id = %s AND seen_at IS NULL", (u["device_id"],)
-        ).rowcount
-    return {"seen": n}
+        v = conn.execute(
+            "SELECT id, label FROM vehicles WHERE id = %s OR label = %s", (body.vehicle_id, body.vehicle_label)
+        ).fetchone()
+        if v is None:
+            raise HTTPException(404, "없는 차량")
+        t = conn.execute(
+            "INSERT INTO trips (vehicle_id, started_at) VALUES (%s, coalesce(%s, now())) RETURNING id, started_at",
+            (v["id"], body.started_at),
+        ).fetchone()
+    return {"trip_id": t["id"], "vehicle_id": v["id"], "vehicle_label": v["label"], "started_at": t["started_at"]}
 
 
-@app.post("/api/defects/{defect_id}/report")
-def report_defect(defect_id: int, body: UserBody):
-    """신고. 신고서를 만들고 상태를 신고됨으로 바꾼다. 이미 신고된 결함이면 409."""
+@app.post(f"{API}/trips/{{trip_id}}/end")
+def end_trip(trip_id: UUID):
+    """주행을 닫고 그 주행의 확인 목록을 만든다. 주행 중에는 시민에게 알리지 않고 끝난 뒤에만 알린다.
+    이미 닫힌 주행이면 목록만 다시 훑는다."""
+    with db.connect() as conn:
+        t = conn.execute(
+            "UPDATE trips SET ended_at = coalesce(ended_at, now()) WHERE id = %s RETURNING id, ended_at", (trip_id,)
+        ).fetchone()
+        if t is None:
+            raise HTTPException(404, "없는 주행")
+        findings.refresh_trip(conn, trip_id)
+        n = conn.execute("SELECT count(*) AS n FROM findings WHERE trip_id = %s", (trip_id,)).fetchone()["n"]
+    return {"trip_id": trip_id, "ended_at": t["ended_at"], "finding_count": n}
+
+
+@app.get(f"{API}/trips/{{trip_id}}/findings")
+def trip_findings(trip_id: UUID):
+    with db.connect() as conn:
+        t = conn.execute(
+            "SELECT v.owner_user_id FROM trips t JOIN vehicles v ON v.id = t.vehicle_id WHERE t.id = %s", (trip_id,)
+        ).fetchone()
+        if t is None:
+            raise HTTPException(404, "없는 주행")
+        findings.refresh_trip(conn, trip_id)
+        return [_view(d) for d in findings.pending(conn, t["owner_user_id"], trip_id)]
+
+
+@app.post(f"{API}/observations", status_code=201)
+def post_observation(meta: str = Form(...), snapshot: UploadFile | None = File(None)):
+    """관측 한 건 (multipart: meta = ObservationIn JSON, snapshot = 결함 주변 JPEG).
+    같은 client_observation_id 를 다시 보내면 저장하지 않고 처음 결과를 duplicate=true 로 돌려준다."""
+    try:
+        obs = ObservationIn.model_validate_json(meta)
+    except ValidationError as e:
+        raise HTTPException(422, detail=e.errors(include_url=False, include_context=False))
+    if obs.observed_at.tzinfo is None:
+        raise HTTPException(422, "observed_at 에 시간대가 없다")
+
+    photo = snapshot.file.read() if snapshot is not None else None
+    if photo is not None:
+        if len(photo) > config.MAX_SNAPSHOT_BYTES:
+            raise HTTPException(413, "사진이 너무 크다")
+        if not photo.startswith(b"\xff\xd8"):
+            raise HTTPException(422, "snapshot 은 JPEG 파일이어야 한다")
+
+    with db.connect() as conn:
+        trip = conn.execute("SELECT vehicle_id FROM trips WHERE id = %s", (obs.trip_id,)).fetchone()
+        if trip is None:
+            raise HTTPException(404, "없는 주행 (먼저 POST /api/v1/trips)")
+        if trip["vehicle_id"] != obs.vehicle_id:
+            raise HTTPException(422, "vehicle_id 가 그 주행의 차량이 아니다")
+        name = path = None
+        if photo is not None:
+            name = f"{uuid.uuid4().hex}.jpg"
+            path = config.SNAPSHOT_DIR / name
+            path.write_bytes(photo)
+        try:
+            r = dedup.ingest(conn, obs, name, len(photo) if photo is not None else None)
+        except Exception:
+            if path:
+                path.unlink(missing_ok=True)  # 저장에 실패하면 사진도 남기지 않는다
+            raise
+        if r.duplicate and path:
+            path.unlink(missing_ok=True)
+    return {"observation_id": r.observation_id, "defect_id": r.defect_id,
+            "is_new_defect": r.is_new_defect, "duplicate": r.duplicate}
+
+
+# ---------- 시민 ----------
+
+class UserBody(BaseModel):
+    user_id: UUID
+
+
+@app.get(f"{API}/users/{{user_id}}/findings")
+def user_findings(user_id: UUID):
+    """그 시민이 아직 답하지 않은 확인 목록 (모든 끝난 주행)."""
+    with db.connect() as conn:
+        _user(conn, user_id)
+        findings.refresh_user(conn, user_id)
+        return [_view(d) for d in findings.pending(conn, user_id)]
+
+
+@app.get(f"{API}/users/{{user_id}}/notices")
+def user_notices(user_id: UUID):
+    """'주행이 끝났어요' 알림: 끝난 주행 중 아직 답하지 않은 항목이 남은 것. 최근 것부터."""
+    with db.connect() as conn:
+        _user(conn, user_id)
+        findings.refresh_user(conn, user_id)
+        return findings.notices(conn, user_id)
+
+
+@app.post(f"{API}/defects/{{defect_id}}/report")
+def report_defect(defect_id: UUID, body: UserBody):
+    """신고. 결함당 신고서는 1건 (FR-5.5). 이미 신고됐으면 409."""
     with db.connect() as conn:
         u = _user(conn, body.user_id)
         _defect(conn, defect_id)
         seen = conn.execute(
-            "SELECT 1 FROM observations WHERE defect_id = %s AND device_id = %s LIMIT 1", (defect_id, u["device_id"])
+            """SELECT 1 FROM observations o JOIN vehicles v ON v.id = o.vehicle_id
+               WHERE o.defect_id = %s AND v.owner_user_id = %s LIMIT 1""",
+            (defect_id, u["id"]),
         ).fetchone()
         if seen is None:
-            raise HTTPException(403, "이 시민의 기기가 관측한 결함이 아니다")
+            raise HTTPException(403, "이 시민의 차량이 관측한 결함이 아니다")
         # 상태를 바꾸는 UPDATE 가 한 번에 한 요청만 통과시킨다
         won = conn.execute(
-            "UPDATE defects SET status = %s WHERE id = %s AND status = %s RETURNING id",
-            (rules.REPORTED, defect_id, rules.UNREPORTED),
+            "UPDATE defects SET status = 'reported' WHERE id = %s AND status = 'unreported' RETURNING id", (defect_id,)
         ).fetchone()
         if won is None:
             raise HTTPException(409, "이미 신고됨")
+        d = _defect(conn, defect_id)
         now = datetime.now(rules.KST)
-        body_json = report.build_report_body(_defect(conn, defect_id), u["name"], now)
+        payload = report.build_payload(d, u["name"], now)
         rep = conn.execute(
-            "INSERT INTO reports (defect_id, user_id, created_at, body) VALUES (%s, %s, %s, %s::jsonb) RETURNING id",
-            (defect_id, u["id"], now, psycopg.types.json.Jsonb(body_json)),
+            """INSERT INTO reports (defect_id, user_id, quarter, payload, submission_status, reward_valid, created_at)
+               VALUES (%s, %s, %s, %s, 'mock_submitted', %s, %s)
+               ON CONFLICT (defect_id) DO NOTHING RETURNING id""",
+            (defect_id, u["id"], rules.quarter_label(now), psycopg.types.json.Jsonb(payload),
+             d["reward_eligible_road"], now),
         ).fetchone()
-    return {"report_id": rep["id"], "status": rules.REPORTED, "body": body_json}
+        if rep is None:
+            raise HTTPException(409, "이미 신고됨")
+        # 신고한 시민의 항목은 신고함, 같은 결함을 기다리던 다른 시민의 항목은 이미 신고됨
+        conn.execute(
+            """UPDATE findings SET response = CASE WHEN user_id = %s THEN 'reported' ELSE 'already_reported' END::finding_response,
+                                   responded_at = now()
+               WHERE defect_id = %s AND response = 'pending'""",
+            (u["id"], defect_id),
+        )
+    return {"report_id": rep["id"], "status": rules.REPORTED, "payload": payload}
 
 
-@app.post("/api/defects/{defect_id}/skip")
-def skip_defect(defect_id: int, body: UserBody):
+@app.post(f"{API}/defects/{{defect_id}}/skip")
+def skip_defect(defect_id: UUID, body: UserBody):
+    """넘기기. 그 시민의 목록에서만 빠지고 다시 묻지 않는다."""
     with db.connect() as conn:
         _user(conn, body.user_id)
         _defect(conn, defect_id)
-        conn.execute(
-            "INSERT INTO skips (user_id, defect_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (body.user_id, defect_id)
-        )
+        n = conn.execute(
+            """UPDATE findings SET response = 'skipped', responded_at = now()
+               WHERE user_id = %s AND defect_id = %s AND response = 'pending'""",
+            (body.user_id, defect_id),
+        ).rowcount
+        if n == 0:
+            raise HTTPException(404, "그 시민의 확인 목록에 없는 결함")
     return {"ok": True}
 
 
-@app.get("/api/reports/{report_id}")
-def get_report(report_id: int):
+@app.get(f"{API}/reports/{{report_id}}")
+def get_report(report_id: UUID):
     with db.connect() as conn:
         r = conn.execute(
-            "SELECT r.id, r.defect_id, r.user_id, r.created_at, r.body FROM reports r WHERE r.id = %s", (report_id,)
+            """SELECT id, defect_id, user_id, quarter, payload, submission_status, reward_valid, created_at
+               FROM reports WHERE id = %s""",
+            (report_id,),
         ).fetchone()
     if r is None:
         raise HTTPException(404, "없는 신고서")
     return r
 
 
-@app.get("/api/users/{user_id}/reward")
-def reward(user_id: int):
+@app.get(f"{API}/users/{{user_id}}/reports")
+def user_reports(user_id: UUID):
+    """그 시민의 신고서. 최근 것부터."""
+    with db.connect() as conn:
+        _user(conn, user_id)
+        return conn.execute(
+            "SELECT id, defect_id, quarter, payload, created_at FROM reports WHERE user_id = %s ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
+
+
+@app.get(f"{API}/users/{{user_id}}/reward")
+def reward(user_id: UUID):
     """이번 분기(한국 시간)에 그 시민이 낸 포상 대상 신고 수와 5건까지 남은 수."""
-    since = rules.quarter_start(datetime.now(rules.KST))
+    now = datetime.now(rules.KST)
     with db.connect() as conn:
         _user(conn, user_id)
         n = conn.execute(
-            """
-            SELECT count(*) AS n FROM reports r JOIN defects d ON d.id = r.defect_id
-            WHERE r.user_id = %s AND d.reward_eligible AND r.created_at >= %s
-            """,
-            (user_id, since),
+            "SELECT count(*) AS n FROM reports WHERE user_id = %s AND reward_valid AND quarter = %s",
+            (user_id, rules.quarter_label(now)),
         ).fetchone()["n"]
-    return {**rules.reward_progress(n), "since": since.isoformat()}
+    return {**rules.reward_progress(n), "quarter": rules.quarter_label(now),
+            "since": rules.quarter_start(now).isoformat()}
 
 
-@app.get("/api/defects")
+# ---------- 관리자 ----------
+
+class StatusBody(BaseModel):
+    status: str
+
+
+@app.get(f"{API}/defects")
 def list_defects(type: str | None = None, status: str | None = None):
-    if type is not None and type not in ("pothole", "crack", "lane_wear"):
+    if type is not None and type not in {t.value for t in DefectType}:
         raise HTTPException(422, "type 이 올바르지 않다")
     if status is not None and status not in rules.STATUSES:
         raise HTTPException(422, "status 가 올바르지 않다")
     with db.connect() as conn:
-        return conn.execute(
+        rows = conn.execute(
             f"""
             SELECT {db.DEFECT_COLS} FROM defects d
-            WHERE (%s::text IS NULL OR d.type = %s) AND (%s::text IS NULL OR d.status = %s)
-            ORDER BY d.id
+            WHERE (%s::text IS NULL OR d.defect_type::text = %s) AND (%s::text IS NULL OR d.status::text = %s)
+            ORDER BY d.first_seen_at, d.id
             """,
             (type, type, status, status),
         ).fetchall()
+    return [_view(d) for d in rows]
 
 
-@app.patch("/api/defects/{defect_id}/status")
-def change_status(defect_id: int, body: StatusBody):
-    """관리자가 상태를 바꾼다. 허용하는 전환은 rules.can_transition 만."""
+@app.patch(f"{API}/defects/{{defect_id}}/status")
+def change_status(defect_id: UUID, body: StatusBody):
+    """관리자가 상태를 바꾼다. 허용하는 전환은 rules.can_transition 만 (신고됨 → 보수 중)."""
     if body.status not in rules.STATUSES:
         raise HTTPException(422, "status 가 올바르지 않다")
     with db.connect() as conn:
         old = _defect(conn, defect_id)["status"]
         if not rules.can_transition(old, body.status):
             raise HTTPException(409, f"{old} 에서 {body.status} 로 바꿀 수 없다")
-        # 읽은 뒤 다른 요청이 상태를 바꿨으면 고치지 않는다
         done = conn.execute(
             "UPDATE defects SET status = %s WHERE id = %s AND status = %s RETURNING id", (body.status, defect_id, old)
         ).fetchone()
@@ -270,12 +332,14 @@ def change_status(defect_id: int, body: StatusBody):
     return {"id": defect_id, "status": body.status}
 
 
-@app.get("/api/stats")
+@app.get(f"{API}/stats")
 def stats():
-    """기기별 받은 건수와 용량 (통신량 실험용)."""
+    """차량별 받은 관측 수와 용량 (통신량 실험용)."""
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT device_id, count(*) AS observations, sum(bytes)::bigint AS bytes FROM observations GROUP BY device_id ORDER BY device_id"
+            """SELECT v.label AS vehicle_label, count(*) AS observations,
+                      coalesce(sum(coalesce(o.snapshot_bytes, 0) + coalesce(o.clip_bytes, 0)), 0)::bigint AS bytes
+               FROM observations o JOIN vehicles v ON v.id = o.vehicle_id GROUP BY v.label ORDER BY v.label"""
         ).fetchall()
-    return {"devices": rows, "total_observations": sum(r["observations"] for r in rows),
+    return {"vehicles": rows, "total_observations": sum(r["observations"] for r in rows),
             "total_bytes": sum(r["bytes"] for r in rows)}

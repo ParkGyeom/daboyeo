@@ -1,6 +1,13 @@
-"""DB 연결과 테이블 (docs/DESIGN.md 6장). PostgreSQL/PostGIS."""
+"""DB 연결과 스키마. 스키마는 server/sql/001_init.sql 한 곳에만 있다 (PRD 9장).
+
+docker compose 의 DB 는 처음 뜰 때 001_init.sql 을 스스로 실행한다. 테스트용 DB 처럼 테이블이 없는 DB 는
+init_db() 가 같은 파일을 실행한다. 시연용 시민 3명과 차량(bb-01~03)은 고정 UUID 로 넣어 몇 번 불러도 같다.
+"""
 
 from __future__ import annotations
+
+import uuid
+from pathlib import Path
 
 import psycopg
 from psycopg import conninfo, sql
@@ -8,76 +15,19 @@ from psycopg.rows import dict_row
 
 from server import config
 
-SCHEMA = """
-CREATE EXTENSION IF NOT EXISTS postgis;
+SCHEMA_SQL = Path(__file__).resolve().parent / "sql" / "001_init.sql"
 
-CREATE TABLE IF NOT EXISTS users (
-    id         serial PRIMARY KEY,
-    name       text NOT NULL,
-    device_id  text NOT NULL UNIQUE
-);
+# 시연용 시민과 차량. 차량 이름(label)은 가상 블랙박스의 --device-id 와 같다
+DEMO = [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
+_NS = uuid.UUID("6f1d3c52-6b8e-4a35-9d1e-2b8f6c0a9d41")
 
-CREATE TABLE IF NOT EXISTS defects (
-    id                  serial PRIMARY KEY,
-    type                text NOT NULL,
-    location            geography(Point, 4326) NOT NULL,
-    severity            text NOT NULL,
-    status              text NOT NULL DEFAULT '미신고',
-    first_seen          timestamptz NOT NULL,
-    last_seen           timestamptz NOT NULL,
-    observation_count   integer NOT NULL DEFAULT 1,
-    device_count        integer NOT NULL DEFAULT 1,
-    max_confidence      real NOT NULL,
-    best_snapshot_path  text,
-    reward_eligible     boolean NOT NULL DEFAULT false,
-    jurisdiction        text
-);
 
-CREATE TABLE IF NOT EXISTS observations (
-    id             serial PRIMARY KEY,
-    device_id      text NOT NULL,
-    detected_at    timestamptz NOT NULL,
-    location       geography(Point, 4326) NOT NULL,
-    type           text NOT NULL,
-    confidence     real NOT NULL,
-    bbox           integer[] NOT NULL,
-    snapshot_path  text,
-    defect_id      integer REFERENCES defects(id),
-    bytes          integer NOT NULL,
-    received_at    timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS observations_defect_idx ON observations(defect_id);
-CREATE INDEX IF NOT EXISTS defects_location_idx ON defects USING gist(location);
+def demo_user_id(label: str) -> uuid.UUID:
+    return uuid.uuid5(_NS, f"user/{label}")
 
-CREATE TABLE IF NOT EXISTS reports (
-    id          serial PRIMARY KEY,
-    defect_id   integer NOT NULL UNIQUE REFERENCES defects(id),
-    user_id     integer NOT NULL REFERENCES users(id),
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    body        jsonb NOT NULL
-);
 
-CREATE TABLE IF NOT EXISTS skips (
-    user_id    integer NOT NULL REFERENCES users(id),
-    defect_id  integer NOT NULL REFERENCES defects(id),
-    PRIMARY KEY (user_id, defect_id)
-);
-
--- 주행 종료. 가상 블랙박스가 구간 재생을 끝내면 한 줄 생긴다.
--- 시민 화면은 seen_at 이 비어 있는 줄을 "주행이 끝났어요" 알림으로 보여준다.
-CREATE TABLE IF NOT EXISTS drives (
-    id            serial PRIMARY KEY,
-    device_id     text NOT NULL,
-    started_at    timestamptz,
-    ended_at      timestamptz NOT NULL DEFAULT now(),
-    defect_count  integer NOT NULL,
-    seen_at       timestamptz
-);
-CREATE INDEX IF NOT EXISTS drives_device_idx ON drives(device_id);
-"""
-
-# 시연용 시민 3명. 기기 번호는 가상 블랙박스의 --device-id 와 같다.
-DEMO_USERS = [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
+def demo_vehicle_id(label: str) -> uuid.UUID:
+    return uuid.uuid5(_NS, f"vehicle/{label}")
 
 
 def connect() -> psycopg.Connection:
@@ -93,28 +43,55 @@ def ensure_database(url: str) -> None:
             conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
 
 
+class OldSchemaError(RuntimeError):
+    pass
+
+
+def _has_schema(conn: psycopg.Connection) -> bool:
+    """001_init.sql 테이블이 있으면 True. 이전 형식 테이블(defects 는 있고 trips 는 없음)이면 OldSchemaError."""
+    r = conn.execute(
+        "SELECT to_regclass('public.trips') IS NOT NULL AS new, to_regclass('public.defects') IS NOT NULL AS any"
+    ).fetchone()
+    if r["any"] and not r["new"]:
+        raise OldSchemaError(
+            "DB 에 이전 형식 테이블이 있다. 새 스키마(001_init.sql)로 DB 를 다시 만든다: "
+            "docker compose down -v && docker compose up -d db (이전 컨테이너 daboyeo-db-1 은 docker rm -f 로 지운다)"
+        )
+    return r["new"]
+
+
+def seed_demo(conn: psycopg.Connection) -> None:
+    for name, label in DEMO:
+        uid, vid = demo_user_id(label), demo_vehicle_id(label)
+        conn.execute("INSERT INTO users (id, name) VALUES (%s, %s) ON CONFLICT (id) DO NOTHING", (uid, name))
+        conn.execute(
+            "INSERT INTO vehicles (id, owner_user_id, label) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
+            (vid, uid, label),
+        )
+
+
 def init_db() -> None:
-    """DB·테이블이 없으면 만들고 시연용 시민을 넣는다. 여러 번 불러도 안전하다."""
+    """DB 와 테이블이 없으면 만들고(001_init.sql) 시연용 시민·차량을 넣는다. 여러 번 불러도 안전하다."""
     ensure_database(config.DATABASE_URL)
     with connect() as conn:
-        conn.execute(SCHEMA)
-        for name, device_id in DEMO_USERS:
-            conn.execute(
-                "INSERT INTO users (name, device_id) VALUES (%s, %s) ON CONFLICT (device_id) DO NOTHING",
-                (name, device_id),
-            )
+        if not _has_schema(conn):
+            conn.execute(SCHEMA_SQL.read_text(encoding="utf-8"))
+        seed_demo(conn)
 
 
 def reset_db() -> None:
-    """모든 데이터를 지우고 처음 상태로 되돌린다 (시민은 다시 넣는다)."""
+    """모든 데이터를 지우고 처음 상태로 (시민·차량은 다시 넣는다)."""
     with connect() as conn:
-        conn.execute("TRUNCATE drives, skips, reports, observations, defects, users RESTART IDENTITY CASCADE")
-    init_db()
+        conn.execute("TRUNCATE reports, findings, observations, defects, trips, vehicles, users CASCADE")
+        seed_demo(conn)
 
 
-# 결함 한 건을 읽을 때 쓰는 열. 위치는 위도·경도로 풀어서 돌려준다.
+# 결함 한 건을 읽을 때 쓰는 열. 위치는 위도·경도로 풀고, 대표 사진은 신뢰도가 가장 높은 관측의 사진이다
 DEFECT_COLS = """
-    d.id, d.type, ST_Y(d.location::geometry) AS lat, ST_X(d.location::geometry) AS lon,
-    d.severity, d.status, d.first_seen, d.last_seen, d.observation_count, d.device_count,
-    d.max_confidence, d.best_snapshot_path, d.reward_eligible, d.jurisdiction
+    d.id, d.defect_type, ST_Y(d.location::geometry) AS lat, ST_X(d.location::geometry) AS lon,
+    d.risk_level, d.status, d.observation_count, d.vehicle_count, d.confidence, d.is_suspected,
+    d.reward_eligible_road, d.first_seen_at, d.last_seen_at,
+    (SELECT o.snapshot_path FROM observations o
+      WHERE o.defect_id = d.id AND o.snapshot_path IS NOT NULL
+      ORDER BY o.confidence DESC, o.observed_at LIMIT 1) AS snapshot_path
 """

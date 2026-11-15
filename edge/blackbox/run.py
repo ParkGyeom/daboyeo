@@ -30,6 +30,7 @@ from pathlib import Path
 import numpy as np
 
 from daboyeo_ai.inference import load_class_conf
+from daboyeo_contracts import DefectType, ObservationIn
 
 from edge.blackbox.quality import measure
 from edge.blackbox.detect import SENT_TYPES, Detection, Detector, LaneWear
@@ -133,7 +134,11 @@ def drive(args: argparse.Namespace) -> dict:
     detector = Detector(args.model, conf=conf, threads=args.threads)
     sender = Sender(args.server, dry_run=args.dry_run)
     rng = random.Random(args.seed)
-    started = datetime.now(KST)
+    started = datetime.now(KST).replace(microsecond=0)
+    if not sender.start_trip(args.device_id, started):
+        print(f"[{args.device_id}] 서버에 주행을 열지 못했다 ({args.server}). --dry-run 이면 서버 없이 돈다", file=sys.stderr)
+        sender.close()
+        return {"frames": 0}
     first_t: float | None = None
     pacer = Pacer()
     detect_s = 0.0
@@ -148,24 +153,21 @@ def drive(args: argparse.Namespace) -> dict:
         if x2 <= x1 or y2 <= y1:
             return
         h, w = image.shape[:2]
+        # t_s: 주행(영상) 시작부터 초. 영상은 영상 시각, 로드마크는 첫 프레임 GPS 시각 기준
         offset = (fix.time_s - first_t) if (fix.time_s is not None and first_t is not None) else float(i)
         if offset < 0:
             offset += 86400
         lat, lon = add_gps_noise(fix.lat, fix.lon, args.gps_noise, rng)
-        event = {
-            "device_id": args.device_id,
-            "detected_at": (started + timedelta(seconds=offset)).isoformat(timespec="seconds"),
-            "lat": round(lat, 7),
-            "lon": round(lon, 7),
-            "type": d.type,
-            "confidence": round(d.confidence, 4),
-            "bbox": [x1, y1, x2, y2],
-            "frame_w": w,
-            "frame_h": h,
-            "quality_ok": True,
-        }
-        res = sender.send(event, crop_snapshot(image, d.bbox))
-        tag = "" if res is None else f" → 결함 #{res['defect_id']}{' (새 결함)' if res['is_new_defect'] else ''}"
+        # 차선 마모는 구간이라 박스를 보내지 않는다 (handoff 8장). 사진은 측정 영역으로 자른다
+        bbox = None if d.type == "lane_wear" else (
+            round(x1 / w, 4), round(y1 / h, 4), round(min(1.0, x2 / w), 4), round(min(1.0, y2 / h), 4))
+        obs = ObservationIn(
+            trip_id=sender.trip_id, vehicle_id=sender.vehicle_id, defect_type=DefectType(d.type),
+            confidence=round(d.confidence, 4), bbox=bbox, lat=round(lat, 7), lon=round(lon, 7),
+            t_s=round(offset, 3), observed_at=started + timedelta(seconds=offset),
+        )
+        res = sender.send(obs, crop_snapshot(image, d.bbox))
+        tag = "" if res is None else f" → 결함 {str(res['defect_id'])[:8]}{' (새 결함)' if res['is_new_defect'] else ''}"
         print(f"  {name}: {d.type} {d.confidence:.2f}{tag}")
 
     print(f"[{args.device_id}] {args.video or args.segment} 프레임 {len(frames)}장, 탐지 주기 {args.detect_every}, "
@@ -225,11 +227,10 @@ def drive(args: argparse.Namespace) -> dict:
     except KeyboardInterrupt:
         print("중단")
     finally:
-        # 주행 중에는 알리지 않고 끝난 뒤에 한 번만 알린다
-        # detected_at 은 초 단위로 잘라 보내므로 시작 시각도 초 단위로 맞춘다 (첫 프레임 결과가 빠지지 않게)
-        end = sender.end_drive(args.device_id, started.replace(microsecond=0))
+        # 주행 중에는 알리지 않고 끝난 뒤에 한 번만 알린다 (주행을 닫으면 시민의 확인 목록이 생긴다)
+        end = sender.end_trip()
         if end is not None:
-            print(f"[{args.device_id}] 주행 종료 알림 보냄: 시민에게 보여줄 결함 {end['defect_count']}건")
+            print(f"[{args.device_id}] 주행 종료: 시민에게 보여줄 결함 {end['finding_count']}건")
         if live:
             live.finish(sender.sent)
         sender.close()

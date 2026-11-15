@@ -34,9 +34,17 @@ def test_crop_snapshot_small_jpeg():
 
 
 def test_dry_run_counts_bytes():
+    from datetime import datetime, timezone
+
+    from daboyeo_contracts import DefectType, ObservationIn
+
     s = Sender("http://unused", dry_run=True)
-    assert s.send({"a": 1}, b"\xff\xd8xx") is None
-    assert s.sent == 1 and s.bytes_sent == len('{"a": 1}') + 4
+    assert s.start_trip("bb-01", datetime.now(timezone.utc)) and s.trip_id and s.vehicle_id
+    obs = ObservationIn(trip_id=s.trip_id, vehicle_id=s.vehicle_id, defect_type=DefectType.POTHOLE, confidence=0.9,
+                        bbox=(0.1, 0.1, 0.2, 0.2), lat=37.5, lon=127.0, t_s=1.0, observed_at=datetime.now(timezone.utc))
+    assert s.send(obs, b"\xff\xd8xx") is None
+    assert s.sent == 1 and s.bytes_sent == len(obs.model_dump_json().encode()) + 4
+    assert s.end_trip() is None  # dry_run 은 서버에 알리지 않는다
 
 
 def test_variants():

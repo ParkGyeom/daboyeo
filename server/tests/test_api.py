@@ -1,42 +1,77 @@
-"""B1 완료 기준: POST /api/detections 로 보내면 observations 에 저장되고 사진 파일이 남는다. DB가 필요하다."""
+"""관측 수신 (POST /api/v1/observations, ObservationIn) 과 주행 열기, 잘못된 요청 거절. DB가 필요하다."""
 
 import json
 
 from server import db
-from server.fake import make_events
-
-
-from server.tests.conftest import needs_db, post as _post
+from server.tests.conftest import end, meta, needs_db, post, start
 
 pytestmark = needs_db
 
 
-def test_demo_users_seeded(client):
-    with db.connect() as conn:
-        rows = conn.execute("SELECT device_id FROM users ORDER BY id").fetchall()
-    assert [r["device_id"] for r in rows] == ["bb-01", "bb-02", "bb-03"]
+def test_demo_users_and_vehicles_seeded(client):
+    rows = client.get("/api/v1/users").json()
+    assert [(r["name"], r["vehicle_label"]) for r in rows] == [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
+    assert rows[0]["id"] == str(db.demo_user_id("bb-01"))
 
 
-def test_detection_saved_with_photo(client, tmp_path):
-    import random
-    (ev, photo), = make_events(37.55, 127.07, 1, 1, 0, 1, ["pothole"], random.Random(0))
-    r = _post(client, ev, photo)
-    assert r.status_code == 201
-    oid = r.json()["observation_id"]
+def test_observation_saved_with_photo_and_stats(client, tmp_path):
+    t = start(client)
+    m = meta(t, confidence=0.77, t_s=12.5)
+    r = post(client, m, photo=b"\xff\xd8 jpeg-ish")
+    assert r.status_code == 201, r.text
     with db.connect() as conn:
         row = conn.execute(
-            "SELECT device_id, type, confidence, bbox, snapshot_path, bytes,"
-            " ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM observations WHERE id=%s", (oid,)
+            "SELECT defect_type::text AS t, confidence, bbox, t_s, snapshot_path, snapshot_bytes,"
+            " ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon FROM observations WHERE id = %s",
+            (r.json()["observation_id"],),
         ).fetchone()
-    assert row["type"] == "pothole" and row["device_id"] == "bb-01"
-    assert abs(row["lat"] - ev["lat"]) < 1e-6 and abs(row["lon"] - ev["lon"]) < 1e-6
-    assert row["bbox"] == ev["bbox"]
-    assert (tmp_path / row["snapshot_path"]).read_bytes() == photo
-    assert row["bytes"] > len(photo)
+    assert row["t"] == "pothole" and abs(row["confidence"] - 0.77) < 1e-6 and row["t_s"] == 12.5
+    assert abs(row["lat"] - m["lat"]) < 1e-6 and row["bbox"] == m["bbox"]
+    assert (tmp_path / row["snapshot_path"]).read_bytes() == b"\xff\xd8 jpeg-ish"
+    s = client.get("/api/v1/stats").json()
+    assert s["vehicles"] == [{"vehicle_label": "bb-01", "observations": 1, "bytes": row["snapshot_bytes"]}]
 
 
-def test_bad_requests_rejected(client):
-    import random
-    (ev, photo), = make_events(37.55, 127.07, 1, 1, 0, 1, ["crack"], random.Random(0))
-    assert _post(client, {**ev, "type": "manhole"}, photo).status_code == 422
-    assert _post(client, ev, b"not a jpeg").status_code == 422
+def test_lane_wear_without_bbox_or_photo(client):
+    t = start(client)
+    assert post(client, meta(t, type="lane_wear"), photo=None).status_code == 201
+
+
+def test_bad_observations_rejected(client, tmp_path):
+    t = start(client)
+    other = start(client, "bb-02")
+    assert post(client, meta(t, confidence=1.5)).status_code == 422
+    assert post(client, meta(t, type="manhole")).status_code == 422
+    assert post(client, meta(t), photo=b"not a jpeg").status_code == 422
+    assert post(client, meta(t, observed_at="2026-11-20T10:00:00")).status_code == 422          # 시간대 없음
+    assert post(client, meta(t, vehicle_id=other["vehicle_id"])).status_code == 422             # 다른 차량
+    assert post(client, meta(t, trip_id="00000000-0000-0000-0000-000000000000")).status_code == 404
+    r = client.post("/api/v1/observations", data={"meta": "{not json"})
+    assert r.status_code == 422
+    assert list(tmp_path.iterdir()) == []  # 거절된 요청의 사진은 남지 않는다
+    with db.connect() as conn:
+        assert conn.execute("SELECT count(*) AS n FROM observations").fetchone()["n"] == 0
+
+
+def test_trip_start_and_end(client):
+    assert client.post("/api/v1/trips", json={}).status_code == 422
+    assert client.post("/api/v1/trips", json={"vehicle_label": "bb-09"}).status_code == 404
+    assert client.post("/api/v1/trips", json={"vehicle_label": "bb-01",
+                                              "started_at": "2026-11-20T10:00:00"}).status_code == 422
+    t = start(client)
+    e1 = end(client, t)
+    e2 = end(client, t)  # 두 번 닫아도 같은 시각
+    assert e1["ended_at"] == e2["ended_at"]
+    assert client.post("/api/v1/trips/00000000-0000-0000-0000-000000000000/end").status_code == 404
+    assert client.get(f"/api/v1/trips/{t['trip_id']}/findings").json() == []
+
+
+def test_meta_is_contracts_observation(client):
+    """블랙박스가 보내는 것과 같은 모양: contracts.ObservationIn 의 JSON."""
+    from daboyeo_contracts import ObservationIn
+
+    t = start(client)
+    obs = ObservationIn.model_validate(meta(t))
+    r = client.post("/api/v1/observations", data={"meta": obs.model_dump_json()})
+    assert r.status_code == 201
+    assert json.loads(obs.model_dump_json())["defect_type"] == "pothole"

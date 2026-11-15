@@ -1,65 +1,70 @@
-"""중복 정리 (B3 완료 기준). DB가 필요하다."""
+"""중복 정리 (계획 2.4): 같은 지점·같은 유형은 결함 하나, 차량 수는 서로 다른 차량 수. DB가 필요하다."""
 
 from server import db
-from server.tests.conftest import event, needs_db, north, post
+from server.tests.conftest import meta, needs_db, north, observe, post, start
 
 pytestmark = needs_db
+LAT = 37.4979
 
 
 def _defects():
     with db.connect() as conn:
-        return conn.execute(f"SELECT {db.DEFECT_COLS} FROM defects d ORDER BY d.id").fetchall()
+        return conn.execute(
+            "SELECT defect_type::text AS t, observation_count, vehicle_count, confidence, risk_level::text AS risk,"
+            " reward_eligible_road FROM defects ORDER BY first_seen_at"
+        ).fetchall()
 
 
-def test_same_place_same_type_three_devices_become_one(client):
-    lat = 37.55
-    ids = []
-    for dev, dm, conf in [("bb-01", 0, 0.5), ("bb-02", 6, 0.9), ("bb-03", -5, 0.7)]:
-        r = post(client, event(lat=north(lat, dm), device=dev, confidence=conf)).json()
-        ids.append((r["defect_id"], r["is_new_defect"]))
-    assert ids[0][1] is True and ids[1][1] is False and ids[2][1] is False
-    assert len({i for i, _ in ids}) == 1
+def test_three_vehicles_same_place_become_one(client):
+    ids = set()
+    for i, label in enumerate(["bb-01", "bb-02", "bb-03"]):
+        t = start(client, label)
+        ids.add(observe(client, t, lat=north(LAT, i * 5), confidence=0.5 + i * 0.1)["defect_id"])
+    assert len(ids) == 1
     (d,) = _defects()
-    assert d["observation_count"] == 3 and d["device_count"] == 3
-    assert abs(d["max_confidence"] - 0.9) < 1e-6
-    # 위치는 세 관측의 평균 (북쪽으로 +1/3 m)
-    assert abs((d["lat"] - lat) * 111_320 - 1 / 3) < 0.05
-    # 대표 사진은 신뢰도가 가장 높은 관측의 사진
-    with db.connect() as conn:
-        best = conn.execute("SELECT snapshot_path FROM observations ORDER BY confidence DESC LIMIT 1").fetchone()
-    assert d["best_snapshot_path"] == best["snapshot_path"]
+    assert (d["observation_count"], d["vehicle_count"]) == (3, 3)
+    assert abs(d["confidence"] - 0.7) < 1e-6  # 대표 신뢰도는 최고값
 
 
-def test_same_device_twice_counts_one_device(client):
-    post(client, event(device="bb-01"))
-    post(client, event(lat=north(37.55, 8), device="bb-01", at="2026-11-14T10:00:01+09:00"))
+def test_same_vehicle_twice_counts_one_vehicle(client):
+    t = start(client)
+    observe(client, t, t_s=1)
+    observe(client, t, t_s=2)
     (d,) = _defects()
-    assert d["observation_count"] == 2 and d["device_count"] == 1
-    assert d["first_seen"] < d["last_seen"]
+    assert (d["observation_count"], d["vehicle_count"]) == (2, 1)
 
 
-def test_different_type_not_merged(client):
-    post(client, event(type="pothole"))
-    post(client, event(type="crack"))
-    assert len(_defects()) == 2
-
-
-def test_outside_distance_not_merged(client):
-    post(client, event(lat=37.55))
-    post(client, event(lat=north(37.55, 25)))  # 포트홀 기준 20m 밖
-    assert len(_defects()) == 2
+def test_different_type_or_far_not_merged(client):
+    t = start(client)
+    a = observe(client, t)["defect_id"]
+    b = observe(client, t, type="crack")["defect_id"]
+    c = observe(client, t, lat=north(LAT, 50))["defect_id"]
+    assert len({a, b, c}) == 3
 
 
 def test_lane_wear_uses_wider_distance(client):
-    post(client, event(type="lane_wear", lat=37.55))
-    post(client, event(type="lane_wear", lat=north(37.55, 25)))  # 차선 마모 기준 30m 안
-    assert len(_defects()) == 1
+    t = start(client)
+    a = observe(client, t, type="lane_wear")["defect_id"]
+    b = observe(client, t, type="lane_wear", lat=north(LAT, 25))["defect_id"]  # 점 결함 기준(20m)보다 멀다
+    assert a == b
 
 
-def test_new_defect_gets_severity_reward_jurisdiction(client):
-    post(client, event(type="pothole", lat=37.5154, lon=126.9521))  # 서울
-    post(client, event(type="crack", lat=36.7850, lon=127.1736))     # 서울 밖
-    seoul, outside = _defects()
-    assert (seoul["severity"], seoul["reward_eligible"], seoul["jurisdiction"]) == ("빠른 보수", True, "서울특별시")
-    assert (outside["severity"], outside["reward_eligible"]) == ("정기 보수", False)
-    assert seoul["status"] == "미신고"
+def test_new_defect_gets_risk_and_reward(client):
+    t = start(client)
+    observe(client, t)                                         # 강남역: 서울
+    observe(client, t, type="crack", lat=36.78, lon=127.17)    # 서울 밖
+    p, c = _defects()
+    assert (p["t"], p["risk"], p["reward_eligible_road"]) == ("pothole", "urgent", True)
+    assert (c["t"], c["risk"], c["reward_eligible_road"]) == ("crack", "routine", False)
+
+
+def test_resend_same_client_id_is_not_saved_twice(client):
+    t = start(client)
+    m = meta(t)
+    first = post(client, m)
+    assert first.status_code == 201 and first.json()["duplicate"] is False
+    again = post(client, m)
+    assert again.status_code == 201 and again.json()["duplicate"] is True
+    assert again.json()["observation_id"] == first.json()["observation_id"]
+    (d,) = _defects()
+    assert d["observation_count"] == 1

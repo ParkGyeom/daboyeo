@@ -19,12 +19,12 @@ st.title("지도 대시보드")
 
 STATUS_SHAPE = {"미신고": "circle", "신고됨": "square", "보수 중": "triangle-up"}
 SEV_COLOR = {"빠른 보수": "#d62728", "정기 보수": "#f2a900"}
-NEXT_STATUS = {"신고됨": "보수 중"}
+NEXT_STATUS = {"reported": "under_repair"}
 MAJOR = {"motorway", "trunk", "primary", "motorway_link", "trunk_link", "primary_link"}
 
 f1, f2 = st.columns(2)
-type_f = f1.selectbox("유형", [None, "pothole", "crack", "lane_wear"], format_func=lambda t: "전체" if t is None else api.TYPE_KO[t])
-status_f = f2.selectbox("상태", [None, "미신고", "신고됨", "보수 중"], format_func=lambda s: "전체" if s is None else s)
+type_f = f1.selectbox("유형", [None, *api.TYPE_KO], format_func=lambda t: "전체" if t is None else api.TYPE_KO[t])
+status_f = f2.selectbox("상태", [None, *api.STATUS_KO], format_func=lambda s: "전체" if s is None else api.STATUS_KO[s])
 
 
 @st.fragment(run_every=5)
@@ -36,14 +36,17 @@ def board():
         return
     c = st.columns(4)
     c[0].metric("결함", len(rows))
-    for i, s in enumerate(["미신고", "신고됨", "보수 중"], 1):
-        c[i].metric(s, sum(r["status"] == s for r in rows))
+    for i, (s, ko) in enumerate(api.STATUS_KO.items(), 1):
+        c[i].metric(ko, sum(r["status"] == s for r in rows))
     if not rows:
         st.info("결함이 없습니다.")
         return
 
     df = pd.DataFrame(rows)
-    df["유형"] = df["type"].map(api.TYPE_KO)
+    df["유형"] = df["defect_type"].map(api.TYPE_KO)
+    df["severity"] = df["risk_level"].map(api.RISK_KO)
+    df["상태"] = df["status"].map(api.STATUS_KO)
+    df["번호"] = df["id"].map(api.short)
     pick = alt.selection_point(fields=["id"], name="pick")
     # 보여줄 범위: 결함들 + 여유 300m. 가로세로 비율을 실제 거리에 맞춘다
     lat0 = df["lat"].mean()
@@ -63,9 +66,9 @@ def board():
             y=alt.Y("lat:Q", title="위도", scale=ys),
             color=alt.Color("severity:N", title="위험도",
                             scale=alt.Scale(domain=list(SEV_COLOR), range=list(SEV_COLOR.values()))),
-            shape=alt.Shape("status:N", title="상태",
+            shape=alt.Shape("상태:N", title="상태",
                             scale=alt.Scale(domain=list(STATUS_SHAPE), range=list(STATUS_SHAPE.values()))),
-            tooltip=["id", "유형", "severity", "status", "device_count", "max_confidence"],
+            tooltip=["번호", "유형", "severity", "상태", "vehicle_count", "confidence"],
         )
         .add_params(pick)
     )
@@ -93,25 +96,26 @@ def board():
 
     left, right = st.columns([3, 2])
     left.dataframe(
-        df[["id", "유형", "severity", "status", "device_count", "observation_count", "max_confidence", "jurisdiction"]]
-        .rename(columns={"severity": "위험도", "status": "상태", "device_count": "기기 수",
-                         "observation_count": "관측 수", "max_confidence": "최고 신뢰도", "jurisdiction": "관할"}),
+        df[["번호", "유형", "severity", "상태", "vehicle_count", "observation_count", "confidence", "jurisdiction"]]
+        .rename(columns={"severity": "위험도", "vehicle_count": "차량 수",
+                         "observation_count": "관측 수", "confidence": "최고 신뢰도", "jurisdiction": "관할"}),
         hide_index=True, width="stretch",
     )
     ids = df["id"].tolist()
     cur = st.session_state.get("dash_pick")
-    did = right.selectbox("결함 번호", ids, index=ids.index(cur) if cur in ids else 0)
+    did = right.selectbox("결함 번호", ids, index=ids.index(cur) if cur in ids else 0, format_func=api.short)
     d = next(r for r in rows if r["id"] == did)
-    photo = api.snapshot_bytes(d["best_snapshot_path"])
+    photo = api.snapshot_bytes(d["snapshot_path"])
     if photo:
         right.image(photo, width=260)
     right.markdown(
-        f"**#{d['id']} {api.TYPE_KO[d['type']]}** · {d['severity']} · **{d['status']}**  \n"
+        f"**#{api.short(d['id'])} {api.TYPE_KO[d['defect_type']]}** · {api.RISK_KO[d['risk_level']]} · "
+        f"**{api.STATUS_KO[d['status']]}**  \n"
         f"{d['lat']:.6f}, {d['lon']:.6f} · {d['jurisdiction']}  \n"
-        f"관측 {d['observation_count']}건 · 기기 {d['device_count']}대 · 신뢰도 {d['max_confidence']:.2f}"
+        f"관측 {d['observation_count']}건 · 차량 {d['vehicle_count']}대 · 신뢰도 {d['confidence']:.2f}"
     )
     nxt = NEXT_STATUS.get(d["status"])
-    if nxt and right.button(f"'{nxt}'(으)로 변경", key=f"st-{did}"):
+    if nxt and right.button(f"'{api.STATUS_KO[nxt]}'(으)로 변경", key=f"st-{did}"):
         try:
             api.set_status(did, nxt)
             st.rerun(scope="fragment")

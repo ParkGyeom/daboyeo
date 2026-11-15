@@ -6,6 +6,16 @@ YOLO 형식으로 바꾸고 `parts/krid.zip`, `parts/road.zip` 을 만든다. �
 
     uv run python -m daboyeo_ai.data.prepare_local --out data/aihub
 
+v3 (크랙 라벨 규칙 v3, `yolo.CrackMerge`): `--crack-rule v3 --tag v3` 로 돌리면 `work_v3/`, `progress_v3.json`,
+`parts/road_v3.zip` 에 따로 만든다 (v2 결과는 안 건드린다). 이미 `work/` 에 변환해 둔 도로장애물 zip 은 다시 받지
+않고 라벨만 새 규칙으로 쓴다 (`pipeline.relabel_road_obstacle`).
+
+    uv run python -m daboyeo_ai.data.prepare_local --out data/aihub --no-krid --krid-labels selected \
+        --crack-rule v3 --tag v3 --road-crack-zips 0 --crack-on-toa Mainroad_B02.zip
+
+`--crack-on-toa`: 179 크랙 이미지 zip 은 라벨과 다른 장면이라 (handoff 15장) 크랙 라벨을 같은 이름의 포트홀(TOA) 이미지
+zip 프레임에 붙인다 (`pipeline.process_crack_on_toa`). 크랙 이미지 zip 은 `--road-crack-zips 0` 으로 뺀다.
+
 API 키는 환경변수 또는 레포 최상위 `.env` 의 `AIHUB_APIKEY` 에서 읽는다 (출력하지 않는다).
 중간에 끊겨도 다시 실행하면 `progress.json` 에 기록된 zip 은 건너뛴다.
 """
@@ -27,7 +37,9 @@ from pathlib import Path
 from . import aihub, pipeline, selection, sources
 from .aihub import AihubFile
 from .selection import Job
-from .yolo import CropWriter, YoloDetWriter
+from .yolo import CrackMerge, CropWriter, YoloDetWriter
+
+CRACK_RULES = {"v2": None, "v3": CrackMerge()}
 
 EXIT_ROAD_FORMAT = 2  # 도로장애물 라벨이 COCO 형식이 아님 → KRID 만 만들고 멈춤
 
@@ -39,6 +51,7 @@ class Settings:
     road_stride: int = selection.ROAD_STRIDE
     road_negative_ratio: float = selection.ROAD_NEGATIVE_RATIO
     max_images_per_zip: int = selection.MAX_IMAGES_PER_ZIP
+    crack_merge: CrackMerge | None = None  # None = v2 규칙
 
 
 def convert_job(job: Job, label_zip: Path, image_zip: Path, out: Path, s: Settings = Settings()) -> Counter[str]:
@@ -52,7 +65,28 @@ def convert_job(job: Job, label_zip: Path, image_zip: Path, out: Path, s: Settin
     else:
         stats = pipeline.process_road_obstacle(label_zip, image_zip, det, stride=s.road_stride,
                                                max_images=s.max_images_per_zip,
-                                               negative_ratio=s.road_negative_ratio)
+                                               negative_ratio=s.road_negative_ratio,
+                                               crack_merge=s.crack_merge)
+    stats.update(det.stats)
+    return stats
+
+
+def convert_crack_on_toa(crack_labels: list[Path], toa_label: Path, toa_image: Path, out: Path,
+                         s: Settings = Settings(), stride: int = 2) -> Counter[str]:
+    det = YoloDetWriter(out / "det")
+    stats = pipeline.process_crack_on_toa(crack_labels, toa_label, toa_image, det,
+                                          crack_merge=s.crack_merge or CrackMerge(), stride=stride,
+                                          max_images=s.max_images_per_zip)
+    stats.update(det.stats)
+    return stats
+
+
+def relabel_job(job: Job, label_zip: Path, src_out: Path, out: Path, s: Settings = Settings()) -> Counter[str]:
+    """이미 변환한 도로장애물 작업 폴더(src_out)를 이미지는 그대로, 라벨만 s.crack_merge 규칙으로 다시 써 out 에."""
+    if job.kind != "road":
+        raise ValueError("relabel is only for road (도로장애물) jobs")
+    det = YoloDetWriter(out / "det")
+    stats = pipeline.relabel_road_obstacle(label_zip, src_out / "det", det, s.crack_merge)
     stats.update(det.stats)
     return stats
 
@@ -211,17 +245,31 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--select-only", action="store_true", help="라벨 다운로드·집계·선택까지만 (이미지 zip 은 안 받음)")
     ap.add_argument("--max-images-per-zip", type=int, default=selection.MAX_IMAGES_PER_ZIP)
     ap.add_argument("--keep-raw", action="store_true", help="변환 후 원본 이미지 zip 을 지우지 않는다")
+    ap.add_argument("--no-krid", action="store_true", help="KRID 이미지 zip 은 고르지 않는다 (라벨 집계는 그대로)")
+    ap.add_argument("--road-crack-extra", nargs="*", default=[],
+                    help="자동 선택에 더할 도로장애물 CRACK 라벨 zip 이름 (예: C_Mainroad_B04.zip)")
+    ap.add_argument("--crack-rule", choices=sorted(CRACK_RULES), default="v2",
+                    help="179 크랙 폴리라인 → 박스 규칙. v2: 어노테이션마다 박스 (기본) / v3: 가까운 선끼리 묶어 박스")
+    ap.add_argument("--crack-on-toa", nargs="*", default=[],
+                    help="크랙 라벨을 붙일 도로장애물 TOA 이미지 zip 이름 (예: Mainroad_B02.zip). 짝 크랙 라벨 zip 은 이름이 겹치는 것을 자동으로 찾는다")
+    ap.add_argument("--crack-on-toa-stride", type=int, default=2, help="크랙 프레임 중 몇 장에 1장 쓸지 (기본 2)")
+    ap.add_argument("--tag", default="", help="결과 이름 접미사: work_<tag>/, progress_<tag>.json, parts/<kind>_<tag>.zip")
+    ap.add_argument("--reuse-work", type=Path, default=None,
+                    help="여기 있는 도로장애물 작업 폴더는 다시 받지 않고 라벨만 새로 쓴다 (기본: --tag 가 있으면 <out>/work)")
     return ap.parse_args(argv)
 
 
 def main(argv=None) -> int:
     args = parse_args(argv)
     out: Path = args.out.resolve()
-    labels_dir, raw_dir, work_dir, parts_dir = out / "labels", out / "raw", out / "work", out / "parts"
+    sfx = f"_{args.tag}" if args.tag else ""
+    labels_dir, raw_dir, work_dir, parts_dir = out / "labels", out / "raw", out / f"work{sfx}", out / "parts"
+    progress_path = out / f"progress{sfx}.json"
+    reuse_dir = args.reuse_work.resolve() if args.reuse_work else (out / "work" if args.tag else None)
     for d in (labels_dir, work_dir, parts_dir):
         d.mkdir(parents=True, exist_ok=True)
     apikey = load_apikey()
-    settings = Settings(max_images_per_zip=args.max_images_per_zip)
+    settings = Settings(max_images_per_zip=args.max_images_per_zip, crack_merge=CRACK_RULES[args.crack_rule])
     print(f"out: {out}  (free disk: {shutil.disk_usage(out).free / 1024**3:.0f} GB)")
 
     # 1. 파일 목록
@@ -243,7 +291,8 @@ def main(argv=None) -> int:
     write_csv(out / "label_counts_krid.csv", ["name", *states], rows)
 
     # 3. 도로장애물: 라벨 형식 확인 → 집계 → 선택
-    jobs = list(krid)
+    jobs = [] if args.no_krid else list(krid)
+    crack_on_toa: dict[str, list[Path]] = {}
     road_problem: list[str] = []
     if road:
         toa = [f for f in road_labels if "/1.TOA/" in f.path]
@@ -268,45 +317,77 @@ def main(argv=None) -> int:
                              "using road_label_structure.txt")]
         else:
             picked = selection.pick_road_rows(road_rows, args.road_pothole_zips, args.road_crack_zips)
+            picked += selection.named_crack_rows(road_rows, args.road_crack_extra, exclude=picked)
             jobs += selection.road_jobs(picked, by_path)
+            for name in args.crack_on_toa:
+                toa_label = selection.named_toa_label(road_labels, name)
+                toa_image = selection.road_image_for(toa_label, by_path)
+                if toa_image is None:
+                    raise KeyError(f"no TOA image zip for {name}")
+                toa_stems = pipeline.label_stems(label_paths[toa_label.path])
+                cracks = [f for f in road_labels if "/2.CRACK/" in f.path
+                          and pipeline.label_stems(label_paths[f.path]) & toa_stems]
+                job = Job("roadcrack", selection.ROAD_KEY, toa_image, toa_label)
+                crack_on_toa[job.part] = [label_paths[f.path] for f in cracks]
+                print(f"  crack-on-TOA {name}: crack label zips {[f.name for f in cracks]}")
+                jobs.append(job)
 
     print("\n## selected image zips")
     for j in jobs:
         print(f"  {j.kind:4} {j.image.size:>7}  {j.image.path}")
-    todo = [j for j in jobs if j.part not in Progress(out / "progress.json")]
+    todo = [j for j in jobs if j.part not in Progress(progress_path)
+            and not (reuse_dir and j.kind == "road" and (reuse_dir / j.part / "det").is_dir())]
     print(f"  total {_gb(j.image for j in jobs):.1f} GB, still to do {_gb(j.image for j in todo):.1f} GB")
 
     # 4. 이미지 zip 하나씩: 받기 → 변환 → 원본 삭제
     if not args.select_only:
-        progress = Progress(out / "progress.json")
+        progress = Progress(progress_path)
         for i, j in enumerate(jobs, 1):
             job_out = work_dir / j.part
             if j.part in progress and job_out.exists():
                 print(f"[{i}/{len(jobs)}] skip (done): {j.part}")
+                continue
+            if reuse_dir and j.kind == "road" and (reuse_dir / j.part / "det").is_dir():
+                t = time.time()
+                shutil.rmtree(job_out, ignore_errors=True)
+                stats = relabel_job(j, label_paths[j.label.path], reuse_dir / j.part, job_out, settings)
+                progress.done(j.part, dict(stats, image=j.image.path, relabeled_from=str(reuse_dir / j.part),
+                                           crack_rule=args.crack_rule, seconds=round(time.time() - t)))
+                print(f"[{i}/{len(jobs)}] relabeled {j.part} in {time.time() - t:.0f}s: {dict(stats)}", flush=True)
                 continue
             print(f"[{i}/{len(jobs)}] {j.image.name} ({j.image.size}) downloading...", flush=True)
             t = time.time()
             img_zip = aihub.download(j.ds, j.image, apikey, raw_dir)
             t_dl = time.time() - t
             shutil.rmtree(job_out, ignore_errors=True)
-            stats = convert_job(j, label_paths[j.label.path], img_zip, job_out, settings)
+            if j.kind == "roadcrack":
+                stats = convert_crack_on_toa(crack_on_toa[j.part], label_paths[j.label.path], img_zip, job_out,
+                                             settings, args.crack_on_toa_stride)
+            else:
+                stats = convert_job(j, label_paths[j.label.path], img_zip, job_out, settings)
             if not args.keep_raw:
                 shutil.rmtree(raw_dir / str(j.image.key), ignore_errors=True)
-            progress.done(j.part, dict(stats, image=j.image.path, download_s=round(t_dl),
+            progress.done(j.part, dict(stats, image=j.image.path, download_s=round(t_dl), crack_rule=args.crack_rule,
                                        seconds=round(time.time() - t)))
             print(f"    done in {time.time() - t:.0f}s (download {t_dl:.0f}s): {dict(stats)}", flush=True)
 
         # 5. parts zip
         print("\n## parts")
         for kind in ("krid", "road"):
-            dirs = [work_dir / j.part for j in jobs if j.kind == kind and (work_dir / j.part).exists()]
+            # roadcrack(크랙+포트홀 라벨) 을 먼저 넣어야 같은 이름의 TOA(포트홀만) 사본보다 이긴다 (build_part_zip 은 먼저 본 것을 쓴다)
+            kinds = ("roadcrack", "road") if kind == "road" else (kind,)
+            dirs = [work_dir / j.part for k in kinds for j in jobs if j.kind == k and (work_dir / j.part).exists()]
             if not dirs:
                 continue
-            dest = parts_dir / f"{kind}.zip"
+            dest = parts_dir / f"{kind}{sfx}.zip"
             stats = build_part_zip(dirs, dest)
             print(f"  {dest}  {dest.stat().st_size / 1024**2:.0f} MB  {dict(stats)}")
-        print(f"\nUpload everything in {parts_dir} to Google Drive daboyeo_data/parts/, then run "
-              f"02_train_detector with PARTS = None.")
+        if sfx:
+            print(f"\nUpload the new parts/*{sfx}.zip to Google Drive daboyeo_data/parts/ and list it in "
+                  f"02_train_detector PARTS (not together with the untagged zip of the same kind).")
+        else:
+            print(f"\nUpload everything in {parts_dir} to Google Drive daboyeo_data/parts/, then run "
+                  f"02_train_detector with PARTS = None.")
         print(f"Label counts: {out / 'label_counts_krid.csv'}"
               + (f", {out / 'label_counts_road.csv'}" if (out / "label_counts_road.csv").exists() else ""))
 

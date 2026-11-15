@@ -7,13 +7,17 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import zipfile
 from collections import Counter
 from pathlib import Path, PurePosixPath
 
+import cv2
+
 from .sources import (
     CRACK,
+    ROAD_NOMINAL_SIZE,
     RDD_DEFAULT_COUNTRIES,
     count_coco_like,
     count_krid,
@@ -21,7 +25,7 @@ from .sources import (
     parse_krid,
     parse_rdd_xml,
 )
-from .yolo import CropWriter, YoloDetWriter, decode_image, frame_group, mask_boxes
+from .yolo import CrackMerge, CropWriter, YoloDetWriter, decode_image, frame_group, mask_boxes
 
 
 def _stem(name: str) -> str:
@@ -138,11 +142,13 @@ def process_road_obstacle(
     max_images: int | None = None,
     negative_ratio: float = 0.1,
     min_mask_area: int = 64,
+    crack_merge: CrackMerge | None = None,
 ) -> Counter[str]:
     """포트홀(TOA) 또는 크랙(CRACK) zip 한 쌍을 변환한다.
 
     크랙은 JSON 에 좌표가 없고 마스크 PNG 로 오는 경우가 있어, 박스가 없으면 같은 이름의
     마스크를 라벨 zip 에서 찾아 연결 영역별 박스로 만든다.
+    crack_merge: None 이면 v2 규칙 (어노테이션마다 박스), 주면 v3 규칙 (`sources.parse_coco_like`).
     """
     stats: Counter[str] = Counter()
     with zipfile.ZipFile(label_zip) as lz, zipfile.ZipFile(image_zip) as iz:
@@ -150,7 +156,7 @@ def process_road_obstacle(
         masks = _index_by_stem(lz, (".png",))
         labeled: list = []
         for n in sorted(x for x in lz.namelist() if x.lower().endswith(".json")):
-            labeled.extend(parse_coco_like(_read_json(lz, n), stats))
+            labeled.extend(parse_coco_like(_read_json(lz, n), stats, crack_merge))
         positives = 0
         for li in labeled:
             stem = _stem(li.file_name)
@@ -184,6 +190,112 @@ def process_road_obstacle(
                 stats["written_negative"] += 1
             if max_images and stats["written"] >= max_images:
                 break
+    return stats
+
+
+def label_stems(label_zip: Path) -> set[str]:
+    """라벨 zip 의 JSON 이름(`..._PLINE` / `..._BBOX` 를 뗀 것) = 짝 이미지 이름."""
+    with zipfile.ZipFile(label_zip) as zf:
+        return {_stem(n).removesuffix("_PLINE").removesuffix("_BBOX") for n in zf.namelist()
+                if n.lower().endswith(".json")}
+
+
+def process_crack_on_toa(
+    crack_label_zips: list[Path],
+    toa_label_zip: Path,
+    toa_image_zip: Path,
+    det: YoloDetWriter,
+    *,
+    crack_merge: CrackMerge | None = CrackMerge(),
+    stride: int = 2,
+    chunk: int = 300,
+    max_images: int | None = None,
+) -> Counter[str]:
+    """도로장애물(179) 크랙 라벨을 **포트홀(TOA) 이미지 zip 의 같은 이름 프레임**에 붙인다 (v3, 2026-11-15).
+
+    179 의 크랙 이미지 zip(`2.Images_new_211012/2.CRACK/`)은 라벨과 다른 장면이 들어 있다 (같은 이름의 TOA·CRACK 이미지
+    215쌍이 전부 다른 사진이고, 크랙 선은 TOA 쪽 사진에 맞는다 — `docs/ai-handoff.md` 15장). 그래서 크랙 라벨 zip 들과
+    TOA 라벨·이미지 zip 한 쌍을 받아, TOA 이미지 중 크랙 라벨이 있는 프레임만 쓴다. 박스 = 크랙(crack_merge 규칙) +
+    같은 프레임의 TOA 포트홀 박스. 이름은 TOA 변환과 같은 `ro_<stem>` 이라 parts zip 을 만들 때 이 폴더를 먼저 넣으면
+    TOA 쪽(포트홀만 있는 라벨) 사본을 덮는다. 프레임 번호 % stride 로 줄인다 (번호는 영상 안 위치라 사실상 무작위 추출).
+    """
+    stats: Counter[str] = Counter()
+    crack: dict[str, list] = {}
+    for lz_path in crack_label_zips:
+        with zipfile.ZipFile(lz_path) as lz:
+            for n in sorted(x for x in lz.namelist() if x.lower().endswith(".json")):
+                for li in parse_coco_like(_read_json(lz, n), stats, crack_merge):
+                    if li.boxes:
+                        crack[_stem(li.file_name)] = li
+    with zipfile.ZipFile(toa_label_zip) as lz, zipfile.ZipFile(toa_image_zip) as iz:
+        images = _index_by_stem(iz, (".png", ".jpg", ".jpeg"))
+        toa: dict[str, list] = {}
+        for n in sorted(x for x in lz.namelist() if x.lower().endswith(".json")):
+            for li in parse_coco_like(_read_json(lz, n)):
+                toa[_stem(li.file_name)] = li.boxes
+        for stem in sorted(crack):
+            if stem not in images:
+                stats["skip_not_in_toa_images"] += 1
+                continue
+            group, idx = _group(stem, chunk)
+            if stride > 1 and idx is not None and idx % stride:
+                stats["skip_stride"] += 1
+                continue
+            img = decode_image(iz.read(images[stem]))
+            if img is None:
+                stats["skip_decode"] += 1
+                continue
+            li = crack[stem]
+            h, w = img.shape[:2]
+            if (li.width, li.height) not in ((w, h), (0, 0)):
+                stats["size_mismatch"] += 1  # 라벨 크기와 실제 이미지 크기가 다르면 맞는 프레임이 아니다
+                continue
+            pothole = [b for b in toa.get(stem, []) if b.cls != CRACK]
+            stats["with_toa_pothole"] += bool(pothole)
+            det.write(f"ro_{stem}", img, li.boxes + pothole, group)
+            stats["written"] += 1
+            if max_images and stats["written"] >= max_images:
+                break
+    return stats
+
+
+def relabel_road_obstacle(label_zip: Path, src_root: Path, det: YoloDetWriter,
+                          crack_merge: CrackMerge | None) -> Counter[str]:
+    """이미 변환한 도로장애물 작업 폴더(src_root = .../det)의 이미지는 그대로 두고 라벨만 새 규칙으로 다시 쓴다.
+
+    원본 이미지 zip 을 다시 받지 않으려고 쓴다 (AI Hub 는 이 Mac 에서만 받을 수 있고 zip 이 10 GB 안팎).
+    고르는 이미지(stride·max_images)는 원래 변환과 같고, 이미지는 det 쪽에 하드링크(안 되면 복사)한다.
+    라벨 JSON 이 없는 이미지는 건너뛴다 (`relabel_no_json`). 마스크 PNG 로 박스를 만든 이미지는 없다고 본다
+    (179 실제 크랙은 polyline).
+    """
+    stats: Counter[str] = Counter()
+    by_stem = {}
+    with zipfile.ZipFile(label_zip) as lz:
+        for n in sorted(x for x in lz.namelist() if x.lower().endswith(".json")):
+            for li in parse_coco_like(_read_json(lz, n), stats, crack_merge):
+                by_stem[_stem(li.file_name)] = li
+    for img_path in sorted(Path(src_root).glob("images/*/ro_*.jpg")):
+        split, name = img_path.parent.name, img_path.stem
+        li = by_stem.get(name.removeprefix("ro_"))
+        if li is None:
+            stats["relabel_no_json"] += 1
+            continue
+        w, h = li.width, li.height
+        if w <= 0 or h <= 0:  # 라벨 크기 0: 저장 이미지가 640x360 이면 원본 1280x720 으로 본다, 아니면 건너뜀
+            small = cv2.imread(str(img_path))
+            if small is None or small.shape[:2] != (360, 640):
+                stats["relabel_bad_size"] += 1
+                continue
+            w, h = ROAD_NOMINAL_SIZE
+            stats["relabel_size_assumed"] += 1
+        dst = det.root / "images" / split / img_path.name
+        dst.unlink(missing_ok=True)
+        try:
+            dst.hardlink_to(img_path)
+        except OSError:
+            shutil.copy2(img_path, dst)
+        det.write_label(name, split, li.boxes, w, h, det.scale_for(w, h))
+        stats["written"] += 1
     return stats
 
 

@@ -39,7 +39,7 @@ ROAD_LABEL_DIR, ROAD_IMAGE_DIR = "1.Annotations", "2.Images_new_211012"
 
 @dataclass(frozen=True)
 class Job:
-    kind: str  # "krid" | "road"
+    kind: str  # "krid" | "road" | "roadcrack" (크랙 라벨 + TOA 이미지)
     ds: int
     image: AihubFile
     label: AihubFile
@@ -125,6 +125,28 @@ def pick_road_rows(rows: list[dict], n_pothole=ROAD_POTHOLE_ZIPS, n_crack=ROAD_C
         return rs[:n]
 
     return top("TOA", "pothole", n_pothole) + top("CRACK", "crack", n_crack)
+
+
+def named_crack_rows(rows: list[dict], names: list[str], exclude: list[dict] = ()) -> list[dict]:
+    """CRACK 라벨 zip 을 이름(`C_Mainroad_B04.zip`)으로 고른다. 이미지 zip 이 없거나 이름이 없으면 KeyError."""
+    taken = {r["label"] for r in exclude}
+    out = []
+    for name in names:
+        hit = [r for r in rows if r["kind"] == "CRACK" and r["label"].rsplit("/", 1)[-1] == name]
+        if not hit or not hit[0]["image"]:
+            raise KeyError(f"no CRACK label zip with an image zip named {name!r}")
+        if hit[0]["label"] not in taken:
+            taken.add(hit[0]["label"])
+            out.append(hit[0])
+    return out
+
+
+def named_toa_label(road_labels: list[AihubFile], name: str) -> AihubFile:
+    """TOA 라벨 zip 을 이름(`Mainroad_B02.zip`)으로. 없거나 여러 개면 KeyError."""
+    hit = [f for f in road_labels if "/1.TOA/" in f.path and f.name == name]
+    if len(hit) != 1:
+        raise KeyError(f"TOA label zip {name!r}: {len(hit)} matches")
+    return hit[0]
 
 
 def road_jobs(rows: list[dict], files_by_path: dict[str, AihubFile]) -> list[Job]:

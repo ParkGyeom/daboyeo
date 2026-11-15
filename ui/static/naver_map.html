@@ -4,6 +4,9 @@
   Streamlit 정적 파일(/app/static/)로 localhost:8501 주소에서 열려야 네이버 인증(Web 서비스 URL)이 통과한다.
     ?key=<NAVER_MAP_KEY_ID>   네이버 클라우드 플랫폼 Maps Client ID
     #<base64(JSON)>           결함 목록. 바뀌면 지도를 다시 만들지 않고 점만 다시 찍는다(확대·위치 유지)
+                              읽은 뒤 주소에서 지운다(긴 주소는 네이버 인증 실패)
+  처음 화면은 대한민국 전체. 결함마다 깜빡이는 신호, 새로 생긴 결함(d.fresh)은 크고 빠르게 깜빡인다.
+  확대가 CLUSTER_UNTIL 보다 작으면 화면에서 가까운 점들을 숫자 묶음으로 보이고, 누르면 그 묶음으로 확대한다.
 -->
 <html lang="ko"><head><meta charset="utf-8">
 <style>
@@ -11,10 +14,28 @@
   #map { width: 100%; height: 100%; }  /* 네이버 지도가 position 을 relative 로 바꾸므로 inset 이 아니라 크기로 준다 */
   #err { display: none; position: absolute; inset: 0; z-index: 10; padding: 16px; background: #fff;
          color: #b00020; font-size: 14px; }
+  /* 신호: 가운데 점(모양=상태) + 퍼지는 고리(색=위험도) */
+  .sig { position: relative; width: 18px; height: 18px; }
+  .sig .ring { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+               border-radius: 50%; opacity: 0; animation: pulse 2s ease-out infinite; }
+  .sig.fresh .ring { animation: pulse-fresh 1s ease-out infinite; }
+  .sig.fresh .ring.r2 { animation-delay: .5s; }
+  .sig .core { position: absolute; left: 1px; top: 1px; }
+  @keyframes pulse { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(2.6); opacity: 0; } }
+  @keyframes pulse-fresh { 0% { transform: scale(.6); opacity: .95; } 100% { transform: scale(4.2); opacity: 0; } }
   .pin { width: 16px; height: 16px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); box-sizing: border-box; }
   .pin.c { border-radius: 50%; }
-  .tri { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent;
+  .tri { width: 0; height: 0; margin-left: -1px; border-left: 9px solid transparent; border-right: 9px solid transparent;
          border-bottom-width: 16px; border-bottom-style: solid; filter: drop-shadow(0 0 1px rgba(0,0,0,.7)); }
+  .new-tag { position: absolute; left: 14px; top: -16px; background: #111; color: #fff; font-size: 11px;
+             font-weight: 700; padding: 1px 5px; border-radius: 8px; white-space: nowrap; }
+  /* 묶음: 숫자 원 + 퍼지는 고리 */
+  .cl { position: relative; width: 36px; height: 36px; cursor: pointer; }
+  .cl .ring { position: absolute; inset: 0; border-radius: 50%; opacity: 0; animation: pulse 2s ease-out infinite; }
+  .cl.fresh .ring { animation: pulse-fresh 1s ease-out infinite; }
+  .cl .num { position: absolute; inset: 0; border-radius: 50%; color: #fff; font-weight: 700; font-size: 14px;
+             display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255,255,255,.85);
+             box-shadow: 0 0 0 1px rgba(0,0,0,.3); box-sizing: border-box; }
   .iw { padding: 10px 12px; font-size: 13px; line-height: 1.5; width: 220px; }
   .iw img { width: 100%; border-radius: 4px; margin-bottom: 6px; display: block; }
   .iw b { font-size: 14px; }
@@ -26,8 +47,12 @@
 <div id="err"></div>
 <div id="map"></div>
 <div class="legend"><span style="background:#d62728;margin-left:0"></span>빠른 보수<span style="background:#f2a900"></span>정기 보수
-  &nbsp;·&nbsp; ● 미신고 ■ 신고됨 ▲ 보수 중</div>
+  &nbsp;·&nbsp; ● 미신고 ■ 신고됨 ▲ 보수 중 &nbsp;·&nbsp; 숫자 = 결함 묶음(누르면 확대)</div>
 <script>
+  var KOREA = { lat: 36.3, lon: 127.8, zoom: 7 };  // 처음 화면: 대한민국 전체
+  var CLUSTER_UNTIL = 14;  // 이 확대보다 작을 때만 묶는다
+  var GRID_PX = 56;        // 화면에서 이 거리 안의 점을 하나로 묶는다
+
   function fail(msg) {
     var e = document.getElementById('err');
     e.style.display = 'block';
@@ -41,63 +66,119 @@
       return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
     });
   }
+  // 읽은 # 은 주소에서 지운다. 네이버 인증이 페이지 주소 전체를 보내는데, 결함이 많아 주소가 길면
+  // (16건에 7KB) 인증이 실패한다(11/15 확인). 다음 목록은 Streamlit 이 iframe 주소를 바꿀 때 hashchange 로 온다
+  var lastData = [];
   function readData() {
     var h = location.hash.slice(1);
-    if (!h) return [];
+    if (!h) return lastData;
     var bin = atob(h.replace(/-/g, '+').replace(/_/g, '/'));
     var bytes = Uint8Array.from(bin, function (c) { return c.charCodeAt(0); });
-    return JSON.parse(new TextDecoder().decode(bytes));
+    lastData = JSON.parse(new TextDecoder().decode(bytes));
+    history.replaceState(null, '', location.pathname + location.search);
+    return lastData;
   }
-  function pinHtml(d) {
+  function coreHtml(d) {
     if (d.status === '보수 중') return '<div class="tri" style="border-bottom-color:' + esc(d.color) + '"></div>';
     return '<div class="pin' + (d.status === '미신고' ? ' c' : '') + '" style="background:' + esc(d.color) + '"></div>';
   }
+  function sigHtml(d) {
+    var ring = '<div class="ring" style="background:' + esc(d.color) + '"></div>';
+    return '<div class="sig' + (d.fresh ? ' fresh' : '') + '">' + ring +
+      (d.fresh ? ring.replace('ring', 'ring r2') + '<div class="new-tag">새 결함</div>' : '') +
+      '<div class="core">' + coreHtml(d) + '</div></div>';
+  }
+  function clusterHtml(g) {
+    var urgent = g.some(function (d) { return d.color === '#d62728'; });
+    var c = urgent ? '#d62728' : '#f2a900';
+    var fresh = g.some(function (d) { return d.fresh; });
+    return '<div class="cl' + (fresh ? ' fresh' : '') + '"><div class="ring" style="background:' + c + '"></div>' +
+      '<div class="num" style="background:' + c + '">' + g.length + '</div></div>';
+  }
   function infoHtml(d) {
     return '<div class="iw">' + (d.photo ? '<img src="' + esc(d.photo) + '">' : '') +
-      '<b>#' + d.id + ' ' + esc(d.type) + '</b><br>' +
+      '<b>#' + esc(d.id) + ' ' + esc(d.type) + '</b>' + (d.fresh ? ' <b style="color:#d62728">새 결함</b>' : '') + '<br>' +
       esc(d.severity) + ' · <b>' + esc(d.status) + '</b><br>' +
       esc(d.jurisdiction) + '<br>' +
       '관측 ' + d.obs + '건 · 차량 ' + d.vehicles + '대 · 신뢰도 ' + Number(d.conf).toFixed(2) + '</div>';
   }
 
-  var map = null, markers = [], openId = null, iw = null, fitted = false;
+  var map = null, data = [], markers = [], openId = null, iw = null;
 
-  function draw() {
-    var data = readData();
-    markers.forEach(function (m) { m.setMap(null); });
-    markers = [];
-    if (!data.length) { if (iw) iw.close(); return; }
-    var pts = data.map(function (d) { return new naver.maps.LatLng(d.lat, d.lon); });
-    if (!map) {
-      map = new naver.maps.Map('map', { center: pts[0], zoom: 16, scaleControl: true });
-      iw = new naver.maps.InfoWindow({ content: '', borderWidth: 1, borderColor: '#ccc' });
-    }
-    var reopen = null;
-    data.forEach(function (d, i) {
-      var marker = new naver.maps.Marker({
-        position: pts[i], map: map, title: '#' + d.id,
-        icon: { content: pinHtml(d), anchor: new naver.maps.Point(8, 8) }
-      });
-      naver.maps.Event.addListener(marker, 'click', function () {
-        if (iw.getMap() && openId === d.id) { iw.close(); openId = null; return; }
-        iw.setContent(infoHtml(d));
-        iw.open(map, marker);
-        openId = d.id;
-      });
-      if (d.id === openId) reopen = { d: d, marker: marker };
-      markers.push(marker);
+  // 화면 픽셀 격자로 가까운 점을 묶는다. 확대가 충분하면 하나씩
+  function groups() {
+    if (map.getZoom() >= CLUSTER_UNTIL) return data.map(function (d) { return [d]; });
+    var proj = map.getProjection(), cells = {}, out = [];
+    data.forEach(function (d) {
+      var p = proj.fromCoordToOffset(new naver.maps.LatLng(d.lat, d.lon));
+      var k = Math.floor(p.x / GRID_PX) + ':' + Math.floor(p.y / GRID_PX);
+      if (!cells[k]) { cells[k] = []; out.push(cells[k]); }
+      cells[k].push(d);
     });
-    // 열려 있던 말풍선은 새 내용(바뀐 상태 등)으로 다시 연다
-    if (reopen) { iw.setContent(infoHtml(reopen.d)); iw.open(map, reopen.marker); }
-    else if (iw.getMap()) { iw.close(); openId = null; }
-    // 처음 한 번만 결함 전체가 보이게 맞춘다. 그 뒤로는 보고 있던 확대·위치를 유지한다
-    if (!fitted) {
-      if (pts.length > 1) map.fitBounds(pts, { top: 40, right: 40, bottom: 60, left: 40, maxZoom: 17 });
-      else map.setCenter(pts[0]);
-      fitted = true;
-    }
+    return out;
   }
 
+  function render() {
+    markers.forEach(function (m) { m.setMap(null); });
+    markers = [];
+    var reopen = null;
+    groups().forEach(function (g) {
+      if (g.length === 1) {
+        var d = g[0];
+        var marker = new naver.maps.Marker({
+          position: new naver.maps.LatLng(d.lat, d.lon), map: map, title: '#' + d.id, zIndex: d.fresh ? 200 : 100,
+          icon: { content: sigHtml(d), anchor: new naver.maps.Point(9, 9) }
+        });
+        naver.maps.Event.addListener(marker, 'click', function () {
+          if (iw.getMap() && openId === d.id) { iw.close(); openId = null; return; }
+          iw.setContent(infoHtml(d));
+          iw.open(map, marker);
+          openId = d.id;
+        });
+        if (d.id === openId) reopen = { d: d, marker: marker };
+        markers.push(marker);
+        return;
+      }
+      var lat = 0, lon = 0;
+      g.forEach(function (d) { lat += d.lat; lon += d.lon; });
+      var cm = new naver.maps.Marker({
+        position: new naver.maps.LatLng(lat / g.length, lon / g.length), map: map, zIndex: 300,
+        title: '결함 ' + g.length + '건 (누르면 확대)',
+        icon: { content: clusterHtml(g), anchor: new naver.maps.Point(18, 18) }
+      });
+      naver.maps.Event.addListener(cm, 'click', function () {
+        var b = new naver.maps.LatLngBounds(
+          new naver.maps.LatLng(Math.min.apply(null, g.map(function (d) { return d.lat; })),
+                                Math.min.apply(null, g.map(function (d) { return d.lon; }))),
+          new naver.maps.LatLng(Math.max.apply(null, g.map(function (d) { return d.lat; })),
+                                Math.max.apply(null, g.map(function (d) { return d.lon; }))));
+        var z = map.getZoom();
+        map.fitBounds(b, { top: 60, right: 60, bottom: 80, left: 60, maxZoom: 18 });
+        // 점들이 거의 한 자리라 확대가 안 되면 묶음이 풀리는 확대까지 직접 올린다
+        if (map.getZoom() <= z) map.morph(b.getCenter(), Math.max(z + 3, CLUSTER_UNTIL));
+      });
+      markers.push(cm);
+    });
+    // 열려 있던 말풍선은 새 내용(바뀐 상태 등)으로 다시 연다. 묶음 속으로 들어갔으면 닫는다
+    if (reopen) { iw.setContent(infoHtml(reopen.d)); iw.open(map, reopen.marker); }
+    else if (iw.getMap()) { iw.close(); openId = null; }
+  }
+
+  function draw() {
+    data = readData();
+    if (!map) {
+      map = new naver.maps.Map('map', {
+        center: new naver.maps.LatLng(KOREA.lat, KOREA.lon), zoom: KOREA.zoom, scaleControl: true,
+        zoomControl: true, zoomControlOptions: { position: naver.maps.Position.TOP_RIGHT }
+      });
+      iw = new naver.maps.InfoWindow({ content: '', borderWidth: 1, borderColor: '#ccc' });
+      naver.maps.Event.addListener(map, 'zoom_changed', function () { if (data.length) render(); });
+      naver.maps.Event.once(map, 'init', function () { render(); });
+    }
+    if (map.getProjection()) render();
+  }
+
+  readData();  // 네이버 스크립트를 부르기 전에 # 을 지운다
   var key = new URLSearchParams(location.search).get('key');
   if (!key) {
     fail('NAVER_MAP_KEY_ID 가 없습니다.');

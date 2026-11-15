@@ -9,6 +9,9 @@
 components.html(srcdoc) 로 넣으면 주소가 없는 iframe 이라 네이버 인증이 실패한다(11/13 확인).
 정적 파일 서빙은 .streamlit/config.toml 과 scripts/demo.sh 에서 켠다.
 
+처음 화면은 대한민국 전체이고, 결함마다 깜빡이는 신호를 띄운다. 전국 축척에서 가까운 점은 숫자 묶음이 된다.
+새로 생긴 결함(이 화면을 연 뒤 처음 본 것)은 FRESH_S 초 동안 크게 깜빡이고 '새 결함' 표시가 붙는다.
+
 결함 목록은 iframe 주소의 # 뒤에 담는다. 목록이 바뀌면 # 만 바뀌어 지도는 다시 만들어지지 않고 점만 다시 찍힌다.
 지도는 iframe 이라 점을 눌러도 Streamlit 쪽으로 값이 돌아오지 않는다.
 그래서 점을 누르면 지도 위에 상세 말풍선(사진 포함)을 띄우고, 상태 변경은 아래 '결함 번호'에서 한다.
@@ -19,15 +22,19 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 from pathlib import Path
 from urllib.parse import quote
 
+import streamlit as st
 import streamlit.components.v1 as components
 
 import api
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = "/app/static/naver_map.html"
+MINI_PAGE = "/app/static/mini_map.html"
+FRESH_S = 20  # 새 결함을 강조하는 시간(초). 대시보드는 5초마다 다시 그리므로 네 번 정도 보인다
 SEV_COLOR = {"urgent": "#d62728", "routine": "#f2a900"}
 
 
@@ -44,8 +51,24 @@ def key_id() -> str | None:
     return None
 
 
+def fresh_ids(rows: list[dict], state: dict | None = None, now: float | None = None) -> set[str]:
+    """이번에 새로 강조할 결함 id. 화면을 처음 그릴 때 있던 결함은 새것이 아니다.
+
+    state 는 세션마다 하나(기본 st.session_state). {"seen": 처음 본 시각(id별), "ready": 첫 그림 여부}
+    """
+    state = st.session_state.setdefault("naver_map_seen", {}) if state is None else state
+    now = time.time() if now is None else now
+    seen = state.setdefault("seen", {})
+    first = not state.get("ready")
+    for r in rows:
+        seen.setdefault(r["id"], 0.0 if first else now)
+    state["ready"] = True
+    return {r["id"] for r in rows if now - seen[r["id"]] < FRESH_S}
+
+
 def render(rows: list[dict], height: int = 560) -> None:
-    """결함 목록(서버 /api/v1/defects 결과)을 네이버 지도에 점으로 그린다."""
+    """결함 목록(서버 /api/v1/defects 결과)을 네이버 지도에 깜빡이는 신호로 그린다."""
+    fresh = fresh_ids(rows)
     data = [
         {
             "id": api.short(r["id"]), "lat": r["lat"], "lon": r["lon"],
@@ -54,9 +77,56 @@ def render(rows: list[dict], height: int = 560) -> None:
             "status": api.STATUS_KO.get(r["status"], r["status"]),
             "color": SEV_COLOR.get(r["risk_level"], "#555"), "jurisdiction": r.get("jurisdiction"),
             "obs": r["observation_count"], "vehicles": r["vehicle_count"], "conf": round(float(r["confidence"]), 3),
-            "photo": api.snapshot_url(r.get("snapshot_path")),
+            "photo": api.snapshot_url(r.get("snapshot_path")), "fresh": r["id"] in fresh,
         }
         for r in rows
     ]
     blob = base64.urlsafe_b64encode(json.dumps(data, ensure_ascii=False).encode("utf-8")).decode("ascii")
     components.iframe(f"{PAGE}?key={quote(key_id() or '', safe='')}#{blob}", height=height)
+
+
+def mini(lat: float, lon: float, risk_level: str | None = None, height: int = 170) -> None:
+    """결함 한 곳의 작은 지도(핀 하나). 시민 확인 화면·신고서에서 좌표 글자 대신 쓴다.
+
+    키가 없으면 받아 둔 도로선 위에 점(인터넷 없이), 도로도 없으면 좌표 글자.
+    키가 있어도 인터넷이 없으면 지도 페이지가 좌표 글자로 대신 보인다.
+    """
+    if key := key_id():
+        color = SEV_COLOR.get(risk_level or "", "#d62728")
+        components.iframe(
+            f"{MINI_PAGE}?key={quote(key, safe='')}&lat={lat:.7f}&lon={lon:.7f}&color={quote(color, safe='')}",
+            height=height,
+        )
+        st.caption("지도 © NAVER Corp.")
+        return
+    _mini_roads(lat, lon, SEV_COLOR.get(risk_level or "", "#d62728"), height)
+
+
+def _mini_roads(lat: float, lon: float, color: str, height: int) -> None:
+    """키가 없을 때의 작은 지도: 결함 주변 250m 의 도로선 + 점."""
+    import math
+
+    import altair as alt
+    import pandas as pd
+
+    import basemap
+
+    m = 250
+    dlat, dlon = m / 111_320, m / (111_320 * math.cos(math.radians(lat)))
+    s, w, n, e = lat - dlat, lon - dlon, lat + dlat, lon + dlon
+    roads = basemap.load_roads((s, w, n, e))
+    if not roads:
+        st.caption(f"위치 {lat:.5f}, {lon:.5f}")
+        return
+    xs = alt.Scale(domain=[w, e], zero=False, nice=False)
+    ys = alt.Scale(domain=[s, n], zero=False, nice=False)
+    rdf = pd.DataFrame([{"rid": r["id"], "i": i, "lat": la, "lon": lo}
+                        for r in roads for i, (la, lo) in enumerate(r["coords"])])
+    lines = (alt.Chart(rdf).mark_line(clip=True, color="#8a8f98", opacity=0.6, strokeWidth=2)
+             .encode(x=alt.X("lon:Q", scale=xs, axis=None), y=alt.Y("lat:Q", scale=ys, axis=None),
+                     detail="rid:N", order="i:Q"))
+    pt = (alt.Chart(pd.DataFrame([{"lat": lat, "lon": lon}]))
+          .mark_point(filled=True, size=220, color=color, stroke="white", strokeWidth=2, opacity=1)
+          .encode(x=alt.X("lon:Q", scale=xs, axis=None), y=alt.Y("lat:Q", scale=ys, axis=None)))
+    st.altair_chart(alt.layer(lines, pt).properties(height=height).configure_view(stroke=None), width="stretch")
+    st.caption(basemap.ATTRIBUTION)

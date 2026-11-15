@@ -1,0 +1,150 @@
+{
+ "version": "v2",
+ "file": "detector_v2.onnx",
+ "classes": [
+  "pothole",
+  "crack",
+  "guardrail",
+  "sign"
+ ],
+ "input_size": 640,
+ "input": "1x3xHxW float32 RGB 0~1 (letterbox, OnnxDetector 가 처리)",
+ "recommended_conf": 0.25,
+ "nms_iou": 0.45,
+ "base_model": "/content/drive/MyDrive/daboyeo_data/models/detector_v1.pt",
+ "data_parts": [
+  "krid",
+  "rdd2022",
+  "road"
+ ],
+ "train_counts": {
+  "test": {
+   "crack": 9166,
+   "guardrail": 452,
+   "images": 4344,
+   "pothole": 934,
+   "sign": 1720
+  },
+  "train": {
+   "crack": 70509,
+   "guardrail": 4136,
+   "images": 26937,
+   "pothole": 7875,
+   "sign": 15571
+  },
+  "val": {
+   "crack": 8389,
+   "guardrail": 754,
+   "images": 4660,
+   "pothole": 996,
+   "sign": 2436
+  }
+ },
+ "epochs_trained": 30,
+ "metrics": {
+  "val": {
+   "pothole": {
+    "P": 0.637,
+    "R": 0.402,
+    "mAP50": 0.477,
+    "mAP50_95": 0.22
+   },
+   "crack": {
+    "P": 0.634,
+    "R": 0.279,
+    "mAP50": 0.305,
+    "mAP50_95": 0.161
+   },
+   "guardrail": {
+    "P": 0.67,
+    "R": 0.512,
+    "mAP50": 0.57,
+    "mAP50_95": 0.364
+   },
+   "sign": {
+    "P": 0.698,
+    "R": 0.64,
+    "mAP50": 0.679,
+    "mAP50_95": 0.46
+   },
+   "all": {
+    "P": 0.66,
+    "R": 0.458,
+    "mAP50": 0.507,
+    "mAP50_95": 0.301
+   }
+  },
+  "test": {
+   "pothole": {
+    "P": 0.585,
+    "R": 0.409,
+    "mAP50": 0.468,
+    "mAP50_95": 0.224
+   },
+   "crack": {
+    "P": 0.592,
+    "R": 0.258,
+    "mAP50": 0.272,
+    "mAP50_95": 0.143
+   },
+   "guardrail": {
+    "P": 0.612,
+    "R": 0.515,
+    "mAP50": 0.553,
+    "mAP50_95": 0.362
+   },
+   "sign": {
+    "P": 0.679,
+    "R": 0.614,
+    "mAP50": 0.658,
+    "mAP50_95": 0.432
+   },
+   "all": {
+    "P": 0.617,
+    "R": 0.449,
+    "mAP50": 0.488,
+    "mAP50_95": 0.29
+   }
+  }
+ },
+ "onnx_parity": {
+  "images": 10,
+  "ultralytics_boxes": 66,
+  "matched": 66
+ },
+ "colab_cpu_speed": {
+  "1thread_ms": 133.9,
+  "2thread_ms": 116.2
+ },
+ "created": "2026-11-14T21:53:41",
+ "eval_by_source": {
+  "note": "2026-11-15 노트북 밖에서 추가. test 를 출처별로 나눠 평가 (Ultralytics val, imgsz 640). 크랙 성능은 RDD 기준으로 본다 — 도로장애물(179) 크랙 라벨은 이미지당 최대 350개의 짧은 선분 박스라 박스 매칭이 거의 안 된다.",
+  "rdd2022_test": {
+   "images": 3526,
+   "v2": {
+    "all": 0.501,
+    "pothole": 0.418,
+    "pothole_R": 0.393,
+    "crack": 0.584,
+    "crack_R": 0.565
+   },
+   "v1": {
+    "all": 0.49,
+    "pothole": 0.409,
+    "pothole_R": 0.37,
+    "crack": 0.57,
+    "crack_R": 0.54
+   }
+  },
+  "road179_test": {
+   "images": 392,
+   "v2": {
+    "all": 0.287,
+    "pothole": 0.573,
+    "pothole_R": 0.466,
+    "crack": 0.001,
+    "crack_R": 0.0
+   }
+  }
+ }
+}

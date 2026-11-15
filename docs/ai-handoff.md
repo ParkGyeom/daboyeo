@@ -8,7 +8,7 @@
 ```python
 from daboyeo_ai.inference import OnnxDetector
 
-det = OnnxDetector("ai/models/detector_v1.onnx", threads=1)
+det = OnnxDetector("ai/models/detector_v2.onnx", threads=1)
 detections = det.detect(frame_bgr)        # OpenCV 로 읽은 BGR 프레임 그대로
 for d in detections:
     d.class_name   # "pothole" | "crack" | "guardrail" | "sign"
@@ -32,16 +32,26 @@ uv 를 안 쓰면: `pip install -e contracts -e ai`
 
 | 파일 | 위치 | 비고 |
 |---|---|---|
-| `detector_v1.onnx` | 박겸 Google Drive `daboyeo_data/models/` → 받아서 **`ai/models/`** 에 둔다 | git 에 안 올림 (`.gitignore`) |
-| `detector_v1.json` | 같은 곳 | 클래스 순서, 입력 크기, 성능, 학습 데이터 정보 |
+| `detector_v2.onnx` | 박겸 Google Drive `daboyeo_data/models/` → 받아서 **`ai/models/`** 에 둔다 | git 에 안 올림 (`.gitignore`) |
+| `detector_v2.json` | 레포 `ai/models/` (Drive 에도 있음) | 클래스 순서, 입력 크기, 성능, 학습 데이터 정보 |
 
 | 버전 | 클래스 | 상태 |
 |---|---|---|
-| **v1** | 출력은 4클래스지만 **학습된 건 pothole·crack 만** (공개 데이터 RDD2022) | 11/13 학습 중, 11/18 전 전달 |
-| v2 | 4클래스 전부 (AI Hub 국내 도로·시설물 데이터 추가) | AI Hub 서버 복구 후 |
+| **v2 (사용)** | 4클래스 전부 — RDD2022 + AI Hub 도로장애물(179) + 전국 도로시설물(KRID) | 11/15 완료 |
+| v1 | 출력은 4클래스지만 **학습된 건 pothole·crack 만** (RDD2022) | v2 로 대체 |
 
 **v1 → v2 는 파일만 바꾸면 된다.** 출력 클래스 수·순서·입력 형식이 같아서 코드 변경이 없다.
-v1 에서는 guardrail·sign 이 거의 나오지 않는 게 정상이다.
+
+v2 test mAP50 (자세한 값은 `detector_v2.json`):
+
+| | pothole | crack | guardrail | sign |
+|---|---|---|---|---|
+| 전체 test | 0.468 | 0.272 | 0.553 | 0.658 |
+| RDD2022 test 만 | 0.418 | **0.584** | — | — |
+| 도로장애물(179) test 만 | 0.573 | 0.001 | — | — |
+
+- 크랙 성능은 **RDD2022 test 기준(0.584)** 으로 본다. 도로장애물(179) 크랙 라벨은 한 이미지에 짧은 선분 박스가 수백 개라, 모델이 크랙 전체를 큰 박스로 잡아도 평가에서 맞은 것으로 치지 않는다. 전체 test 의 0.272 는 그 영향이다.
+- 같은 RDD2022 test 에서 v1 은 pothole 0.409 / crack 0.570 이라 v2 가 떨어진 클래스는 없다.
 
 ## 4. `OnnxDetector` 옵션
 
@@ -83,8 +93,8 @@ DB enum(`server/sql/001_init.sql`)과 `DefectType`·`RiskLevel` 이 어긋나면
 ## 6. 확인된 것
 
 - `OnnxDetector` 의 전처리·후처리는 Ultralytics 가 같은 ONNX 를 돌린 결과와 **박스·신뢰도가 완전히 같다** (사전학습 YOLO11n, 5/5, IoU 1.000).
-- 학습 노트북이 v1 모델을 만들 때 val 10장으로 같은 비교를 다시 하고 결과를 `detector_v1.json` 의 `onnx_parity` 에 남긴다.
-- CPU 속도는 `detector_v1.json` 의 `colab_cpu_speed` 에 참고값이 있다 (Colab CPU 기준). **정식 측정은 노트북 PC 에서** (계획 4.2).
+- 학습 노트북이 모델을 만들 때마다 val 10장으로 같은 비교를 다시 하고 결과를 `detector_vN.json` 의 `onnx_parity` 에 남긴다 (v2: 66/66 일치).
+- CPU 속도는 `detector_vN.json` 의 `colab_cpu_speed` 에 참고값이 있다 (Colab CPU 기준). **정식 측정은 노트북 PC 에서** (계획 4.2).
 
 ## 7. 주의
 

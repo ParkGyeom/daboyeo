@@ -87,16 +87,32 @@ def load_lines(path: Path) -> list[tuple[int, np.ndarray]]:
 
 
 def load_gps(path: Path) -> tuple[float, float, float] | None:
-    """GPS CSV 한 줄 `UTCTime(hhmmss.ss),위도,경도,...` → (초, 위도, 경도). 날짜는 없다."""
+    """GPS CSV 한 줄 → (UTC 초, 위도, 경도). 날짜는 없고 시각은 hhmmss.ss, 속도(쓰지 않음)는 knot.
+
+    형식이 셋 섞여 있다: A `시각,위도,경도,속도,방위,…`(8칸), B `번호,시각,위도,경도,…`(9칸), C 는 A 뒤에 빈 칸.
+    B 는 2·3번째가 아니라 3·4번째 칸이 한국 좌표 범위라서 구별한다. 좌표가 한국 범위가 아니면(다른 신호가 든
+    잘못된 행) None.
+    """
     if not path.exists():
         return None
     p = path.read_text(encoding="utf-8-sig").strip().split(",")
-    try:
-        hms, lat, lon = float(p[0]), float(p[1]), float(p[2])
-    except (IndexError, ValueError):
-        return None
-    t = int(hms // 10000) * 3600 + int(hms // 100 % 100) * 60 + hms % 100
-    return t, lat, lon
+
+    def num(i: int) -> float | None:
+        try:
+            return float(p[i])
+        except (IndexError, ValueError):
+            return None
+
+    for ti in (0, 1):  # A·C 는 시각이 0번째, B 는 1번째
+        hms, lat, lon = num(ti), num(ti + 1), num(ti + 2)
+        if hms is not None and lat is not None and lon is not None and _in_korea(lat, lon):
+            t = int(hms // 10000) * 3600 + int(hms // 100 % 100) * 60 + hms % 100
+            return t, lat, lon
+    return None
+
+
+def _in_korea(lat: float, lon: float) -> bool:
+    return 33.0 <= lat <= 39.0 and 124.0 <= lon <= 132.0
 
 
 def road_brightness(img: np.ndarray) -> float:
@@ -173,6 +189,20 @@ def ego_lines(lines: list[tuple[int, np.ndarray]], w: int, h: int, y_ref: float 
     return {k: (v[1] if v else None) for k, v in best.items()}
 
 
+def ego_offsets(lines: list[tuple[int, np.ndarray]], w: int, h: int, y_ref: float = 0.83) -> dict[str, float | None]:
+    """자기 차로 왼쪽·오른쪽 선이 높이 y_ref 에서 화면 가운데로부터 떨어진 거리 (화면 폭 비율). 선이 없으면 None.
+    측정기가 한쪽 선 위에 달려 있다면, 차가 그 선에서 멀어질수록 LTL-M 이 '페인트 없음'으로 떨어져야 한다."""
+    out: dict[str, float | None] = {}
+    for side, e in ego_lines(lines, w, h, y_ref).items():
+        if e is None:
+            out[side] = None
+            continue
+        q = e[1][np.argsort(-e[1][:, 1])]
+        (x1, y1), (x2, y2) = q[0], q[1]
+        out[side] = float(abs(x1 + (y_ref * h - y1) * (x2 - x1) / (y2 - y1) - w / 2) / w)
+    return out
+
+
 def label_contrast(img: np.ndarray, poly: np.ndarray, y_lo: float = 0.6, y_hi: float = 0.92,
                    horizon: float = 0.2, max_stripe: float = 0.035) -> float | None:
     """라벨 선 위치에서 잰 (페인트 V − 옆 노면 V) / 노면 V 의 중앙값. 우리 차선 찾기와 무관한 **기준(oracle) 대비**.
@@ -221,6 +251,7 @@ class Frame:
     oracle: dict[str, float | None] = field(default_factory=dict)  # left/right 기준 대비
     road_v: float | None = None  # `road_brightness`
     gps: tuple[float, float, float] | None = None  # (UTC 초, 위도, 경도)
+    ego_off: dict[str, float | None] = field(default_factory=dict)  # `ego_offsets`
 
 
 def measure_frames(names: Iterable[str], src: ImageSource, meter: LaneWearMeter, ltl: dict[str, float],
@@ -240,10 +271,21 @@ def measure_frames(names: Iterable[str], src: ImageSource, meter: LaneWearMeter,
             lines = load_lines(lp)
             ego = ego_lines(lines, w, h)
             f.has_label, f.ego_left, f.ego_right = True, ego["left"] is not None, ego["right"] is not None
+            f.ego_off = ego_offsets(lines, w, h)
             if r.lane_found:
                 f.seg_pts, f.seg_hit = segments_on_lines(segs, lines, tol_frac * w)
             f.oracle = {s: (label_contrast(img, e[1]) if e is not None else None) for s, e in ego.items()}
         yield f
+
+
+def refresh_meta(frames: list[Frame], labels: Path | None, gps: Path | None, size: tuple[int, int] = (1920, 1080)) -> None:
+    """캐시에서 읽은 프레임의 GPS·라벨 선 거리를 다시 읽는다 (이미지 없이). 파서를 고친 뒤 다시 잴 필요가 없게."""
+    for f in frames:
+        if gps is not None:
+            f.gps = load_gps(gps / f"{f.name}.csv")
+        lp = labels / f"{f.name}.json" if labels is not None else None
+        if lp is not None and lp.exists():
+            f.ego_off = ego_offsets(load_lines(lp), *size)
 
 
 # ---- 지표 ------------------------------------------------------------------------------
@@ -344,12 +386,21 @@ def evaluate(frames: list[Frame], no_paint_below: float = NO_PAINT_BELOW, worn_b
         w2 = ltl_all[idx2] < worn_below
         res["star_if_no_paint_is_worn"] = score_metrics(sc[star][idx2], ltl_all[idx2], w2,
                                                         [frames[i].drive for i in idx2], PROVISIONAL_WEAR_SCORE)
+        # 정현우 11/12 기준: LTL-M < 30 = 마모 (온전 표본 100~160, 손상 0~16 사이에서 고른 값 — 매뉴얼·법 기준 아님)
+        low = ltl_all[idx2] < no_paint_below
+        d2 = [frames[i].drive for i in idx2]
+        res["worn_is_below_cutoff"] = {k: score_metrics(sc[k][idx2], ltl_all[idx2], low, d2,
+                                                        PROVISIONAL_WEAR_SCORE if k == star else None)
+                                       for k in (star, "contrast", "paint_len")}
+        res["accuracy"] = {"below_cutoff": _accuracy(sc[star][idx2], low, PROVISIONAL_WEAR_SCORE),
+                           "below_worn": _accuracy(sc[star][idx], worn, PROVISIONAL_WEAR_SCORE)}
         s = sc[star][idx]
         ok = ~np.isnan(s)
         res["star_threshold_rows"] = threshold_rows(s[ok], worn[ok], thresholds)
         s_np = sc[star][nopaint]
         res["star_flag_rate_no_paint"] = {str(t): _rate(s_np[~np.isnan(s_np)] < t) for t in thresholds}
         res["oracle"] = _oracle(frames, paint, ltl_all, worn_below)
+        res["sides"] = _sides(frames, has, ltl_all, no_paint_below)
         rv = np.array([np.nan if f.road_v is None else f.road_v for f in frames])
         okv = paint & ~np.isnan(rv)
         cst = sc["contrast"]
@@ -364,6 +415,33 @@ def evaluate(frames: list[Frame], no_paint_below: float = NO_PAINT_BELOW, worn_b
 
 def _rate(x: np.ndarray) -> float | None:
     return float(np.mean(x)) if len(x) else None
+
+
+def _accuracy(score: np.ndarray, worn: np.ndarray, thr: float) -> dict:
+    """잠정 기준에서의 정확도와 "전부 정상" 이라고 부를 때의 정확도. 차선을 못 찾으면(NaN) 정상으로 본다 (실제로도
+    보내지 않는다). 양성이 20% 안팎이면 정확도만으로는 판단할 수 없다 — AUC·F1 을 같이 본다."""
+    pred = ~np.isnan(score) & (np.nan_to_num(score, nan=np.inf) < thr)
+    tp = int(np.sum(pred & worn))
+    return {"n": int(len(worn)), "positive_rate": _rate(worn), "accuracy": _rate(pred == worn),
+            "accuracy_all_intact": _rate(~worn), "precision": tp / max(1, int(pred.sum())),
+            "recall": tp / max(1, int(worn.sum()))}
+
+
+def _sides(frames: list[Frame], has: np.ndarray, ltl: np.ndarray, no_paint_below: float) -> dict:
+    """측정기가 어느 쪽 선을 재나: 쪽마다 (1) 라벨 선이 있을 때·없을 때 LTL-M < 30 비율, (2) 그 선까지 거리와
+    LTL-M(≥30) 의 Spearman, (3) 거리로 < 30 을 가르는 AUC (멀수록 < 30 이면 0.5 보다 크다)."""
+    out = {}
+    for side in ("left", "right"):
+        idx = [i for i in np.flatnonzero(has) if frames[i].ego_off]
+        off = np.array([np.nan if frames[i].ego_off.get(side) is None else frames[i].ego_off[side] for i in idx])
+        v = ltl[idx]
+        low = v < no_paint_below
+        line = ~np.isnan(off)
+        pm = line & ~low
+        out[side] = {"n": len(idx), "low_rate_with_line": _rate(low[line]), "low_rate_without_line": _rate(low[~line]),
+                     "offset_spearman_ltl": spearman(off[pm], v[pm]) if pm.sum() >= 3 else None,
+                     "offset_auc_low": auc_low_is_worn(-off[line], low[line]) if line.any() else None}
+    return out
 
 
 def _oracle(frames: list[Frame], paint: np.ndarray, ltl: np.ndarray, worn_below: float) -> dict:
@@ -418,7 +496,30 @@ def ltl_consistency(frames: list[Frame], no_paint_below: float = NO_PAINT_BELOW,
                                   "mean_first": float(np.mean(np.array(v)[:, 0])),
                                   "mean_second": float(np.mean(np.array(v)[:, 1]))}
                               for k, v in sorted(pairs.items())}
+    out["repeat_pass_no_paint"] = _repeat_low_agreement(fs, no_paint_below, near_m)
     return out
+
+
+def _repeat_low_agreement(fs: list[Frame], no_paint_below: float, near_m: float) -> dict:
+    """다른 주행이 같은 곳(near_m 안)을 지날 때 '< no_paint_below' 가 되풀이되나. 닳은 페인트(장소의 성질)라면
+    한쪽이 낮을 때 다른 쪽도 낮아야 하고, 측정기가 순간적으로 페인트를 벗어난 것이라면 기저 비율 근처다."""
+    if len(fs) < 2:
+        return {"n_pairs": 0}
+    lat = np.array([f.gps[1] for f in fs])
+    lon = np.array([f.gps[2] for f in fs])
+    xy = np.stack([lat * 111_000.0, lon * 111_000.0 * np.cos(np.radians(lat.mean()))], 1)
+    pr = []
+    for i in range(len(fs)):
+        d = np.hypot(*(xy[i + 1:] - xy[i]).T)
+        for j in np.flatnonzero(d < near_m) + i + 1:
+            if fs[i].drive != fs[j].drive:
+                pr.append((fs[i].ltl < no_paint_below, fs[j].ltl < no_paint_below))
+    if not pr:
+        return {"n_pairs": 0}
+    a = np.array(pr, bool)
+    n_low = int(a.sum())
+    return {"n_pairs": len(a), "base_low_rate": float(a.mean()),
+            "p_other_low_given_low": 2 * int(np.sum(a[:, 0] & a[:, 1])) / n_low if n_low else None}
 
 
 def _geometry(frames: list[Frame]) -> dict:
@@ -472,6 +573,15 @@ def to_markdown(res: dict) -> str:
         rb = r["road_brightness"]
         lines.append(f"노면 밝기(차선 아님) n={rb['n']}: Spearman(LTL-M) {_fmt(rb['spearman_ltl'])}, "
                      f"Spearman(contrast) {_fmt(rb['spearman_contrast'])}")
+        for key, title in (("below_worn", f"마모 < {st['worn_below']:g}"), ("below_cutoff", f"< {st['no_paint_below']:g} 을 마모로")):
+            acc = r["accuracy"][key]
+            lines.append(f"정확도 ({title}, ★ < {st['provisional_wear_score']:g}, 차선 못 찾음 = 정상): {_pct(acc['accuracy'])} "
+                         f"vs 전부 정상 {_pct(acc['accuracy_all_intact'])} (양성 {_pct(acc['positive_rate'])}, "
+                         f"정밀도 {_fmt(acc['precision'])}, 재현율 {_fmt(acc['recall'])})")
+        lines.append(f"< {st['no_paint_below']:g} 을 마모로: " + ", ".join(
+            f"{k} AUC {_fmt(m['auc'])} 2-fold F1 {_fmt(m['f1_2fold'])}" for k, m in r["worn_is_below_cutoff"].items()))
+        lines.append("쪽별 (라벨 선): " + ", ".join(f"{s} " + " ".join(f"{k}={_fmt(v)}" for k, v in o.items())
+                                                 for s, o in r["sides"].items()))
         lines.append("라벨 선 기준 대비 (oracle): " + ", ".join(
             f"{s} n={o['n']} Spearman {_fmt(o.get('spearman_ltl'))} AUC {_fmt(o.get('auc'))}"
             for s, o in r["oracle"].items()))
@@ -536,6 +646,7 @@ def main(argv: list[str] | None = None) -> int:
     ltl = load_ltlm(a.ltlm)
     if a.cache is not None and a.cache.exists():
         frames = [frame_from_cache(d) for d in json.loads(a.cache.read_text(encoding="utf-8"))]
+        refresh_meta(frames, a.labels, a.gps)
     else:
         src = ImageSource(a.images)
         names = src.names() if a.all_images else [n for n in src.names() if n in ltl]

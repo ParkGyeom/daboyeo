@@ -28,5 +28,5 @@ daboyeo-contracts = { workspace = true }
 daboyeo-ai = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["contracts/tests", "ai/tests", "tests", "server/tests", "edge/blackbox/tests"]
+testpaths = ["contracts/tests", "ai/tests", "tests", "server/tests", "edge/blackbox/tests", "ui/tests"]
 pythonpath = ["."]

@@ -39,6 +39,7 @@ rows = {
     "신고 일시": b["reported_at"].replace("T", " "),
     "결함 유형": api.TYPE_KO.get(b["defect_type"], b["defect_type"]),
     "위험도": api.RISK_KO.get(b["risk_level"], b["risk_level"]),
+    "주소": naver_map.place(b["location"].get("address")) or "-",
     "관할": b["location"]["jurisdiction"],
     "AI 신뢰도": f"{b['confidence']:.2f}",
     "관측 차량 수": f"{b['vehicle_count']}대",

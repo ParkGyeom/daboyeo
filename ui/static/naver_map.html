@@ -99,7 +99,7 @@
     return '<div class="iw">' + (d.photo ? '<img src="' + esc(d.photo) + '">' : '') +
       '<b>#' + esc(d.id) + ' ' + esc(d.type) + '</b>' + (d.fresh ? ' <b style="color:#d62728">새 결함</b>' : '') + '<br>' +
       esc(d.severity) + ' · <b>' + esc(d.status) + '</b><br>' +
-      esc(d.jurisdiction) + '<br>' +
+      (d.address ? esc(d.address) + '<br>' : '') + esc(d.jurisdiction) + '<br>' +
       '관측 ' + d.obs + '건 · 차량 ' + d.vehicles + '대 · 신뢰도 ' + Number(d.conf).toFixed(2) + '</div>';
   }
 

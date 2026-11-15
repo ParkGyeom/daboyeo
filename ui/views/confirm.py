@@ -63,6 +63,8 @@ for d in items:
             st.image(photo, width="stretch")
         badge = "🔴" if d["risk_level"] == "urgent" else "🟡"
         st.markdown(f"**{api.TYPE_KO.get(d['defect_type'], d['defect_type'])}** · {badge} {api.RISK_KO[d['risk_level']]}")
+        if addr := naver_map.place(d.get("address")):
+            st.markdown(f"📍 {addr}")
         naver_map.mini(d["lat"], d["lon"], d["risk_level"])
         st.caption(
             f"관할 {d['jurisdiction']}  \n"

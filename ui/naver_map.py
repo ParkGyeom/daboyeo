@@ -51,6 +51,11 @@ def key_id() -> str | None:
     return None
 
 
+def place(address: str | None) -> str | None:
+    """저장해 둔 주소를 화면 글자로: "서울 강남구 강남대로 396 부근". 없으면 None (server/geocode.py)."""
+    return f"{address} 부근" if address else None
+
+
 def fresh_ids(rows: list[dict], state: dict | None = None, now: float | None = None) -> set[str]:
     """이번에 새로 강조할 결함 id. 화면을 처음 그릴 때 있던 결함은 새것이 아니다.
 
@@ -76,6 +81,7 @@ def render(rows: list[dict], height: int = 560) -> None:
             "severity": api.RISK_KO.get(r["risk_level"], r["risk_level"]),
             "status": api.STATUS_KO.get(r["status"], r["status"]),
             "color": SEV_COLOR.get(r["risk_level"], "#555"), "jurisdiction": r.get("jurisdiction"),
+            "address": place(r.get("address")),
             "obs": r["observation_count"], "vehicles": r["vehicle_count"], "conf": round(float(r["confidence"]), 3),
             "photo": api.snapshot_url(r.get("snapshot_path")), "fresh": r["id"] in fresh,
         }

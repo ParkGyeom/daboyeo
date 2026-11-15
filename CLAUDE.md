@@ -22,6 +22,7 @@ uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3
 scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
 # 블랙박스가 보는 프레임과 탐지 박스: 화면의 관리자 → 블랙박스 화면 (server_data/live/, --live-fps 0 이면 끔)
+# 관리자 지도를 네이버 지도로: .env 에 NAVER_MAP_KEY_ID=<Client ID>, 콘솔 Web 서비스 URL 에 http://localhost:8501 등록 (인터넷 필요). 없으면 도로선 지도
 scripts/demo.sh down
 ```
 

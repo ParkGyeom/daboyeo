@@ -72,7 +72,8 @@ cmd_up() {
     else
         port_busy "$WEB_PORT" && die "포트 $WEB_PORT 을(를) 다른 프로그램이 쓰고 있다"
         SERVER_URL="http://localhost:$SERVER_PORT" start_bg web .venv/bin/streamlit run ui/app.py \
-            --server.port "$WEB_PORT" --server.headless true --browser.gatherUsageStats false
+            --server.port "$WEB_PORT" --server.headless true --browser.gatherUsageStats false \
+            --server.enableStaticServing true
         wait_http "http://localhost:$WEB_PORT/_stcore/health" web
         say "  화면 준비됨 http://localhost:$WEB_PORT"
     fi

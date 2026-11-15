@@ -25,7 +25,10 @@
 4. **contrast = (차선 V 중앙값 − 바로 옆 노면 V 중앙값) / 노면 V 중앙값.** 노면은 선분과 같은 행에서
    차선 폭의 2배 떨어진 양옆이다 (ROI 전체 노면과 비교하면 그림자·다른 차로 때문에 크게 흔들린다).
    극성 조건 때문에 contrast 는 항상 양수다.
-5. contrast < threshold 이면 마모(is_worn).
+5. contrast < threshold 이면 마모(is_worn). **이 절대 판정은 호환용이다** — 손 라벨 143장에서 AUC 0.56.
+6. 페인트 양: `contrast_p25` (행마다 잰 대비의 하위 25%, 벗겨진 구간이 많으면 낮다) 와 `paint_len`
+   (채택 선분 길이 합 ÷ 폭). 판정은 `LaneWearTracker` 가 같은 주행의 보통 수준과 비교해서 한다
+   (`score = contrast_p25 ÷ 주행 중앙값 × paint_len < 1.7`, 같은 라벨에서 AUC 0.79 · 2-fold F1 0.58).
 
 한계 (판정에 반드시 반영할 것):
 - **차선이 완전히 지워진 도로와 차선이 원래 없는 도로는 구별할 수 없다.** 그래서 차선 선분을 못 찾으면
@@ -45,6 +48,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 
 import cv2
@@ -71,6 +75,9 @@ class LaneWearResult:
     confidence: float  # 0~1, is_worn 판정의 신뢰도 (ObservationIn.confidence 로 쓴다)
     lane_pixel_ratio: float  # 차선 화소 / ROI 화소 (진단용)
     n_segments: int  # 모든 조건을 통과한 Hough 선분 수 (진단용)
+    # 아래 둘은 상대 판정(`LaneWearTracker`)용. lane_found=False 면 None / 0.
+    contrast_p25: float | None = None  # 선분을 따라 행마다 잰 대비의 하위 25% 값. 페인트가 군데군데 벗겨지면 낮다
+    paint_len: float = 0.0  # 채택 선분 길이 합 ÷ 작업 해상도 폭. 남은 페인트 양 (해상도와 무관)
 
 
 _NOT_FOUND = {"lane_found": False, "contrast": None, "is_worn": False, "confidence": 0.0}
@@ -174,6 +181,7 @@ class LaneWearMeter:
         segs: list[tuple[int, int, int, int]] = []
         lane_vals: list[np.ndarray] = []
         road_vals: list[np.ndarray] = []
+        row_vals: list[np.ndarray] = []  # 행마다의 대비 (차선 − 밝은 쪽 옆 노면) / 밝은 쪽 옆 노면
         for xa, ya, xb, yb in (lines.reshape(-1, 4) if lines is not None else ()):
             xa, ya, xb, yb = int(xa), int(ya), int(xb), int(yb)
             if ya == yb or np.degrees(np.arctan2(abs(yb - ya), abs(xb - xa))) < self.min_angle_deg:
@@ -211,6 +219,8 @@ class LaneWearMeter:
             segs.append((xa, ya, xb, yb))
             lane_vals.append(lv)
             road_vals.append(rv)
+            side_v = np.maximum(lf, rf)
+            row_vals.append((lv - side_v) / np.maximum(side_v, 1.0))
 
         # 소실점 투표: 차선(과 그 연장)은 한 점으로 모이고, 노면 질감·기둥·차 테두리 조각은 제각각이다.
         # 선분 쌍의 교점 중 가장 많은(긴) 선분이 지나가는 점을 소실점으로 두고, 그 점을 향하지 않는 선분은 버린다.
@@ -219,6 +229,7 @@ class LaneWearMeter:
         segs = [segs[i] for i in keep]
         lane_vals = [lane_vals[i] for i in keep]
         road_vals = [road_vals[i] for i in keep]
+        row_vals = [row_vals[i] for i in keep]
         total_len = float(sum(np.hypot(xb - xa, yb - ya) for xa, ya, xb, yb in segs))
 
         if not segs:
@@ -242,6 +253,10 @@ class LaneWearMeter:
         road_l = float(np.median(np.concatenate(road_vals)))
         contrast = (lane_l - road_l) / max(road_l, 1.0)
         is_worn = contrast < self.threshold
+        # 페인트 양: 행마다의 대비 하위 25% (벗겨진 구간이 많으면 낮다) 와 남은 선 길이. 점선은 칠한 토막만
+        # 선분으로 잡히므로 토막 사이 빈칸은 길이에서 빠질 뿐 하위 25% 를 낮추지 않는다.
+        contrast_p25 = float(np.percentile(np.concatenate(row_vals), 25))
+        paint_len = total_len / sw
 
         # 신뢰도 = (선 구조가 충분한가) × (기준값에서 얼마나 떨어져 있나). 기준값 바로 위아래면 0.5×support.
         support = min(1.0, total_len / max(1.0, 1.5 * ch))
@@ -249,7 +264,7 @@ class LaneWearMeter:
         confidence = support * (0.5 + 0.5 * certainty)
         return LaneWearResult(
             lane_found=True, contrast=contrast, is_worn=is_worn, confidence=float(np.clip(confidence, 0, 1)),
-            lane_pixel_ratio=ratio, n_segments=len(segs),
+            lane_pixel_ratio=ratio, n_segments=len(segs), contrast_p25=contrast_p25, paint_len=paint_len,
         ), segs_px
 
     # ---- 내부 ----------------------------------------------------------------------
@@ -267,6 +282,83 @@ class LaneWearMeter:
             cv2.fillPoly(m, [poly], 255)
             self._mask_cache[key] = (m[y0:y1, x0:x1] > 0, (int(x0), int(y0), int(x1), int(y1)))
         return self._mask_cache[key]
+
+
+# 상대 판정 잠정값 (TBD) — 오픈 이슈 #6. 손 라벨 143장(KRID·AI Hub 도로장애물, 2026-11-15)에서 고른 값.
+# 시연 주행 영상으로 다시 확인한다 (`python -m daboyeo_ai.eval.lane_wear_eval`).
+PROVISIONAL_WEAR_SCORE = 1.7
+
+
+@dataclass(frozen=True)
+class WearJudgement:
+    """`LaneWearTracker.update` 결과. 한 프레임의 상대 판정."""
+
+    lane_found: bool
+    ready: bool  # 기준(baseline) 을 만들 만큼 차선 프레임이 모였나 (warmup 이 끝났나)
+    baseline: float | None  # 이 주행의 보통 contrast_p25 (최근 window 개 차선 프레임의 중앙값)
+    score: float | None  # (contrast_p25 ÷ baseline) × paint_len. 낮을수록 마모. ready=False 면 None
+    is_worn: bool  # ready 이고 score < threshold 일 때만 True
+    confidence: float  # 0~1, is_worn 판정의 신뢰도
+
+
+class LaneWearTracker:
+    """한 주행(같은 카메라·비슷한 조명) 안에서 **상대적으로** 마모를 판정한다. 주행마다 하나씩 만든다.
+
+        meter, tracker = LaneWearMeter(), LaneWearTracker()   # 주행 시작
+        j = tracker.update(meter.measure(frame_bgr))
+        if j.is_worn:
+            ...  # ObservationIn(defect_type=LANE_WEAR, confidence=j.confidence, ...)
+
+    왜: 절대 대비(contrast)는 마모보다 카메라·노면색·조명에 더 크게 좌우된다 (KRID 선명 중앙값 0.47 vs
+    AI Hub 도로장애물 마모 0.72). 그래서 대비는 같은 주행의 보통 값으로 나누고, 페인트가 남은 길이를 곱한다.
+
+    score = (contrast_p25 ÷ baseline) × paint_len
+      - contrast_p25: 선분을 따라 행마다 잰 대비의 하위 25%. 벗겨진 구간이 많으면 낮다.
+      - baseline: 최근 `window` 개 차선 프레임의 contrast_p25 중앙값 (마모 프레임이 섞여도 중앙값이라 덜 흔들린다).
+      - paint_len: 남은 차선 선분 길이 합 ÷ 폭. 지워져 토막 난 차선은 짧다.
+    차선을 찾은 프레임이 `warmup` 개 모이기 전에는 판정하지 않는다 (is_worn=False, ready=False).
+    현재 프레임은 판정한 **다음에** 기준에 넣는다.
+
+    한계: 주행 전체가 마모 도로면 기준 자체가 낮아져 마모를 놓친다. 터널·야간으로 조명이 크게 바뀌면
+    `reset()` 하거나 새 tracker 를 쓴다. paint_len 은 보이는 차로 수에 따라 달라진다 (편도 1차로는 짧다).
+    """
+
+    def __init__(self, threshold: float = PROVISIONAL_WEAR_SCORE, window: int = 100, warmup: int = 20):
+        if threshold <= 0:
+            raise ValueError("threshold 는 0보다 커야 한다")
+        if window < 1 or not 1 <= warmup <= window:
+            raise ValueError("1 <= warmup <= window 여야 한다")
+        self.threshold = float(threshold)
+        self.window = int(window)
+        self.warmup = int(warmup)
+        self._recent: deque[float] = deque(maxlen=self.window)
+
+    @property
+    def baseline(self) -> float | None:
+        if len(self._recent) < self.warmup:
+            return None
+        return float(np.median(self._recent))
+
+    def reset(self) -> None:
+        self._recent.clear()
+
+    def score(self, r: LaneWearResult, baseline: float) -> float:
+        """기준값이 주어졌을 때의 점수. 오프라인 평가(주행 전체 중앙값을 기준으로)에도 쓴다."""
+        return float(r.contrast_p25) / max(baseline, 1e-3) * r.paint_len
+
+    def update(self, r: LaneWearResult) -> WearJudgement:
+        if not r.lane_found or r.contrast_p25 is None:
+            return WearJudgement(lane_found=False, ready=self.baseline is not None, baseline=self.baseline,
+                                 score=None, is_worn=False, confidence=0.0)
+        base = self.baseline
+        self._recent.append(float(r.contrast_p25))
+        if base is None:
+            return WearJudgement(lane_found=True, ready=False, baseline=None, score=None, is_worn=False,
+                                 confidence=0.0)
+        s = self.score(r, base)
+        certainty = min(1.0, abs(s - self.threshold) / self.threshold)
+        return WearJudgement(lane_found=True, ready=True, baseline=base, score=s, is_worn=s < self.threshold,
+                             confidence=float(0.5 + 0.5 * certainty))
 
 
 def _vanishing_inliers(segs: np.ndarray, w: int, h: int, tol_deg: float, max_segs: int = 40) -> list[int]:

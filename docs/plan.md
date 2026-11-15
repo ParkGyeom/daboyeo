@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 기반 | [PRD.md](../PRD.md) **v0.5** (v0.4 + 시설물 파손 판정 대체안 확정, 줄 번호는 v0.4 와 같음) |
-| 계획 버전 | r3.6 (2026-11-15) — r1은 PRD v0.2, r2는 v0.3 기준 |
+| 계획 버전 | r3.7 (2026-11-15) — r1은 PRD v0.2, r2는 v0.3 기준 |
 | 완성 기한 | 2026-11-27 (금), D-14 |
 | 상태 | 팀 검토 중 — 0.1(레포·`contracts/`)은 완료 |
 
@@ -354,6 +354,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 
 ## 변경 이력
 
+- **r3.7 (2026-11-15)** — 차선 마모 판정을 절대 대비 기준값 하나에서 **상대 대비 + 페인트 양**으로 바꿈 (2.6, #6). 손 라벨 143장(선명 112 / 마모 31, KRID·AI Hub 도로장애물)에서 절대 contrast 는 AUC 0.56 · best F1 0.37 로 카메라·조명에 더 좌우됨. 새 점수 `score = (contrast_p25 ÷ 같은 주행의 중앙값) × paint_len` (행마다 잰 대비의 하위 25% · 남은 차선 길이) 은 AUC 0.79 · best F1 0.58 · 2-fold F1 0.58 (두 카메라 각각 AUC 0.79). 잠정 기준 `score < 1.7` (TBD, 시연 영상으로 재확인). `LaneWearResult` 에 `contrast_p25`·`paint_len` 추가(기본값 있음), 주행마다 쓰는 `LaneWearTracker`(최근 100 프레임 중앙값, warmup 20), 비교 도구 `ai/daboyeo_ai/eval/lane_wear_eval.py`. `measure()` 와 `PROVISIONAL_THRESHOLD` 는 그대로. tracker 를 블랙박스에 둘지 서버(차량별)에 둘지는 정현우와 정할 것 — `docs/ai-handoff.md` 8장.
 - **r3.6 (2026-11-15)** — 차선 마모 측정을 실제 프레임에 맞게 고침 (2.6, #6 준비). 실제 블랙박스 프레임 300장(KRID 150 + AI Hub 도로장애물 150)에서 잡힌 선분 대부분이 차선이 아니라 균열·이음매·가드레일·앞차였음 (contrast 32% 가 음수). 변경: 양옆 노면보다 밝은 줄무늬만 후보(극성), 원근·소실점 투표로 선분 거르기, 대비는 ROI 전체가 아니라 선분 바로 옆 노면과 비교, 밝기는 V(=max RGB, 노란 차선용), 화소 값은 폭 640 기준으로 해상도 비례, ROI 기본값을 화면 0.35~0.92 육각형으로. 결과: 차선 찾음 92% → 73% (잘못 찾던 프레임이 빠짐), 음수 contrast 32% → 0%, 중앙값 0.10 → 0.50, 1280×720 약 4 ms. 기준값(잠정 0.3)은 그대로 — 손 라벨로 #6 에서 정한다. `docs/ai-handoff.md` 8장 ROI 설명 갱신.
 - **r3.5 (2026-11-15)** — 탐지 v2 확정 (RDD test crack 0.584 ≥ v1 0.570, `ai/models/detector_v2.json`). 시설물 파손 분류 (2.7) 학습 결과 No-go → **대체안(위치 탐지까지만) 확정**, PRD v0.5. 첫 학습은 Ultralytics 가 val 정확도로 best.pt 를 골라 '전부 정상' epoch 1 모델이 뽑혔다(val 이 정상 91%) → 조기 종료 끄고 last.pt 로 다시 학습(v1b)해 판단. 노트북 03 도 같은 방식으로 수정.
 - **r3.4 (2026-11-15)** — 시설물 파손 분류 (2.7) 구현: `ai/daboyeo_ai/data/damage_cls.py`(크롭 → 시설물 종류 표 `krid_crop_types.csv.gz`, normal 줄이기), `ai/daboyeo_ai/eval/damage_metrics.py`, `ai/daboyeo_ai/inference/damage_classifier.py`, `OnnxDetector(damage_model=...)`, `ai/notebooks/03_train_damage_cls.ipynb`. 학습 크롭과 추론 크롭은 같은 `facility_crop`(CropWriter 에서 분리) + `square_input`(정사각형, Ultralytics 가운데 자르기에 가드레일이 잘리지 않게). 로컬 Mac 에서 2 epoch 모의 학습·ONNX 일치 확인. 사용법은 `docs/ai-handoff.md` 9장(정현우 확인 필요).

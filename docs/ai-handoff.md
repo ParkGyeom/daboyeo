@@ -263,7 +263,49 @@ for d in det.detect(frame_bgr):
 
 ## 11. AI 쪽이 받아야 하는 것 (계획 4장)
 
-- **속도 측정 로그 형식**: 프레임·단계별 `{"frame", "t", "stage", "ran", "ms"}` JSONL — `bench_cpu`·`interval_sweep` 실험이 이 로그를 읽는다. 형식이 바뀌면 알려주기.
+- **속도 측정 로그 형식**: 프레임·단계별 `{"frame", "t", "stage", "ran", "ms"}` JSONL — `bench_cpu` 실험이 이 로그를 읽는다. 형식이 바뀌면 알려주기. (`interval_sweep` 은 탐지기를 직접 돌려서 이 로그가 필요 없다.)
   주기 적용 전/후 로그를 하나씩 주면 단계별 실행 비율·ms·FPS·영상 1분당 계산 시간을 낸다: `uv run python -m daboyeo_ai.eval.bench_cpu log 전=before.jsonl 후=after.jsonl --out experiments/bench_cpu_log.csv`. 건너뛴 프레임도 `"ran": false` 로 한 줄씩 남겨 주기 (영상 길이·실행 비율 계산에 쓴다). `t` 가 없으면 `--video-fps 30` 을 준다.
 - **프레임 샘플링 방식**: 분석 주기(N프레임마다 탐지 등)를 어떻게 적용하는지.
-- **시연 영상 + 수동 라벨** (`experiments/gt_events/`): 실제 주행 영상 평가에 쓴다.
+- **시연 영상 + 수동 라벨** (`experiments/gt_events/`): 실제 주행 영상 평가에 쓴다. 라벨 형식은 12장 (제안).
+
+## 12. 수동 라벨 `experiments/gt_events/<video_id>.csv` (제안 — 정현우 확인 필요)
+
+계획 0.10 의 수동 라벨 형식. `eval_detector`·`interval_sweep`(박겸, 4.1·4.3) 과 1.1 가짜 탐지기(정현우)가 **같은 파일**을
+읽으므로 형식을 같이 정한다. `<video_id>` = 영상 파일 이름에서 확장자를 뺀 것 (`v1.mp4` → `v1.csv`).
+
+```csv
+defect_id,t_start_s,t_end_s,defect_type,memo
+P001,12.0,14.5,pothole,오른쪽 차로
+C003,30.2,,crack,t_end_s 를 비우면 t_start_s ± 1초
+L001,41.0,55.0,lane_wear,구간 전체가 마모
+G002,61.5,63.0,guardrail_damage,시설물은 '보임' 만 적는다 (파손 판정 안 함)
+```
+
+| 열 | 뜻 |
+|---|---|
+| `defect_id` | 결함 ID. **두 영상에 같은 결함이 보이면 같은 ID** (계획 0.10, 중복 정리 평가용). 비우면 `<video_id>#줄번호` |
+| `t_start_s`, `t_end_s` | 영상 시작부터 초. 화면에 결함이 보이기 시작한 때 ~ 사라진 때. `mm:ss` 도 된다. `t_end_s` 를 비우면 한 시각으로 본다 |
+| `defect_type` | `daboyeo_contracts.DefectType` 값: `pothole` `crack` `lane_wear` `guardrail_damage` `sign_damage` |
+| `memo` | 자유 |
+
+- 받는 쪽은 너그럽게 읽는다: 헤더 한국어(`ID`·`시작`·`끝`·`시각`·`유형`·`메모`), 시각 하나만 쓰는 `t_s` 열(→ `t_s ± 1초`),
+  유형 한국어(`포트홀`·`균열`·`차선 마모`·`가드레일`·`표지판`)와 탐지 클래스 이름(`guardrail`·`sign`), `#` 주석 줄.
+  그래도 **위 영어 형식으로 쓰기를 권한다** (가짜 탐지기도 읽기 쉽게).
+- 가짜 탐지기(1.1)는 `t_start_s`(또는 `t_s`) 시각에 그 유형 탐지 1건을 내면 된다 → `observations` 행 = 라벨 수.
+- 시설물: 파손 판정을 하지 않으므로(PRD v0.5) 평가는 "시설물 위치를 찾았나"로만 하고 결함 지표와 섞지 않는다.
+  보이는 가드레일·표지판을 **전부** 적을 여유가 없으면 시설물 행은 빼도 된다 (적지 않으면 정밀도가 낮게 나올 뿐 결함 지표에는 영향 없음).
+- 평가 규칙: 정답 창 `[t_start − 0.5초, t_end + 0.5초]` 안의 분석 프레임에 같은 유형 탐지가 하나라도 있으면 찾음.
+  예측은 1초 이내로 이어지는 탐지를 한 이벤트로 묶고, 정답 창에 걸리면 맞음. 차선 마모는 `LaneWearTracker.confirmed` 프레임.
+
+실행 (박겸, Mac):
+
+```bash
+uv run python -m daboyeo_ai.eval.interval_sweep data/videos/v1.mp4 --cache-dir data/eval_cache   # 모든 프레임 1번 + 간격 1/3/5/10/15
+uv run python -m daboyeo_ai.eval.eval_detector data/videos/v1.mp4 --every 3 --cache-dir data/eval_cache   # conf 0.25~0.6 별 P/R/F1
+```
+
+클래스별 기준은 `--conf-json experiments/conf_thresholds.json` 을 붙인다 (`class_conf` 를 읽음). 캐시는 영상마다 한 개라,
+`interval_sweep`(매 프레임) 을 **먼저** 돌리면 `eval_detector` 가 어떤 `--every` 로든 다시 쓴다 (conf 기준이 캐시보다 낮으면 다시 돈다).
+
+결과는 `experiments/interval_sweep/sweep.csv`(+ `--with matplotlib` 로 실행하면 `sweep.png`), `experiments/eval_detector/summary.{csv,json}`.
+캐시(`data/eval_cache/`)는 git 에 올리지 않는다.

@@ -140,10 +140,16 @@ def test_evaluate_counts_and_perfect_score():
 
 def test_load_gps_and_road_brightness(tmp_path):
     (tmp_path / "g.csv").write_text("64907.28,37.0658417,127.9272414,21.3,104.6,0.8,1.7,1.8\n")
+    (tmp_path / "b.csv").write_text("1,41852.20,37.30257333,126.89875333,40.340,335,,,\n")  # 형식 B (번호 먼저)
+    (tmp_path / "c.csv").write_text("64907.28,37.0658417,127.9272414,21.3,104.6,,,,\n")  # 형식 C (빈 칸)
     (tmp_path / "bad.csv").write_text("x\n")
+    (tmp_path / "wrong.csv").write_text("77.78125,-0.09,-0.14,0.34,1,6551.8,0\n")  # 좌표가 아닌 값이 든 행
     t, lat, lon = rm.load_gps(tmp_path / "g.csv")
     assert t == pytest.approx(6 * 3600 + 49 * 60 + 7.28) and lat == pytest.approx(37.0658417)
-    assert rm.load_gps(tmp_path / "bad.csv") is None and rm.load_gps(tmp_path / "none.csv") is None
+    assert rm.load_gps(tmp_path / "b.csv") == pytest.approx((4 * 3600 + 18 * 60 + 52.2, 37.30257333, 126.89875333))
+    assert rm.load_gps(tmp_path / "c.csv") == pytest.approx((t, lat, lon))
+    for bad in ("bad", "wrong", "none"):
+        assert rm.load_gps(tmp_path / f"{bad}.csv") is None
     assert rm.road_brightness(frame_with_lanes(road=80)) == pytest.approx(80, abs=3)
 
 
@@ -162,6 +168,8 @@ def test_ltl_consistency_consecutive_and_repeat_pass():
     assert c["consecutive"]["p_no_paint_after_no_paint"] == pytest.approx(0.5)
     rp = c["repeat_pass"]["light-night"]
     assert rp["n_pairs"] == 2 and rp["mean_first"] == pytest.approx(101) and rp["mean_second"] == pytest.approx(131.5)
+    nl = c["repeat_pass_no_paint"]  # 낮 (100,102) 자리와 밤 (130,133) 자리: 낮은 값이 겹치지 않는다
+    assert nl["n_pairs"] == 2 and nl["base_low_rate"] == 0.0 and nl["p_other_low_given_low"] is None
 
 
 def test_cache_roundtrip():
@@ -204,3 +212,34 @@ def test_main_end_to_end_writes_aggregates_only(tmp_path):
     text = out.read_text(encoding="utf-8")
     assert not any(n in text for n in names)  # 프레임 이름(프레임별 값)은 결과에 남기지 않는다
     assert cache.exists() and rm.main(args) == 0  # 두 번째는 캐시에서 읽는다
+
+
+def test_ego_offsets():
+    off = rm.ego_offsets([(383, LEFT), (383, RIGHT)], W, H)
+    # 높이 0.83H(=597.6) 에서 왼쪽 선 x ≈ 382, 오른쪽 ≈ 898 → 가운데(640)에서 폭의 약 0.2
+    assert off["left"] == pytest.approx((640 - 382) / W, abs=0.01)
+    assert off["right"] == pytest.approx((898 - 640) / W, abs=0.01)
+    assert rm.ego_offsets([(383, LEFT)], W, H)["right"] is None
+
+
+def test_accuracy_counts_not_found_as_intact():
+    score = np.array([0.5, 2.0, np.nan, 0.5, 2.0])
+    worn = np.array([True, False, True, False, False])
+    acc = rm._accuracy(score, worn, 1.0)
+    assert acc["accuracy"] == pytest.approx(3 / 5)  # 맞음: 0, 1, 4
+    assert acc["accuracy_all_intact"] == pytest.approx(3 / 5)
+    assert acc["precision"] == pytest.approx(0.5) and acc["recall"] == pytest.approx(0.5)
+
+
+def test_sides_finds_the_side_whose_distance_explains_no_paint():
+    frames = []
+    for i in range(40):
+        near = i % 4 != 0  # 4 번에 1 번은 오른쪽 선에서 멀어지고, 그때 측정기 아래 페인트가 없다
+        f = _frame(f"0401_light_clear_smooth_0100{i:04d}", 120.0 + i if near else 10.0, 1.0)
+        f.ego_off = {"left": 0.2 + 0.001 * (i % 7), "right": 0.15 if near else 0.3}
+        frames.append(f)
+    ltl = np.array([f.ltl for f in frames])
+    sides = rm._sides(frames, np.ones(len(frames), bool), ltl, 30.0)
+    assert sides["right"]["offset_auc_low"] == pytest.approx(1.0)
+    assert abs(sides["left"]["offset_auc_low"] - 0.5) < 0.3
+    assert sides["right"]["low_rate_with_line"] == pytest.approx(0.25)

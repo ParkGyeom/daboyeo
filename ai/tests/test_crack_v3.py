@@ -176,3 +176,31 @@ def test_source_subset_links_only_prefix(tmp_path):
     assert "test: images/test" in y.read_text()
     source_subset(root, tmp_path / "sub", "ro_")   # 다시 부르면 이전 링크는 지운다
     assert [p.name for p in (tmp_path / "sub" / "images" / "test").iterdir()] == ["ro_b.jpg"]
+
+
+def test_crack_on_toa_uses_toa_images_and_merges_pothole_boxes(tmp_path):
+    from daboyeo_ai.data.pipeline import label_stems, process_crack_on_toa
+
+    stems = [f"V3F_HY_{i:04d}_20160212_013015_N_CH0_Seoul_Cloud_Mainroad_Day_{i:05d}" for i in range(4)]
+    crack_l = tmp_path / "C_L.zip"
+    with zipfile.ZipFile(crack_l, "w") as z:
+        for s in stems[:3] + ["V3F_only_in_crack_00000"]:
+            z.writestr(f"{s}_PLINE.json", json.dumps(crack_js(f"{s}.png", CHAIN + FAR)))
+    toa_l, toa_i = tmp_path / "T_L.zip", tmp_path / "T_I.zip"
+    img = cv2.imencode(".png", np.full((720, 1280, 3), 90, np.uint8))[1].tobytes()
+    with zipfile.ZipFile(toa_l, "w") as lz, zipfile.ZipFile(toa_i, "w") as iz:
+        for s in stems:
+            anns = [{"id": 1, "image_id": 1, "category_id": 1, "bbox": [600, 500, 80, 40]}] if s == stems[0] else []
+            lz.writestr(f"{s}_BBOX.json", json.dumps({
+                "images": {"id": 1, "file_name": f"{s}.png", "width": 1280, "height": 720},
+                "annotations": anns, "categories": [{"id": 1, "name": "Pothole"}]}))
+            iz.writestr(f"img/{s}.png", img)
+    assert label_stems(toa_l) == set(stems) and len(label_stems(crack_l) & label_stems(toa_l)) == 3
+
+    det = YoloDetWriter(tmp_path / "det")
+    stats = process_crack_on_toa([crack_l], toa_l, toa_i, det, stride=1)
+    assert stats["written"] == 3 and stats["skip_not_in_toa_images"] == 1 and stats["with_toa_pothole"] == 1
+    labs = read_labels(tmp_path / "det")
+    assert sorted(labs) == [f"ro_{s}" for s in stems[:3]]
+    assert sorted(line.split()[0] for line in labs[f"ro_{stems[0]}"]) == ["0", "1", "1"]   # 포트홀 1 + 크랙 묶음 2
+    assert all(len(v) == 2 for k, v in labs.items() if k != f"ro_{stems[0]}")

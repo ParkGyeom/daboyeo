@@ -494,16 +494,14 @@ det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, conf=load_class_conf
 한계: 한 도로(0401)·1 fps 토막, 정답 라벨 없음, 새 탐지 판정은 한 사람이 눈으로 본 것, `top=0.45` 는 이 카메라의 지평선(약 50%)
 기준이라 카메라 각도가 다른 시연 영상에서는 맞춰야 할 수 있다.
 
-## 15. 균열 v3 — 도로장애물(179) 크랙 라벨 다시 보기 (11/15, 결과: **라벨 규칙은 고쳤지만, 179 크랙 라벨 대부분이 이미지와 안 맞는다 → v3 를 이대로 학습하지 않는다 (박겸 결정 필요)**)
+## 15. 균열 v3 — 도로장애물(179) 크랙 데이터 고치기 (11/15, 결과: **179 크랙 이미지 zip 이 라벨과 다른 사진 → 크랙 라벨을 같은 이름의 포트홀(TOA) 이미지에 붙여 `road_v3.zip` 을 새로 만듦. v3 학습 준비 완료, 11/18 판단**)
 
 14장에서 must-keep 균열 3개(로드마크 654 VS4 `0401_light_rainy_smooth_03000120`·`..._03000130`·`0401_light_clear_smooth_07000023`)는
-추론 방식을 바꿔도 안 잡혔다. v2 의 179 test crack mAP50 이 0.001 이라 '한국 주행 시점 균열 학습 신호가 사실상 없다' 고 보고
-179 크랙 라벨을 박스로 바꾸는 규칙부터 봤다.
+추론 방식을 바꿔도 안 잡혔다. v2 의 179 test crack mAP50 은 0.001 — 한국 주행 시점 균열 학습 신호가 사실상 없었다.
 
 ### 15-1. 진단 (숫자)
 
-`road.zip` 에 들어간 179 크랙 이미지 2,289장 (C_Mainroad_B02 1,996 + C_Frontback_B01 293, train 1,834 / val 222 / test 233).
-길이·크기는 학습 이미지(긴 변 640) 기준 px.
+`road.zip`(v2) 의 179 크랙 이미지 2,289장 (C_Mainroad_B02 1,996 + C_Frontback_B01 293). 길이·크기는 학습 이미지(긴 변 640) px.
 
 | | RDD2022 train crack | 179 크랙 (v2 규칙 = 선 하나에 박스 하나) |
 |---|---|---|
@@ -514,70 +512,56 @@ det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, conf=load_class_conf
 | 긴 변/짧은 변 중앙값 · p90 | 2.0 · 6.3 | 2.3 · 14.6 |
 | 4 px 미만이라 버린 선 | — | 36% (세로 4 px 미만 30%) |
 
-179 폴리라인: 점 수 중앙값 4 (p90 12), 선 길이 중앙값 24 px (p10 6 / p90 107). 크랙 하나를 짧은 선 여러 개로 그렸다.
-원본 1280×720 (라벨 0 크기 0.01~0.5%).
+179 폴리라인: 점 수 중앙값 4 (p90 12), 선 길이 중앙값 24 px (p10 6 / p90 107) — 크랙 하나를 짧은 선 여러 개로 그렸다.
 
-### 15-2. 새 규칙 (선택 옵션, 기본은 v2 그대로)
+**더 큰 문제 — 크랙 이미지가 라벨과 다른 사진이다.**
 
-`daboyeo_ai.data.yolo.CrackMerge` / `merge_polylines` — `parse_coco_like(..., crack_merge=CrackMerge())`, CLI `--crack-rule v3`.
-이미지 하나의 크랙 선을 모아:
+- 박스를 그려 보니 선이 사람·차·하늘·횡단보도 위에 있고, 바로 옆의 뚜렷한 균열에는 라벨이 없는 이미지가 많았다.
+  무작위 24장 (seed 7, 선 그대로): 보이는 균열을 따라가는 것 **8장 (33%)**. AI Hub 원본 zip(C_Mainroad_B04, 변환 코드 안 거침) 12장도 3~4장만 맞음.
+- 같은 이름(`V3F_HY_..._05263`)이 포트홀(TOA) 이미지 zip 과 크랙 이미지 zip 에 둘 다 있는 프레임 215쌍: **전부 다른 사진**
+  (평균 픽셀 차 44/255, 같은 것 0쌍). 크랙 선을 TOA 쪽 사진에 그리면 **균열 위에 정확히 맞는다** (6쌍 눈으로 확인).
+  → 179 의 `2.Images_new_211012/2.CRACK/` 이미지가 이름과 다른 장면이다. 라벨(JSON)은 맞다. 포트홀(TOA)은 이미지·라벨이 맞다 (179 test pothole 0.573).
+- 크랙 라벨 274,984개 중 **108,445개(39%)** 가 TOA 이미지 zip 에 같은 이름의 프레임이 있다 (라벨 zip 이름 비교, `pipeline.label_stems`).
+  예: TOA `Mainroad_B02.zip`(Training, 11 GB) 하나에 C_Mainroad_B02 3,089 + C_Mainroad_B03 4,008 = 7,097 프레임.
+- v2 의 179 test crack 0.001 은 박스가 잘게 쪼개진 탓 + **엉뚱한 사진** 탓이다. v2 학습의 179 크랙 2,289장은 사실상 잡음이었다.
 
-1. 선을 `merge_px`=16 px 두께로 그려 서로 닿는 선끼리 한 묶음 (= 16 px 안으로 가까운 선)
-2. 묶음마다 원래 점들의 외접 박스 하나 (그린 두께만큼 부풀리지 않음)
-3. 묶음 선 길이 합 < `min_len_px`=24 px 는 버림
-4. 짧은 변을 `min_thick_px`=12 px 까지 늘림 (가는 세로·가로 균열도 박스가 됨)
-5. 길이 합이 긴 순으로 이미지당 `max_boxes`=20 개까지
+### 15-2. 새 데이터 규칙 (선택 옵션 — 기본은 v2 그대로)
 
-값은 C_Mainroad_B02 600장으로 merge 6·12·20·32 px × 최소 길이 0·24 px 를 비교해 RDD 와 가장 비슷한 쪽으로 골랐다
-(merge 12/16/20 → 박스/이미지 중앙값 3, 가로 중앙값 69~85, 세로 35~45; 32 는 화면 절반짜리 박스가 많아짐).
-결과 (실제 변환): C_Mainroad_B02 박스 46,566 → **7,553** (이미지당 3.8), C_Frontback_B01 2,924 → **926**.
-도로장애물 포트홀(TOA) 3개 zip 은 같은 명령으로 라벨을 다시 써도 v2 와 개수가 정확히 같다 (예: J03 포트홀 1,641·버림 52·배경 68).
+1. **크랙 라벨 → TOA 이미지** (`pipeline.process_crack_on_toa`, CLI `--crack-on-toa <TOA 이미지 zip 이름>`): TOA 이미지 zip 에서 크랙
+   라벨이 있는 프레임만, 박스 = 크랙 + 같은 프레임의 TOA 포트홀 박스. 라벨의 이미지 크기가 실제 이미지와 다르면 버림.
+   크랙 이미지 zip 은 쓰지 않는다 (`--road-crack-zips 0`). 짝 크랙 라벨 zip 은 이름이 겹치는 것을 자동으로 찾는다.
+2. **선 묶어 박스 하나** (`yolo.CrackMerge` / `merge_polylines`, `--crack-rule v3`): 이미지의 크랙 선을 모아
+   ① `merge_px`=16 px 두께로 그려 닿는 선끼리 한 묶음 ② 묶음마다 원래 점들의 외접 박스 ③ 선 길이 합 < 24 px 는 버림
+   ④ 짧은 변을 12 px 까지 늘림 (가는 세로 균열도 박스) ⑤ 길이 합 순으로 이미지당 20개까지.
+   값은 600장으로 merge 6·12·20·32 px × 최소 길이 0·24 px 를 비교해 RDD 와 가장 비슷한 쪽 (merge 12~20 → 박스/이미지 중앙값 3,
+   가로 69~85, 세로 35~45; 32 는 화면 절반짜리 박스가 많아짐).
+   확인: 포트홀(TOA) zip 3개를 같은 코드로 다시 쓰면 v2 와 개수가 정확히 같다 (예: J03 포트홀 1,641·버림 52·배경 68).
 
-### 15-3. 그런데 — 179 크랙 라벨 대부분이 이미지와 안 맞는다
-
-규칙을 확인하려고 박스를 그려 보니 선이 **사람·차·하늘·건물·횡단보도** 위에 있고, 바로 옆의 뚜렷한 균열은 라벨이 없는 이미지가 많았다.
-
-- 무작위 24장 (seed 7) 을 선 그대로 그려 눈으로 판정 (박겸 Mac `data/aihub/work/`, 레포에 이미지 없음):
-  **선이 보이는 균열을 따라가는 것 8장 (33%)**, 나머지 16장은 차·사람·하늘 위, 균열 없는 노면, 또는 균열이 있는데 다른 곳에 선.
-  모양은 실제 균열 같아서 **같은 영상의 다른 프레임 라벨** 처럼 보인다 (차가 지나가기 전·후). 이미지 묶음 이름이
-  `2.Images_new_211012` (2021-10-12 새로 낸 이미지) 라 그때 프레임이 바뀌었을 가능성 — 확인 못 함.
-- 촬영 묶음(V1F/V2F/V3F × 연도)·채널(CH0/1/2)별로 봐도 전부 섞여 있다. 이름으로 걸러낼 수 없다.
-- 라벨 zip 은 정상 (JSON 1개 = 이미지 1장, 이름 중복 없음). 라벨 하나하나가 서로 다른 클립이라 '앞뒤 프레임으로 밀어 맞추기' 도 불가.
-- 자동 판별 시도: 선 위의 '가늘고 어두운 선' 반응(black-hat) ÷ 같은 선을 15~40 px 옮긴 곳. 전체 중앙값 0.98 (= 옮긴 곳과 같음),
-  손 판정 24장에서 AUC 0.72 — 거르는 기준으로 쓰기엔 약하다.
-- v2 의 179 test crack 0.001 은 박스가 잘게 쪼개진 탓만이 아니라 **라벨 자체가 틀린 탓**이 크다.
-
-**결론: 박스 규칙만 바꾼 `road_v3.zip` 으로 v3 를 학습해도 균열이 나아질 근거가 없다** (틀린 위치를 '균열' 로 배우면 오탐만 늘 수 있다).
-11/18 판단 전에 아래 중 하나를 고른다 (박겸):
-
-| 안 | 할 일 | 시간 | 기대 |
-|---|---|---|---|
-| A. 직접 라벨 (추천) | 로드마크 654 VS4 등 실제 1080p 주행 프레임에서 균열이 보이는 150~300장에 박스. **must-keep 이 있는 두 구간(`0401_light_rainy_smooth_03`, `0401_light_clear_smooth_07`)은 빼서** 평가에 남긴다 | 라벨 2~3시간 + 학습 1시간 | must-keep 과 같은 시점·해상도라 가장 직접적. 양이 적어 v2 에서 짧게 이어 학습 |
-| B. 179 골라 쓰기 | 179 크랙 이미지를 모음 사진으로 보고 맞는 것만 남김 (약 1/3) → v3 규칙으로 박스 | 600장 보는 데 30~45분 → 약 200장 | 정답은 깨끗하지만 양이 적고 1280×720 근접 시점 |
-| C. 균열은 지금 그대로 | v2 유지. 발표에서 균열은 RDD2022 test 0.584 로만 말하고, 실제 주행 균열 재현율 한계를 밝힌다 | 0 | 변화 없음 |
-
-A·B 모두 아래 코드(규칙·평가)를 그대로 쓴다. A 는 라벨 도구·형식을 정하면 `parts/` 에 zip 하나를 더하는 방식으로 만든다 (다음 작업).
-
-### 15-4. 만들어 둔 것 (그대로 쓸 수 있음)
-
-**데이터** (Mac, 다시 받지 않고 라벨만 다시 씀 — `pipeline.relabel_road_obstacle`):
+### 15-3. `road_v3.zip` 만들기 (Mac)
 
 ```bash
 uv run python -m daboyeo_ai.data.prepare_local --out data/aihub --no-krid --krid-labels selected \
-    --crack-rule v3 --tag v3 --road-crack-extra C_Mainroad_B04.zip C_Mainroad_E04.zip C_Mainroad_B05.zip
+    --crack-rule v3 --tag v3 --road-crack-zips 0 --crack-on-toa Mainroad_B02.zip
 ```
 
-`work_v3/`, `progress_v3.json`, `parts/road_v3.zip` 에 따로 만든다 (`road.zip`·`work/` 는 안 건드림). 이미 `work/` 에 있는 zip 은
-라벨만 다시 쓰고, `--road-crack-extra` 는 새로 받는다 (크랙/GB 순위 3·5·6위, 합 10.4 GB). 결과 크기·개수는 15-5.
+`work_v3/`, `progress_v3.json`, `parts/road_v3.zip` 에 따로 만든다 (`road.zip`·`work/` 는 안 건드림). 포트홀 TOA 3개 zip 은 `work/` 에서
+이미지를 다시 받지 않고 라벨만 다시 쓴다 (`pipeline.relabel_road_obstacle`). TOA `Mainroad_B02.zip` 은 새로 받는다 (11 GB, 약 14분).
+**AI Hub 는 이어받기가 안 된다** (curl 33) — 받다가 끊으면 처음부터.
 
-**학습** (`02_train_detector.ipynb`, 설정 셀이 v3 로 되어 있음): `VERSION="v3"`, `PARTS=["krid","rdd2022","road_v3"]`,
-`BASE_MODEL=detector_v2.pt` (Drive `models/`), `EPOCHS=15`. `road` 와 `road_v3` 를 같이 고르면 1단계에서 멈춘다 (같은 이미지).
-`DATASET` 은 버전마다 따로. 새 셀 **3-1 출처별 평가**: test 를 RDD2022 / 179 / KRID 로 나눠 새 모델과 v2 를 **같은 라벨로** 재고
-`detector_v3.json` 의 `eval_by_source` 에 넣는다. `is_finished` 확인은 그대로.
-예상 시간 (재지 않음 — train 약 2.9만 장, YOLO11n 640, batch 32, Colab 데이터 로더가 병목): T4 약 4분/epoch → 15 epoch 약 1시간
+ROAD_V3_RESULT
+
+더 넣고 싶으면 (크랙 프레임/GB 순): `Mainroad_B03.zip` 11 GB → 6,491 · `1.Frontback_E01.zip` 10 GB → 5,852 (골목) ·
+`1.Frontback_G01.zip` 11 GB → 5,533 · `5.Mainroad_G01.zip` 11 GB → 5,189. `--crack-on-toa` 에 이름을 더한다.
+
+### 15-4. v3 학습 (Colab, `02_train_detector.ipynb` — 설정 셀이 v3)
+
+`VERSION="v3"`, `PARTS=["krid","rdd2022","road_v3"]`, `BASE_MODEL=detector_v2.pt` (Drive `models/`), `EPOCHS=15`.
+`road` 와 `road_v3` 를 같이 고르면 1단계에서 멈춘다 (같은 이미지가 있다). `DATASET` 은 버전마다 따로. 새 셀 **3-1 출처별 평가**:
+test 를 RDD2022 / 179 / KRID 로 나눠 v3 와 v2 를 **같은 라벨로** 재고 `detector_v3.json` 의 `eval_by_source` 에 넣는다. `is_finished` 확인은 그대로.
+예상 시간 (재지 않음 — train 약 3만 장, YOLO11n 640, batch 32, Colab 데이터 로더가 병목): T4 약 4분/epoch → 15 epoch 약 1시간
 + 풀기·평가·내보내기 15분, L4 약 40분, A100 약 30분. Colab 단위로 T4 약 2~3, L4 약 3~4, A100 약 7~8 (Pro 100 단위 중).
 
-**평가** (Mac, v3 가 생기면):
+### 15-5. v3 평가 (Mac, v3 가 생기면)
 
 ```bash
 uv run python -m daboyeo_ai.eval.compare_v3 \
@@ -589,10 +573,12 @@ uv run python -m daboyeo_ai.eval.compare_v3 \
     --out-dir /Users/parkgyeom/daboyeo/data/compare_v3
 ```
 
-must-keep 4개(균열 3 + 포트홀 1) ±6 프레임, 14장의 300장 표본 — 둘 다 `base`(전체 640) 와 `base+roi_t2`(`road_tiles(2)`),
-기준은 두 모델 모두 v2 카드의 `class_conf_draft` (crack 0.29). 집계 `experiments/compare_v3.json`, 이미지는 `--out-dir`.
+must-keep 4개(균열 3 + 포트홀 1) ±6 프레임, 14장의 300장 표본 — 둘 다 `base`(전체 640) 와 `base+roi_t2`(`road_tiles(2)`).
+기준은 두 모델 모두 v2 카드의 `class_conf_draft` (crack 0.29). 집계 `experiments/compare_v3.json`, 이미지는 `--out-dir`
+(`mustkeep/<old|new>_<변형>/contact_*.jpg`, `new_dets/<변형>.jpg` — v3 에서 새로 생긴 탐지 모음, 눈으로 볼 것).
 v2 끼리 돌려 확인함: 14장 값과 같다 (base 포트홀 0.26, 조각 0.45·13장 중 5장, 균열 0) — Mac M4 Pro 80초.
 
-**Go 기준 (제안, `compare_v3` 상단 상수):** (1) must-keep 균열 3개 중 **2개 이상**을 `base` 에서 crack 0.29 이상으로,
-(2) RDD2022 test crack·pothole mAP50 이 v2 보다 **0.02 넘게 안 떨어짐** (v2: crack 0.584, pothole 0.418), (3) 300장 표본에서 v2 에 없던
-pothole+crack 새 탐지 **≤ 0.10/프레임** (v2 base 는 0), (4) guardrail+sign 잃은 것 ≤ 0.03/프레임. 하나라도 안 되면 v2 유지.
+**Go 기준 (제안, `compare_v3` 상단 상수 — 11/18 박겸 확정):**
+(1) must-keep 균열 3개 중 **2개 이상**을 `base` 에서 crack 0.29 이상, (2) RDD2022 test crack·pothole mAP50 이 v2 보다
+**0.02 넘게 안 떨어짐** (v2: crack 0.584, pothole 0.418), (3) 300장 표본에서 v2 에 없던 pothole+crack 새 탐지 **≤ 0.10/프레임**
+(v2 base 는 0), (4) guardrail+sign 잃은 것 ≤ 0.03/프레임. (1) 만 안 되고 나머지가 되면 179 test crack 이 오른 것만으로 v3 를 쓸지 따로 정한다.

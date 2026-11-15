@@ -193,6 +193,72 @@ def process_road_obstacle(
     return stats
 
 
+def label_stems(label_zip: Path) -> set[str]:
+    """라벨 zip 의 JSON 이름(`..._PLINE` / `..._BBOX` 를 뗀 것) = 짝 이미지 이름."""
+    with zipfile.ZipFile(label_zip) as zf:
+        return {_stem(n).removesuffix("_PLINE").removesuffix("_BBOX") for n in zf.namelist()
+                if n.lower().endswith(".json")}
+
+
+def process_crack_on_toa(
+    crack_label_zips: list[Path],
+    toa_label_zip: Path,
+    toa_image_zip: Path,
+    det: YoloDetWriter,
+    *,
+    crack_merge: CrackMerge | None = CrackMerge(),
+    stride: int = 2,
+    chunk: int = 300,
+    max_images: int | None = None,
+) -> Counter[str]:
+    """도로장애물(179) 크랙 라벨을 **포트홀(TOA) 이미지 zip 의 같은 이름 프레임**에 붙인다 (v3, 2026-11-15).
+
+    179 의 크랙 이미지 zip(`2.Images_new_211012/2.CRACK/`)은 라벨과 다른 장면이 들어 있다 (같은 이름의 TOA·CRACK 이미지
+    215쌍이 전부 다른 사진이고, 크랙 선은 TOA 쪽 사진에 맞는다 — `docs/ai-handoff.md` 15장). 그래서 크랙 라벨 zip 들과
+    TOA 라벨·이미지 zip 한 쌍을 받아, TOA 이미지 중 크랙 라벨이 있는 프레임만 쓴다. 박스 = 크랙(crack_merge 규칙) +
+    같은 프레임의 TOA 포트홀 박스. 이름은 TOA 변환과 같은 `ro_<stem>` 이라 parts zip 을 만들 때 이 폴더를 먼저 넣으면
+    TOA 쪽(포트홀만 있는 라벨) 사본을 덮는다. 프레임 번호 % stride 로 줄인다 (번호는 영상 안 위치라 사실상 무작위 추출).
+    """
+    stats: Counter[str] = Counter()
+    crack: dict[str, list] = {}
+    for lz_path in crack_label_zips:
+        with zipfile.ZipFile(lz_path) as lz:
+            for n in sorted(x for x in lz.namelist() if x.lower().endswith(".json")):
+                for li in parse_coco_like(_read_json(lz, n), stats, crack_merge):
+                    if li.boxes:
+                        crack[_stem(li.file_name)] = li
+    with zipfile.ZipFile(toa_label_zip) as lz, zipfile.ZipFile(toa_image_zip) as iz:
+        images = _index_by_stem(iz, (".png", ".jpg", ".jpeg"))
+        toa: dict[str, list] = {}
+        for n in sorted(x for x in lz.namelist() if x.lower().endswith(".json")):
+            for li in parse_coco_like(_read_json(lz, n)):
+                toa[_stem(li.file_name)] = li.boxes
+        for stem in sorted(crack):
+            if stem not in images:
+                stats["skip_not_in_toa_images"] += 1
+                continue
+            group, idx = _group(stem, chunk)
+            if stride > 1 and idx is not None and idx % stride:
+                stats["skip_stride"] += 1
+                continue
+            img = decode_image(iz.read(images[stem]))
+            if img is None:
+                stats["skip_decode"] += 1
+                continue
+            li = crack[stem]
+            h, w = img.shape[:2]
+            if (li.width, li.height) not in ((w, h), (0, 0)):
+                stats["size_mismatch"] += 1  # 라벨 크기와 실제 이미지 크기가 다르면 맞는 프레임이 아니다
+                continue
+            pothole = [b for b in toa.get(stem, []) if b.cls != CRACK]
+            stats["with_toa_pothole"] += bool(pothole)
+            det.write(f"ro_{stem}", img, li.boxes + pothole, group)
+            stats["written"] += 1
+            if max_images and stats["written"] >= max_images:
+                break
+    return stats
+
+
 def relabel_road_obstacle(label_zip: Path, src_root: Path, det: YoloDetWriter,
                           crack_merge: CrackMerge | None) -> Counter[str]:
     """이미 변환한 도로장애물 작업 폴더(src_root = .../det)의 이미지는 그대로 두고 라벨만 새 규칙으로 다시 쓴다.

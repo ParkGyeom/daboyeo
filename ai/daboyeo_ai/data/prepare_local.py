@@ -10,8 +10,11 @@ v3 (크랙 라벨 규칙 v3, `yolo.CrackMerge`): `--crack-rule v3 --tag v3` 로 
 `parts/road_v3.zip` 에 따로 만든다 (v2 결과는 안 건드린다). 이미 `work/` 에 변환해 둔 도로장애물 zip 은 다시 받지
 않고 라벨만 새 규칙으로 쓴다 (`pipeline.relabel_road_obstacle`).
 
-    uv run python -m daboyeo_ai.data.prepare_local --out data/aihub --no-krid --crack-rule v3 --tag v3 \
-        --road-crack-extra C_Mainroad_B04.zip C_Mainroad_E04.zip C_Mainroad_B05.zip
+    uv run python -m daboyeo_ai.data.prepare_local --out data/aihub --no-krid --krid-labels selected \
+        --crack-rule v3 --tag v3 --road-crack-zips 0 --crack-on-toa Mainroad_B02.zip
+
+`--crack-on-toa`: 179 크랙 이미지 zip 은 라벨과 다른 장면이라 (handoff 15장) 크랙 라벨을 같은 이름의 포트홀(TOA) 이미지
+zip 프레임에 붙인다 (`pipeline.process_crack_on_toa`). 크랙 이미지 zip 은 `--road-crack-zips 0` 으로 뺀다.
 
 API 키는 환경변수 또는 레포 최상위 `.env` 의 `AIHUB_APIKEY` 에서 읽는다 (출력하지 않는다).
 중간에 끊겨도 다시 실행하면 `progress.json` 에 기록된 zip 은 건너뛴다.
@@ -64,6 +67,16 @@ def convert_job(job: Job, label_zip: Path, image_zip: Path, out: Path, s: Settin
                                                max_images=s.max_images_per_zip,
                                                negative_ratio=s.road_negative_ratio,
                                                crack_merge=s.crack_merge)
+    stats.update(det.stats)
+    return stats
+
+
+def convert_crack_on_toa(crack_labels: list[Path], toa_label: Path, toa_image: Path, out: Path,
+                         s: Settings = Settings(), stride: int = 2) -> Counter[str]:
+    det = YoloDetWriter(out / "det")
+    stats = pipeline.process_crack_on_toa(crack_labels, toa_label, toa_image, det,
+                                          crack_merge=s.crack_merge or CrackMerge(), stride=stride,
+                                          max_images=s.max_images_per_zip)
     stats.update(det.stats)
     return stats
 
@@ -237,6 +250,9 @@ def parse_args(argv=None) -> argparse.Namespace:
                     help="자동 선택에 더할 도로장애물 CRACK 라벨 zip 이름 (예: C_Mainroad_B04.zip)")
     ap.add_argument("--crack-rule", choices=sorted(CRACK_RULES), default="v2",
                     help="179 크랙 폴리라인 → 박스 규칙. v2: 어노테이션마다 박스 (기본) / v3: 가까운 선끼리 묶어 박스")
+    ap.add_argument("--crack-on-toa", nargs="*", default=[],
+                    help="크랙 라벨을 붙일 도로장애물 TOA 이미지 zip 이름 (예: Mainroad_B02.zip). 짝 크랙 라벨 zip 은 이름이 겹치는 것을 자동으로 찾는다")
+    ap.add_argument("--crack-on-toa-stride", type=int, default=2, help="크랙 프레임 중 몇 장에 1장 쓸지 (기본 2)")
     ap.add_argument("--tag", default="", help="결과 이름 접미사: work_<tag>/, progress_<tag>.json, parts/<kind>_<tag>.zip")
     ap.add_argument("--reuse-work", type=Path, default=None,
                     help="여기 있는 도로장애물 작업 폴더는 다시 받지 않고 라벨만 새로 쓴다 (기본: --tag 가 있으면 <out>/work)")
@@ -276,6 +292,7 @@ def main(argv=None) -> int:
 
     # 3. 도로장애물: 라벨 형식 확인 → 집계 → 선택
     jobs = [] if args.no_krid else list(krid)
+    crack_on_toa: dict[str, list[Path]] = {}
     road_problem: list[str] = []
     if road:
         toa = [f for f in road_labels if "/1.TOA/" in f.path]
@@ -302,6 +319,18 @@ def main(argv=None) -> int:
             picked = selection.pick_road_rows(road_rows, args.road_pothole_zips, args.road_crack_zips)
             picked += selection.named_crack_rows(road_rows, args.road_crack_extra, exclude=picked)
             jobs += selection.road_jobs(picked, by_path)
+            for name in args.crack_on_toa:
+                toa_label = selection.named_toa_label(road_labels, name)
+                toa_image = selection.road_image_for(toa_label, by_path)
+                if toa_image is None:
+                    raise KeyError(f"no TOA image zip for {name}")
+                toa_stems = pipeline.label_stems(label_paths[toa_label.path])
+                cracks = [f for f in road_labels if "/2.CRACK/" in f.path
+                          and pipeline.label_stems(label_paths[f.path]) & toa_stems]
+                job = Job("roadcrack", selection.ROAD_KEY, toa_image, toa_label)
+                crack_on_toa[job.part] = [label_paths[f.path] for f in cracks]
+                print(f"  crack-on-TOA {name}: crack label zips {[f.name for f in cracks]}")
+                jobs.append(job)
 
     print("\n## selected image zips")
     for j in jobs:
@@ -331,7 +360,11 @@ def main(argv=None) -> int:
             img_zip = aihub.download(j.ds, j.image, apikey, raw_dir)
             t_dl = time.time() - t
             shutil.rmtree(job_out, ignore_errors=True)
-            stats = convert_job(j, label_paths[j.label.path], img_zip, job_out, settings)
+            if j.kind == "roadcrack":
+                stats = convert_crack_on_toa(crack_on_toa[j.part], label_paths[j.label.path], img_zip, job_out,
+                                             settings, args.crack_on_toa_stride)
+            else:
+                stats = convert_job(j, label_paths[j.label.path], img_zip, job_out, settings)
             if not args.keep_raw:
                 shutil.rmtree(raw_dir / str(j.image.key), ignore_errors=True)
             progress.done(j.part, dict(stats, image=j.image.path, download_s=round(t_dl), crack_rule=args.crack_rule,
@@ -341,7 +374,9 @@ def main(argv=None) -> int:
         # 5. parts zip
         print("\n## parts")
         for kind in ("krid", "road"):
-            dirs = [work_dir / j.part for j in jobs if j.kind == kind and (work_dir / j.part).exists()]
+            # roadcrack(크랙+포트홀 라벨) 을 먼저 넣어야 같은 이름의 TOA(포트홀만) 사본보다 이긴다 (build_part_zip 은 먼저 본 것을 쓴다)
+            kinds = ("roadcrack", "road") if kind == "road" else (kind,)
+            dirs = [work_dir / j.part for k in kinds for j in jobs if j.kind == k and (work_dir / j.part).exists()]
             if not dirs:
                 continue
             dest = parts_dir / f"{kind}{sfx}.zip"

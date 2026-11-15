@@ -2,8 +2,8 @@
 
 | 항목 | 내용 |
 |---|---|
-| 기반 | [PRD.md](../PRD.md) **v0.4** (주행 영상 확보 방식, AI Hub 데이터 확인 결과 반영) |
-| 계획 버전 | r3 (2026-11-13) — r1은 PRD v0.2, r2는 v0.3 기준 |
+| 기반 | [PRD.md](../PRD.md) **v0.5** (v0.4 + 시설물 파손 판정 대체안 확정, 줄 번호는 v0.4 와 같음) |
+| 계획 버전 | r3.5 (2026-11-15) — r1은 PRD v0.2, r2는 v0.3 기준 |
 | 완성 기한 | 2026-11-27 (금), D-14 |
 | 상태 | 팀 검토 중 — 0.1(레포·`contracts/`)은 완료 |
 
@@ -240,10 +240,10 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | 2.4 | 정현우 | `clustering.py` — `ST_DWithin(20m)` 같은 유형에 붙이거나 신규, `vehicle_count`·대표 좌표 갱신. 한 트랜잭션 + `FOR UPDATE` | 테스트: 3대 같은 지점 → 결함 1건, vehicle_count=3 |
 | 2.5 | 정현우 | `risk.py` | 모든 결함에 risk_level (F4) |
 | 2.6 | 박겸 | `lane_wear.py` — 하단 ROI → 흰/노랑 마스크 → 차선 대 노면 밝기 대비 | 선정 영상 수동 라벨 대비 정확도 |
-| 2.7 | 박겸 | Mac `prepare_local` 이 만든 **KRID 파손 크롭**(`krid.zip` 의 `cls/{train,val,test}/{normal,damaged}`)으로 → `03_train_damage_cls.ipynb` 에서 가드레일+표지판 하나의 이진 분류(YOLO11n-cls, 224). normal 은 train 5배·val/test 10배로 줄임, 임계값은 val 최대 F1. 파손이 부족할 때만 공개 영상 프레임·공개 이미지로 보충 (`PRD.md:371`). 크롭 수(파손): train 107 / val 15 / test 17 — 가드레일 55·표지판 84 | test precision·recall·F1·normal 오탐률 (시설물별), `damage_cls_v1.json` |
+| 2.7 | 박겸 | Mac `prepare_local` 이 만든 **KRID 파손 크롭**(`krid.zip` 의 `cls/{train,val,test}/{normal,damaged}`)으로 → `03_train_damage_cls.ipynb` 에서 가드레일+표지판 하나의 이진 분류(YOLO11n-cls, 224). normal 은 train 5배·val/test 10배로 줄임, 임계값은 val 최대 F1. 파손이 부족할 때만 공개 영상 프레임·공개 이미지로 보충 (`PRD.md:371`). 크롭 수(파손): train 107 / val 15 / test 17 — 가드레일 55·표지판 84. **결과(11/15, `damage_cls_v1b`, 60 epoch): test F1 0.43 (P 0.32 / R 0.65), test 정상 크롭 4,848장 오탐률 15.7% (가드레일 20.5%·표지판 13.5%), val 최대 F1 0.275 → No-go, 대체안 확정** | test precision·recall·F1·normal 오탐률 (시설물별), `damage_cls_v1.json` |
 | 2.8 | 공동 | **11/21 첫 end-to-end** — `e2e_smoke.py` | 영상 2개(또는 노이즈 3대) → DB에서 공통 결함이 묶임, 라벨 대비 결함 수 출력 |
 
-**11/20 Go/No-go** (`PRD.md:642`): 파손 크롭(KRID + 보충)이 클래스당 100장 미만(제안값)이면 위치 탐지만으로 확정. 0.2b 집계에서 이미 넉넉하면 사실상 유지 확정.
+**11/20 Go/No-go** (`PRD.md:642`): **11/15 결정 — 대체안(위치 탐지까지만) 확정.** 크롭 수 기준(파손 139장)은 넘었지만 학습 결과가 기준(test 파손 F1 ≥ 0.6, 정상 오탐률 ≤ 5%)에 크게 못 미침. 코드(`OnnxDetector(damage_model=...)`)는 끈 채로 남겨 두고, `Detection.damage` 는 항상 `None`. 남는 시간은 차선 마모 보정(#6)과 통합에.
 **11/21 Go/No-go** (`PRD.md:643`): E2E가 늦으면 위험도는 유형만으로.
 
 ### M3 화면 · M4 실험 — 11/22(일) ~ 11/24(화)
@@ -306,7 +306,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | **유튜브 영상 압축·화각 문제** (노면이 뭉개짐, 화면 오버레이) | 탐지 결과가 공개셋보다 크게 낮음 | 1080p 이상만 선정, 화면 하단 오버레이 영역 마스킹, AI Hub 국내 데이터로 보강 |
 | **RDD2022(해외 도로) → 국내 도로 성능 저하** | 선정 영상 평가 mAP 저조 | AI Hub 도로장애물/표면 데이터로 v2 학습 (`PRD.md:373`), 시간 되면 선정 영상 프레임 일부 라벨링해 파인튜닝 |
 | **AI Hub 데이터(전국 도로시설물·도로장애물) 승인 지연·대용량** (각 1 TB 이상) | 11/16까지 미승인 | RDD 2클래스로 진행. 승인 후 라벨만 먼저 받아(0.2b) 필요한 이미지 zip만 다운로드, 클래스당 수천 장 샘플링 (`PRD.md:670`, `PRD.md:375-394`) |
-| **KRID 파손 라벨이 생각보다 적거나 품질이 낮음** | 0.2b 집계에서 가드레일·표지판 파손 각 100개 미만 | `Validation` 이미지·다른 도로 종류 zip 추가, 공개 이미지 보충, 그래도 부족하면 11/20 대체안 |
+| **KRID 파손 라벨이 생각보다 적거나 품질이 낮음** | 0.2b 집계에서 가드레일·표지판 파손 각 100개 미만 | `Validation` 이미지·다른 도로 종류 zip 추가, 공개 이미지 보충, 그래도 부족하면 11/20 대체안 — **11/15 현실화: 대체안 확정** |
 | 연속 프레임 중복으로 관측 폭증 | 결함 수 ≫ 라벨 수 | `track_merge.py` + `clustering.py` 2단계 |
 | 동시 신고 경쟁 | AC-7 실패 | UNIQUE + `ON CONFLICT`, `FOR UPDATE` |
 | 시연 현장 성능·네트워크 | 리허설 중 FPS 하락 | 전부 로컬 docker, replay 모드 대기 |
@@ -354,6 +354,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 
 ## 변경 이력
 
+- **r3.5 (2026-11-15)** — 탐지 v2 확정 (RDD test crack 0.584 ≥ v1 0.570, `ai/models/detector_v2.json`). 시설물 파손 분류 (2.7) 학습 결과 No-go → **대체안(위치 탐지까지만) 확정**, PRD v0.5. 첫 학습은 Ultralytics 가 val 정확도로 best.pt 를 골라 '전부 정상' epoch 1 모델이 뽑혔다(val 이 정상 91%) → 조기 종료 끄고 last.pt 로 다시 학습(v1b)해 판단. 노트북 03 도 같은 방식으로 수정.
 - **r3.4 (2026-11-15)** — 시설물 파손 분류 (2.7) 구현: `ai/daboyeo_ai/data/damage_cls.py`(크롭 → 시설물 종류 표 `krid_crop_types.csv.gz`, normal 줄이기), `ai/daboyeo_ai/eval/damage_metrics.py`, `ai/daboyeo_ai/inference/damage_classifier.py`, `OnnxDetector(damage_model=...)`, `ai/notebooks/03_train_damage_cls.ipynb`. 학습 크롭과 추론 크롭은 같은 `facility_crop`(CropWriter 에서 분리) + `square_input`(정사각형, Ultralytics 가운데 자르기에 가드레일이 잘리지 않게). 로컬 Mac 에서 2 epoch 모의 학습·ONNX 일치 확인. 사용법은 `docs/ai-handoff.md` 9장(정현우 확인 필요).
 
 - **r3.3 (2026-11-14)** — 차선 마모 측정 `ai/daboyeo_ai/lane_wear.py`(`LaneWearMeter.measure(frame) -> LaneWearResult`)와 보정 도구 `ai/daboyeo_ai/eval/lane_wear_calib.py` 구현 (2.6). 합성 프레임 시험 통과, 1280×720 에서 약 1.5 ms. 기준값은 잠정 0.3 — 실제 프레임 분포로 #6 에서 결정. 사용법은 `docs/ai-handoff.md` 8장(정현우 확인 필요). 3장 레포 구조의 경로를 실제 위치로 갱신.

@@ -363,3 +363,57 @@ uv run python -m daboyeo_ai.eval.eval_detector data/videos/v1.mp4 --every 3 --ca
 
 결과는 `experiments/interval_sweep/sweep.csv`(+ `--with matplotlib` 로 실행하면 `sweep.png`), `experiments/eval_detector/summary.{csv,json}`.
 캐시(`data/eval_cache/`)는 git 에 올리지 않는다.
+
+## 13. 서버 검증기 V0 측정 (11/15, 결과: **쓰지 않음 — no-go**)
+
+V0 = 서버가 받은 크롭 JPEG 에 **같은 `detector_v2`** 를 한 번 더 돌려 점수를 매기는 검증기 (정현우 제안 V0/V1/V2 중 V0).
+코드: `daboyeo_ai.inference.verifier.Verifier(model_path, threads=1).verify(jpeg, defect_type) -> 0~1`
+(같은 클래스·중심이 크롭 가운데 60% 안인 탐지의 최고 신뢰도, onnxruntime 만 사용). 크롭은 블랙박스 `crop_snapshot`
+(`origin/be/port-existing` 3c62628 `edge/blackbox/sender.py`) 을 그대로 옮긴 `daboyeo_ai.eval.snapshot` 으로 만든다.
+
+```bash
+uv run python -m daboyeo_ai.eval.verify_eval --model /Users/parkgyeom/daboyeo/ai/models/detector_v2.onnx \
+    --parts-dir /Users/parkgyeom/daboyeo/data/aihub/parts --records /Users/parkgyeom/daboyeo/data/verify_v0/records.csv
+```
+
+**측정 (Set T** = `conf_thresholds` 와 같은 test 데이터·출처, 탐지 기준 = `class_conf_draft`, IoU 0.5 매칭, 탐지 7,558건).
+비교 기준(baseline) = 검증기 없이 **탐지 신뢰도 기준만 올려서** 같은 수의 TP(또는 FP)를 남기는 것.
+
+| 클래스 | TP / FP | TP 유지 ≥ 90% 에서 V0 FP 제거 | 같은 TP 유지에서 신뢰도 올리기 FP 제거 | FP 40% 제거 시 TP 유지: V0 / 신뢰도 |
+|---|---|---|---|---|
+| pothole | 336 / 142 | 19.7% (τ 0.01) | 22.5% | 78.6% / 85.4% |
+| crack | 2,043 / 839 | 17.3% (τ 0.05) | 29.4% | 74.6% / 85.8% |
+| guardrail | 890 / 381 | 0% (τ 0 — 거를 수 있는 τ 없음) | 0% | 77.5% / 89.6% |
+| sign | 2,059 / 868 | 0% (τ 0) | 0.7% | 5.0% / 44.2% (FP 97% 제거 지점) |
+| 전체 (클래스별 τ) | 5,328 / 2,230 | **7.8%** (TP 95.8% 유지) | **12.8%** | — |
+
+낮은 신뢰도 구간 (초안 기준 ≤ conf < 0.6, 서버가 차량 2대 이상일 때만 보여주는 구간 — 검증기가 필요한 곳):
+TP 2,344 / FP 1,964, 정밀도 0.544. TP 유지 ≥ 90% 에서 V0 FP 제거 **3.9%**, 신뢰도 올리기 7.0%. FP 40% 제거 시 TP 유지는
+pothole 73.2% / 77.5%, crack 63.8% / 77.1%, guardrail 62.5% / 78.9% (V0 / 신뢰도). 정밀도는 V0 적용 후에도 0.544 그대로.
+
+- **모든 클래스·두 구간에서 V0 가 '신뢰도만 올리기' 보다 못하다.** 같은 탐지기를 크롭에 다시 돌린 점수는 원래 신뢰도와 거의 같은
+  정보이고, 크롭 확대 때문에 오히려 잡음이 더해진다.
+- 표지판은 크롭의 **95%(TP)·97%(FP) 에서 다시 못 찾는다** (v = 0). KRID 표지판은 장면 속 작은 물체로 학습되어, 크롭을 640 으로
+  키워 넣으면 탐지기가 표지판으로 보지 않는다. 가드레일도 TP 17% 가 v = 0. → '큰 탐지기를 크롭에' (V1) 도 같은 문제가 날 수 있다.
+  크롭으로 학습한 분류기(V2) 가 아니면 크롭 검증은 기대하기 어렵다.
+- 중심 규칙 대신 위치 무관(`v_any`) 으로 해도 결과는 거의 같다 (JSON `*_v_any`).
+- 속도: 크롭 1장 **21.6 ms** 평균 (p95 23.9 ms, 1 스레드, Apple M4 Pro — 서버 CPU 에서는 다시 잴 것) — 속도 기준(≤ 200 ms) 은 통과.
+
+**must-keep 확인** (AI Hub 로드마크 654 VS4 프레임, 레포에 올리지 않음 — 오버레이·크롭은 박겸 Mac `data/verify_d/`).
+ID 4개는 모두 `VS4.비온전(복합).zip` 안의 **단일 프레임**(1920×1080) 이고, 앞뒤 ±6 프레임을 같이 돌렸다. 로드마크 라벨에는
+포트홀·균열이 없어서 정답 박스 없이 오버레이를 눈으로 봤다 (`verify_mustkeep`).
+
+| 프레임 | 목표 | 목표 프레임 | 앞뒤 13프레임 |
+|---|---|---|---|
+| `0401_light_rainy_smooth_03000136` | pothole | 0.257 (초안 0.27 미만 → **안 보냄**) | 03000135 에서만 0.284 로 탐지, 그 크롭 v = 0.11 |
+| `0401_light_rainy_smooth_03000120` | crack | crack 탐지 없음 (conf 0.05 까지 내려도) | 13프레임 모두 crack 없음 |
+| `0401_light_rainy_smooth_03000130` | crack | crack 탐지 없음. 같은 결함 자리에 **pothole 0.21** (초안 미만) | 13프레임 모두 crack 없음 |
+| `0401_light_clear_smooth_07000023` | crack | 탐지 0건 (긴 세로 균열이 눈에 보이는데도) | 13프레임 모두 crack 없음 |
+
+- 4개 중 목표 프레임에서 초안 기준으로 잡히는 것은 **0개**. 문제는 검증기 이전에 **탐지기 재현율** (실제 1080p 주행 영상의
+  작은·먼 결함) 이다. V0 를 τ ≤ 0.1 로 두면 03000135 의 포트홀 크롭은 통과, τ 0.2 면 탈락.
+
+**판단 (제안 기준: TP 유지 ≥ 90% 에서 FP 제거 ≥ 40%, must-keep 전부 통과, ≤ 200 ms/크롭)**: FP 제거 7.8% (낮은 구간 3.9%),
+must-keep 0/4 (탐지기 단계에서 이미 놓침), 속도만 통과 → **V0 no-go**. 오탐을 줄이려면 신뢰도 기준을 올리는 쪽이 낫고
+(`experiments/conf_thresholds.csv`), 남는 시간은 실제 주행 프레임에서의 탐지 재현율 쪽에 쓰는 것을 제안한다.
+결과 파일: `experiments/verify_v0.json` (클래스별 요약·τ·v=0 비율), `experiments/verify_v0.csv` (τ 곡선).

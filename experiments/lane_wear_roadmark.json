@@ -1,0 +1,578 @@
+{
+ "settings": {
+  "no_paint_below": 30.0,
+  "worn_below": 100.0,
+  "provisional_wear_score": 1.0
+ },
+ "n_frames": 3281,
+ "n_with_ltl": 1996,
+ "light": {
+  "n": 2176,
+  "n_ltl": 1327,
+  "n_no_paint": 307,
+  "n_paint": 1020,
+  "n_worn": 265,
+  "ltl_percentiles_paint": {
+   "p10": 78.0,
+   "p25": 99.0,
+   "p50": 113.0,
+   "p75": 136.0,
+   "p90": 152.0
+  },
+  "lane_found_rate": {
+   "all": 0.9609,
+   "no_paint": 0.9153,
+   "worn": 0.9208,
+   "normal": 0.9801
+  },
+  "scores": {
+   "contrast": {
+    "n": 984,
+    "n_worn": 244,
+    "auc": 0.3221,
+    "best_f1": 0.3974,
+    "best_threshold": 2.2083,
+    "f1_2fold": 0.3948,
+    "spearman_ltl": -0.2929
+   },
+   "contrast_p25": {
+    "n": 984,
+    "n_worn": 244,
+    "auc": 0.3624,
+    "best_f1": 0.3974,
+    "best_threshold": 1.32,
+    "f1_2fold": 0.3935,
+    "spearman_ltl": -0.1311
+   },
+   "paint_len": {
+    "n": 984,
+    "n_worn": 244,
+    "auc": 0.6312,
+    "best_f1": 0.4311,
+    "best_threshold": 2.2818,
+    "f1_2fold": 0.4132,
+    "spearman_ltl": 0.3403
+   },
+   "contrast ÷ 주행 중앙값": {
+    "n": 984,
+    "n_worn": 244,
+    "auc": 0.3494,
+    "best_f1": 0.3977,
+    "best_threshold": 4.0634,
+    "f1_2fold": 0.3964,
+    "spearman_ltl": -0.1814
+   },
+   "★ score (p25 ÷ 주행 중앙값 × paint_len)": {
+    "n": 984,
+    "n_worn": 244,
+    "auc": 0.5055,
+    "best_f1": 0.3977,
+    "best_threshold": 15.1191,
+    "f1_2fold": 0.395,
+    "spearman_ltl": 0.1368,
+    "f1_at_provisional": 0.3055
+   },
+   "score (p25 ÷ 낮/밤 전체 중앙값 × paint_len)": {
+    "n": 984,
+    "n_worn": 244,
+    "auc": 0.501,
+    "best_f1": 0.3977,
+    "best_threshold": 15.0295,
+    "f1_2fold": 0.3964,
+    "spearman_ltl": 0.1436
+   }
+  },
+  "star_if_no_paint_is_worn": {
+   "n": 1265,
+   "n_worn": 525,
+   "auc": 0.5732,
+   "best_f1": 0.5869,
+   "best_threshold": 15.1191,
+   "f1_2fold": 0.5869,
+   "spearman_ltl": 0.2186,
+   "f1_at_provisional": 0.3939
+  },
+  "star_threshold_rows": [
+   {
+    "threshold": 0.6,
+    "flag": 0.1006,
+    "clear_to_worn": 0.0757,
+    "precision": 0.4343,
+    "recall": 0.1762,
+    "f1": 0.2507
+   },
+   {
+    "threshold": 0.8,
+    "flag": 0.1362,
+    "clear_to_worn": 0.1081,
+    "precision": 0.403,
+    "recall": 0.2213,
+    "f1": 0.2857
+   },
+   {
+    "threshold": 1.0,
+    "flag": 0.1778,
+    "clear_to_worn": 0.15,
+    "precision": 0.3657,
+    "recall": 0.2623,
+    "f1": 0.3055
+   },
+   {
+    "threshold": 1.2,
+    "flag": 0.2134,
+    "clear_to_worn": 0.1797,
+    "precision": 0.3667,
+    "recall": 0.3156,
+    "f1": 0.3392
+   },
+   {
+    "threshold": 1.4,
+    "flag": 0.252,
+    "clear_to_worn": 0.2189,
+    "precision": 0.3468,
+    "recall": 0.3525,
+    "f1": 0.3496
+   },
+   {
+    "threshold": 1.7,
+    "flag": 0.3323,
+    "clear_to_worn": 0.3068,
+    "precision": 0.3058,
+    "recall": 0.4098,
+    "f1": 0.3503
+   },
+   {
+    "threshold": 2.0,
+    "flag": 0.4116,
+    "clear_to_worn": 0.3973,
+    "precision": 0.2741,
+    "recall": 0.4549,
+    "f1": 0.3421
+   }
+  ],
+  "star_flag_rate_no_paint": {
+   "0.6": 0.1922,
+   "0.8": 0.2705,
+   "1.0": 0.3274,
+   "1.2": 0.3737,
+   "1.4": 0.4093,
+   "1.7": 0.4875,
+   "2.0": 0.5516
+  },
+  "oracle": {
+   "left": {
+    "n": 857,
+    "spearman_ltl": 0.0709,
+    "auc": 0.5119,
+    "n_worn": 233
+   },
+   "right": {
+    "n": 795,
+    "spearman_ltl": -0.1104,
+    "auc": 0.4129,
+    "n_worn": 234
+   }
+  },
+  "road_brightness": {
+   "n": 1020,
+   "spearman_ltl": 0.7159,
+   "spearman_contrast": -0.474
+  }
+ },
+ "light_clear": {
+  "n": 1400,
+  "n_ltl": 703,
+  "n_no_paint": 178,
+  "n_paint": 525,
+  "n_worn": 126,
+  "ltl_percentiles_paint": {
+   "p10": 83.0,
+   "p25": 100.0,
+   "p50": 115.0,
+   "p75": 129.0,
+   "p90": 153.0
+  },
+  "lane_found_rate": {
+   "all": 0.9643,
+   "no_paint": 0.8989,
+   "worn": 0.9524,
+   "normal": 0.985
+  },
+  "scores": {
+   "contrast": {
+    "n": 513,
+    "n_worn": 120,
+    "auc": 0.2027,
+    "best_f1": 0.3791,
+    "best_threshold": 2.2083,
+    "f1_2fold": 0.3741,
+    "spearman_ltl": -0.5543
+   },
+   "contrast_p25": {
+    "n": 513,
+    "n_worn": 120,
+    "auc": 0.31,
+    "best_f1": 0.3791,
+    "best_threshold": 1.32,
+    "f1_2fold": 0.3664,
+    "spearman_ltl": -0.342
+   },
+   "paint_len": {
+    "n": 513,
+    "n_worn": 120,
+    "auc": 0.6504,
+    "best_f1": 0.4337,
+    "best_threshold": 2.2703,
+    "f1_2fold": 0.4048,
+    "spearman_ltl": 0.3379
+   },
+   "contrast ÷ 주행 중앙값": {
+    "n": 513,
+    "n_worn": 120,
+    "auc": 0.2118,
+    "best_f1": 0.3791,
+    "best_threshold": 3.975,
+    "f1_2fold": 0.3741,
+    "spearman_ltl": -0.4183
+   },
+   "★ score (p25 ÷ 주행 중앙값 × paint_len)": {
+    "n": 513,
+    "n_worn": 120,
+    "auc": 0.4523,
+    "best_f1": 0.3791,
+    "best_threshold": 13.9964,
+    "f1_2fold": 0.3738,
+    "spearman_ltl": -0.0039,
+    "f1_at_provisional": 0.2596
+   },
+   "score (p25 ÷ 낮/밤 전체 중앙값 × paint_len)": {
+    "n": 513,
+    "n_worn": 120,
+    "auc": 0.4699,
+    "best_f1": 0.3791,
+    "best_threshold": 13.0614,
+    "f1_2fold": 0.3766,
+    "spearman_ltl": -0.0102
+   }
+  },
+  "star_if_no_paint_is_worn": {
+   "n": 673,
+   "n_worn": 280,
+   "auc": 0.5757,
+   "best_f1": 0.5876,
+   "best_threshold": 13.9964,
+   "f1_2fold": 0.5847,
+   "spearman_ltl": 0.1885,
+   "f1_at_provisional": 0.3953
+  },
+  "star_threshold_rows": [
+   {
+    "threshold": 0.6,
+    "flag": 0.0936,
+    "clear_to_worn": 0.0738,
+    "precision": 0.3958,
+    "recall": 0.1583,
+    "f1": 0.2262
+   },
+   {
+    "threshold": 0.8,
+    "flag": 0.1248,
+    "clear_to_worn": 0.1043,
+    "precision": 0.3594,
+    "recall": 0.1917,
+    "f1": 0.25
+   },
+   {
+    "threshold": 1.0,
+    "flag": 0.1715,
+    "clear_to_worn": 0.1552,
+    "precision": 0.3068,
+    "recall": 0.225,
+    "f1": 0.2596
+   },
+   {
+    "threshold": 1.2,
+    "flag": 0.2027,
+    "clear_to_worn": 0.1858,
+    "precision": 0.2981,
+    "recall": 0.2583,
+    "f1": 0.2768
+   },
+   {
+    "threshold": 1.4,
+    "flag": 0.2339,
+    "clear_to_worn": 0.2137,
+    "precision": 0.3,
+    "recall": 0.3,
+    "f1": 0.3
+   },
+   {
+    "threshold": 1.7,
+    "flag": 0.3002,
+    "clear_to_worn": 0.2824,
+    "precision": 0.2792,
+    "recall": 0.3583,
+    "f1": 0.3139
+   },
+   {
+    "threshold": 2.0,
+    "flag": 0.3665,
+    "clear_to_worn": 0.3613,
+    "precision": 0.2447,
+    "recall": 0.3833,
+    "f1": 0.2987
+   }
+  ],
+  "star_flag_rate_no_paint": {
+   "0.6": 0.225,
+   "0.8": 0.3125,
+   "1.0": 0.3563,
+   "1.2": 0.4188,
+   "1.4": 0.4375,
+   "1.7": 0.525,
+   "2.0": 0.6062
+  },
+  "oracle": {
+   "left": {
+    "n": 438,
+    "spearman_ltl": -0.1341,
+    "auc": 0.4366,
+    "n_worn": 111
+   },
+   "right": {
+    "n": 450,
+    "spearman_ltl": -0.3317,
+    "auc": 0.3016,
+    "n_worn": 114
+   }
+  },
+  "road_brightness": {
+   "n": 525,
+   "spearman_ltl": 0.9105,
+   "spearman_contrast": -0.6099
+  }
+ },
+ "night": {
+  "n": 1105,
+  "n_ltl": 669,
+  "n_no_paint": 144,
+  "n_paint": 525,
+  "n_worn": 10,
+  "ltl_percentiles_paint": {
+   "p10": 127.0,
+   "p25": 142.0,
+   "p50": 149.0,
+   "p75": 157.0,
+   "p90": 163.0
+  },
+  "lane_found_rate": {
+   "all": 0.9756,
+   "no_paint": 0.9653,
+   "worn": 1.0,
+   "normal": 0.9961
+  },
+  "scores": {
+   "contrast": {
+    "n": 523,
+    "n_worn": 10,
+    "auc": 0.3701,
+    "best_f1": 0.0526,
+    "best_threshold": 0.3675,
+    "f1_2fold": 0.0223,
+    "spearman_ltl": -0.2571
+   },
+   "contrast_p25": {
+    "n": 523,
+    "n_worn": 10,
+    "auc": 0.3356,
+    "best_f1": 0.0435,
+    "best_threshold": 0.1873,
+    "f1_2fold": 0.0224,
+    "spearman_ltl": -0.1998
+   },
+   "paint_len": {
+    "n": 523,
+    "n_worn": 10,
+    "auc": 0.7181,
+    "best_f1": 0.0909,
+    "best_threshold": 0.5592,
+    "f1_2fold": 0.0429,
+    "spearman_ltl": 0.1357
+   },
+   "contrast ÷ 주행 중앙값": {
+    "n": 523,
+    "n_worn": 10,
+    "auc": 0.4103,
+    "best_f1": 0.0556,
+    "best_threshold": 0.6134,
+    "f1_2fold": 0.0224,
+    "spearman_ltl": -0.2363
+   },
+   "★ score (p25 ÷ 주행 중앙값 × paint_len)": {
+    "n": 523,
+    "n_worn": 10,
+    "auc": 0.5142,
+    "best_f1": 0.0635,
+    "best_threshold": 1.1656,
+    "f1_2fold": 0.0231,
+    "spearman_ltl": -0.059,
+    "f1_at_provisional": 0.0408
+   },
+   "score (p25 ÷ 낮/밤 전체 중앙값 × paint_len)": {
+    "n": 523,
+    "n_worn": 10,
+    "auc": 0.5029,
+    "best_f1": 0.0667,
+    "best_threshold": 1.1282,
+    "f1_2fold": 0.0269,
+    "spearman_ltl": -0.0662
+   }
+  },
+  "star_if_no_paint_is_worn": {
+   "n": 662,
+   "n_worn": 149,
+   "auc": 0.7075,
+   "best_f1": 0.4733,
+   "best_threshold": 4.0355,
+   "f1_2fold": 0.466,
+   "spearman_ltl": 0.1918,
+   "f1_at_provisional": 0.2105
+  },
+  "star_threshold_rows": [
+   {
+    "threshold": 0.6,
+    "flag": 0.0306,
+    "clear_to_worn": 0.0312,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0
+   },
+   {
+    "threshold": 0.8,
+    "flag": 0.0574,
+    "clear_to_worn": 0.0565,
+    "precision": 0.0333,
+    "recall": 0.1,
+    "f1": 0.05
+   },
+   {
+    "threshold": 1.0,
+    "flag": 0.0746,
+    "clear_to_worn": 0.0741,
+    "precision": 0.0256,
+    "recall": 0.1,
+    "f1": 0.0408
+   },
+   {
+    "threshold": 1.2,
+    "flag": 0.1071,
+    "clear_to_worn": 0.1053,
+    "precision": 0.0357,
+    "recall": 0.2,
+    "f1": 0.0606
+   },
+   {
+    "threshold": 1.4,
+    "flag": 0.1205,
+    "clear_to_worn": 0.1189,
+    "precision": 0.0317,
+    "recall": 0.2,
+    "f1": 0.0548
+   },
+   {
+    "threshold": 1.7,
+    "flag": 0.1377,
+    "clear_to_worn": 0.1365,
+    "precision": 0.0278,
+    "recall": 0.2,
+    "f1": 0.0488
+   },
+   {
+    "threshold": 2.0,
+    "flag": 0.1874,
+    "clear_to_worn": 0.1871,
+    "precision": 0.0204,
+    "recall": 0.2,
+    "f1": 0.037
+   }
+  ],
+  "star_flag_rate_no_paint": {
+   "0.6": 0.0432,
+   "0.8": 0.0935,
+   "1.0": 0.1511,
+   "1.2": 0.2014,
+   "1.4": 0.3094,
+   "1.7": 0.3957,
+   "2.0": 0.482
+  },
+  "oracle": {
+   "left": {
+    "n": 460,
+    "spearman_ltl": -0.0082,
+    "auc": 0.4023,
+    "n_worn": 9
+   },
+   "right": {
+    "n": 468,
+    "spearman_ltl": -0.1639,
+    "auc": 0.4093,
+    "n_worn": 9
+   }
+  },
+  "road_brightness": {
+   "n": 525,
+   "spearman_ltl": 0.7863,
+   "spearman_contrast": -0.2314
+  }
+ },
+ "lane_geometry": {
+  "n_labelled": 3281,
+  "light": {
+   "n": 2176,
+   "lane_found_rate_with_ego_line": 0.9619,
+   "lane_found_rate_without_ego_line": 0.92,
+   "n_with_ego_line": 2126,
+   "n_without_ego_line": 50,
+   "segment_precision": 0.7199,
+   "frames_mostly_on_lines": 0.7948
+  },
+  "night": {
+   "n": 1105,
+   "lane_found_rate_with_ego_line": 0.9752,
+   "lane_found_rate_without_ego_line": 1.0,
+   "n_with_ego_line": 1088,
+   "n_without_ego_line": 17,
+   "segment_precision": 0.7272,
+   "frames_mostly_on_lines": 0.7801
+  }
+ },
+ "ltl_consistency": {
+  "consecutive": {
+   "n_pairs": 953,
+   "spearman": 0.9039,
+   "median_abs_diff": 3.0,
+   "p_no_paint_after_no_paint": 0.6217,
+   "p_no_paint_after_paint": 0.0958
+  },
+  "repeat_pass": {
+   "light-light": {
+    "n_pairs": 21,
+    "spearman": 0.6237,
+    "mean_first": 97.1429,
+    "mean_second": 103.5714
+   },
+   "light-night": {
+    "n_pairs": 72,
+    "spearman": 0.333,
+    "mean_first": 112.5972,
+    "mean_second": 143.7917
+   },
+   "night-night": {
+    "n_pairs": 17,
+    "spearman": -0.0834,
+    "mean_first": 136.2941,
+    "mean_second": 153.1176
+   }
+  }
+ }
+}

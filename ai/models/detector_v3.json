@@ -1,0 +1,192 @@
+{
+ "version": "v3",
+ "file": "detector_v3.onnx",
+ "classes": [
+  "pothole",
+  "crack",
+  "guardrail",
+  "sign"
+ ],
+ "input_size": 640,
+ "input": "1x3xHxW float32 RGB 0~1 (letterbox, OnnxDetector 가 처리)",
+ "recommended_conf": 0.25,
+ "nms_iou": 0.45,
+ "base_model": "/content/drive/MyDrive/daboyeo_data/models/detector_v2.pt",
+ "data_parts": [
+  "krid",
+  "rdd2022",
+  "road_v3"
+ ],
+ "train_counts": {
+  "test": {
+   "crack": 5626,
+   "guardrail": 1553,
+   "images": 5214,
+   "pothole": 1090,
+   "sign": 3312
+  },
+  "train": {
+   "crack": 47072,
+   "guardrail": 14059,
+   "images": 36074,
+   "pothole": 8930,
+   "sign": 33390
+  },
+  "val": {
+   "crack": 5712,
+   "guardrail": 1827,
+   "images": 5612,
+   "pothole": 1129,
+   "sign": 4365
+  }
+ },
+ "epochs_trained": 15,
+ "metrics": {
+  "val": {
+   "pothole": {
+    "P": 0.621,
+    "R": 0.39,
+    "mAP50": 0.462,
+    "mAP50_95": 0.212
+   },
+   "crack": {
+    "P": 0.617,
+    "R": 0.457,
+    "mAP50": 0.507,
+    "mAP50_95": 0.264
+   },
+   "guardrail": {
+    "P": 0.726,
+    "R": 0.665,
+    "mAP50": 0.723,
+    "mAP50_95": 0.537
+   },
+   "sign": {
+    "P": 0.73,
+    "R": 0.65,
+    "mAP50": 0.706,
+    "mAP50_95": 0.489
+   },
+   "all": {
+    "P": 0.674,
+    "R": 0.54,
+    "mAP50": 0.6,
+    "mAP50_95": 0.375
+   }
+  },
+  "test": {
+   "pothole": {
+    "P": 0.604,
+    "R": 0.404,
+    "mAP50": 0.46,
+    "mAP50_95": 0.22
+   },
+   "crack": {
+    "P": 0.601,
+    "R": 0.456,
+    "mAP50": 0.508,
+    "mAP50_95": 0.264
+   },
+   "guardrail": {
+    "P": 0.727,
+    "R": 0.643,
+    "mAP50": 0.716,
+    "mAP50_95": 0.534
+   },
+   "sign": {
+    "P": 0.716,
+    "R": 0.666,
+    "mAP50": 0.703,
+    "mAP50_95": 0.483
+   },
+   "all": {
+    "P": 0.662,
+    "R": 0.542,
+    "mAP50": 0.597,
+    "mAP50_95": 0.375
+   }
+  }
+ },
+ "eval_by_source": {
+  "rdd2022_test": {
+   "images": 3526,
+   "v3": {
+    "all": 0.503,
+    "pothole": 0.425,
+    "pothole_R": 0.398,
+    "crack": 0.582,
+    "crack_R": 0.566
+   },
+   "v2": {
+    "all": 0.501,
+    "pothole": 0.418,
+    "pothole_R": 0.393,
+    "crack": 0.584,
+    "crack_R": 0.565
+   }
+  },
+  "road179_test": {
+   "images": 523,
+   "v3": {
+    "all": 0.387,
+    "pothole": 0.508,
+    "pothole_R": 0.5,
+    "crack": 0.265,
+    "crack_R": 0.245
+   },
+   "v2": {
+    "all": 0.252,
+    "pothole": 0.496,
+    "pothole_R": 0.429,
+    "crack": 0.007,
+    "crack_R": 0.003
+   }
+  },
+  "krid_test": {
+   "images": 1165,
+   "v3": {
+    "all": 0.709,
+    "guardrail": 0.716,
+    "guardrail_R": 0.619,
+    "sign": 0.703,
+    "sign_R": 0.626
+   },
+   "v2": {
+    "all": 0.636,
+    "guardrail": 0.612,
+    "guardrail_R": 0.556,
+    "sign": 0.659,
+    "sign_R": 0.587
+   }
+  }
+ },
+ "crack_rule": "v3",
+ "onnx_parity": {
+  "images": 10,
+  "ultralytics_boxes": 65,
+  "matched": 65
+ },
+ "colab_cpu_speed": {
+  "1thread_ms": 96.4,
+  "2thread_ms": 99.2
+ },
+ "created": "2026-11-15T14:19:01",
+ "class_conf_draft": {
+  "pothole": 0.31,
+  "crack": 0.3,
+  "guardrail": 0.21,
+  "sign": 0.21
+ },
+ "class_conf_draft_note": "2026-11-16 초안 (제안 — 정현우 확인 필요, 오픈 이슈 #3). experiments/conf_thresholds_v3.json 의 class_conf: v2 와 같은 test·규칙 (정밀도 ≥ 0.7 인 가장 낮은 기준, IoU 0.5). pothole = RDD2022 + 도로장애물(179) road.zip test, crack = RDD2022 test, guardrail·sign = KRID test. 정밀도 ≥ 0.8 은 class_conf_p08. recommended_conf 는 그대로. 기본 모델은 여전히 v2 (docs/ai-handoff.md 15-6).",
+ "class_conf_p08": {
+  "pothole": 0.4,
+  "crack": 0.42,
+  "guardrail": 0.31,
+  "sign": 0.34
+ },
+ "real_frame_check": {
+  "date": "2026-11-16",
+  "result": "no-go (제안, 11/18 박겸 확정)",
+  "file": "experiments/compare_v3.json, experiments/compare_v3_review.json"
+ }
+}

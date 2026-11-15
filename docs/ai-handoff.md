@@ -230,5 +230,6 @@ for d in det.detect(frame_bgr):
 ## 11. AI 쪽이 받아야 하는 것 (계획 4장)
 
 - **속도 측정 로그 형식**: 프레임·단계별 `{"frame", "t", "stage", "ran", "ms"}` JSONL — `bench_cpu`·`interval_sweep` 실험이 이 로그를 읽는다. 형식이 바뀌면 알려주기.
+  주기 적용 전/후 로그를 하나씩 주면 단계별 실행 비율·ms·FPS·영상 1분당 계산 시간을 낸다: `uv run python -m daboyeo_ai.eval.bench_cpu log 전=before.jsonl 후=after.jsonl --out experiments/bench_cpu_log.csv`. 건너뛴 프레임도 `"ran": false` 로 한 줄씩 남겨 주기 (영상 길이·실행 비율 계산에 쓴다). `t` 가 없으면 `--video-fps 30` 을 준다.
 - **프레임 샘플링 방식**: 분석 주기(N프레임마다 탐지 등)를 어떻게 적용하는지.
 - **시연 영상 + 수동 라벨** (`experiments/gt_events/`): 실제 주행 영상 평가에 쓴다.

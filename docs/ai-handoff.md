@@ -75,11 +75,11 @@ v2 test mAP50 (자세한 값은 `detector_v2.json`):
 from daboyeo_ai.inference import OnnxDetector, load_class_conf
 
 det = OnnxDetector("ai/models/detector_v2.onnx", threads=1,
-                   conf={"pothole": 0.22, "crack": 0.25, "guardrail": 0.26, "sign": 0.24})
+                   conf={"pothole": 0.27, "crack": 0.29, "guardrail": 0.26, "sign": 0.24})
 # 또는 파일에서: experiments/conf_thresholds.json 의 "class_conf", 모델 카드의 "class_conf_draft"
 det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, conf=load_class_conf("experiments/conf_thresholds.json"))
-det.class_conf   # [0.22, 0.25, 0.26, 0.24] — class_id 순서
-det.conf         # 0.22 — 그중 최솟값 (예전 코드 호환)
+det.class_conf   # [0.27, 0.29, 0.26, 0.24] — class_id 순서
+det.conf         # 0.24 — 그중 최솟값 (예전 코드 호환)
 ```
 
 초안 값 (2026-11-15, `uv run python -m daboyeo_ai.eval.conf_thresholds --model ... --parts-dir data/aihub/parts`).
@@ -87,19 +87,19 @@ test 사진에서 IoU 0.5 로 맞춘 **탐지 1건 단위** 정밀도(P)·재현
 
 | 클래스 | 정밀도 ≥ 0.7 (`class_conf`) | 0.25 일 때 | 정밀도 ≥ 0.8 | 정밀도 ≥ 0.9 | 데이터 |
 |---|---|---|---|---|---|
-| pothole | **0.22** (P 0.70 / R 0.50) | P 0.72 / R 0.47 | 0.33 (0.82 / 0.40) | 0.48 (0.90 / 0.31) | 도로장애물(179) test 392장 (RDD2022 미포함) |
-| crack | **0.25** (데이터 없음, 그대로) | — | — | — | RDD2022 test 필요 (179 크랙 라벨은 매칭 불가) |
+| pothole | **0.27** (P 0.70 / R 0.36) | P 0.68 / R 0.38 | 0.39 (0.81 / 0.27) | 0.51 (0.90 / 0.19) | RDD2022 test 3,526장 + 도로장애물(179) test 392장 |
+| crack | **0.29** (0.71 / 0.48) | 0.67 / 0.52 | 0.40 (0.80 / 0.39) | 0.55 (0.90 / 0.25) | RDD2022 test 3,526장 (179 크랙 라벨은 매칭 불가라 뺌) |
 | guardrail | **0.26** (0.70 / 0.57) | 0.69 / 0.58 | 0.42 (0.81 / 0.50) | 0.62 (0.90 / 0.37) | KRID test 1,165장 |
 | sign | **0.24** (0.70 / 0.62) | 0.71 / 0.62 | 0.37 (0.81 / 0.56) | 0.56 (0.90 / 0.45) | KRID test 1,165장 |
 
 - 정밀도 0.7 을 목표로 하면 네 클래스 모두 **지금의 0.25 와 거의 같다** — test 에서 0.25 가 이미 정밀도 약 0.7 이다.
-  시민 화면에 헛것을 덜 보이려면 0.8 열(0.33 / 0.42 / 0.37)이 후보. 재현율을 6~8%p 잃는다.
+  시민 화면에 헛것을 덜 보이려면 0.8 열(0.39 / 0.40 / 0.42 / 0.37)이 후보. 재현율을 7~13%p 잃는다.
 - **어디에 쓰나 (정할 것)**: (가) 블랙박스 `conf` — 기준 미만은 아예 서버로 안 간다. (나) 서버 노출 기준 θ
   (`exposure.py`: `conf ≥ θ OR vehicle_count ≥ k`) — 블랙박스는 0.25 로 기록하고, 서버가 클래스별 θ 로 '한 대만 봐도
   보여줄지'를 정한다. θ 는 차량 한 대의 탐지만으로 보여주는 기준이라 (나)라면 0.8~0.9 열이 맞다. **k(최소 차량 수)는
   서버 값이라 여기서 정하지 않는다.**
 - 한계: 학습 데이터와 같은 출처의 사진이다. 시연 영상에서는 정밀도가 달라지므로 #3(11/24)에서 시연 영상으로 다시 확인한다.
-  crack·pothole 은 RDD2022 test(`data/aihub/parts/rdd2022.zip`)를 받으면 같은 명령으로 다시 낸다.
+  (11/15 RDD2022 test 를 넣어 다시 냄 — crack·pothole 값 갱신.)
 
 ## 5. 계약 패키지 (`daboyeo_contracts`)
 

@@ -148,8 +148,8 @@
   }
  },
  "class_conf_draft": {
-  "pothole": 0.22,
-  "crack": 0.25,
+  "pothole": 0.27,
+  "crack": 0.29,
   "guardrail": 0.26,
   "sign": 0.24
  },

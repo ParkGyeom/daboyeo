@@ -315,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
                                 [float(x) for x in args.alt_targets.split(",") if x])
     args.out_dir.mkdir(parents=True, exist_ok=True)
     with (args.out_dir / "conf_thresholds.csv").open("w", newline="", encoding="utf-8") as f:
-        wr = csv.DictWriter(f, fieldnames=["class", "conf", "tp", "fp", "P", "R", "F1"])
+        wr = csv.DictWriter(f, fieldnames=["class", "conf", "tp", "fp", "P", "R", "F1"], lineterminator="\n")
         wr.writeheader()
         for r in rows:
             wr.writerow({k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()})

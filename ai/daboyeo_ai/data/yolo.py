@@ -91,6 +91,81 @@ def polygon_box(cls: int, seg: list) -> Box | None:
     return Box(cls, min(xs), min(ys), max(xs), max(ys))
 
 
+def valid_rings(seg: list) -> tuple[list[list[tuple[float, float]]], int]:
+    """`valid_points` 와 같지만 선(ring)별로 따로 돌려준다. 점이 2개 미만인 선은 버린다."""
+    rings = seg if any(isinstance(r, (list, tuple)) for r in seg) else [seg]
+    out, dropped = [], 0
+    for ring in rings:
+        pts, d = valid_points(ring if isinstance(ring, (list, tuple)) else [ring])
+        dropped += d
+        if len(pts) >= 2:
+            out.append(pts)
+    return out, dropped
+
+
+@dataclass(frozen=True)
+class CrackMerge:
+    """179 크랙 폴리라인 → 박스 규칙 (v3, 2026-11-15). 길이 단위는 **긴 변 ref_side 로 줄인 학습 이미지의 px**.
+
+    179 크랙은 크랙 하나를 짧은 선분 여러 개(중앙값 24 px, 이미지당 19개)로 그려서, 선분마다 박스를 만들면
+    가늘고 작은 박스 수백 개가 되고 36% 는 4 px 미만이라 버려진다. 그래서:
+    1. 선을 merge_px 두께로 그려 서로 닿는(= merge_px 안쪽으로 가까운) 선끼리 한 묶음으로 본다.
+    2. 묶음마다 원래 점들의 외접 박스 하나 (그린 두께만큼 부풀리지 않는다).
+    3. 묶음의 선 길이 합이 min_len_px 미만이면 버린다 (사람도 못 알아볼 조각).
+    4. 짧은 변을 min_thick_px 까지 가운데 기준으로 늘린다 (가는 세로·가로 크랙도 박스가 되게).
+    5. 길이 합이 긴 순서로 max_boxes 개까지.
+    """
+
+    merge_px: float = 16
+    min_len_px: float = 24
+    min_thick_px: float = 12
+    max_boxes: int = 20
+    ref_side: int = 640
+
+
+def merge_polylines(cls: int, polylines: list[list[tuple[float, float]]], width: int, height: int,
+                    rule: CrackMerge = CrackMerge(), stats: Counter[str] | None = None) -> list[Box]:
+    """한 이미지의 폴리라인들(원본 px) → 묶음별 박스(원본 px). 규칙은 `CrackMerge`."""
+    stats = stats if stats is not None else Counter()
+    lines = [np.asarray(p, dtype=np.float64) for p in polylines if len(p) >= 2]
+    if not lines:
+        return []
+    s = min(1.0, rule.ref_side / max(width, height)) if rule.ref_side else 1.0
+    w, h = max(1, round(width * s)), max(1, round(height * s))
+    mask = np.zeros((h, w), np.uint8)
+    thick = max(1, int(round(rule.merge_px)))
+    scaled = [p * s for p in lines]
+    for p in scaled:
+        cv2.polylines(mask, [p.round().astype(np.int32)], False, 255, thickness=thick)
+    _, lab = cv2.connectedComponents(mask, connectivity=8)
+    groups: dict[int, list[np.ndarray]] = {}
+    for p in scaled:
+        x, y = np.clip(p[0].round().astype(int), 0, [w - 1, h - 1])
+        groups.setdefault(int(lab[y, x]), []).append(p)  # 선은 이어 그렸으니 첫 점의 묶음이 선 전체의 묶음
+    cands = []
+    for ps in groups.values():
+        length = sum(float(np.linalg.norm(np.diff(p, axis=0), axis=1).sum()) for p in ps)
+        if length < rule.min_len_px:
+            stats["crack_group_short"] += 1
+            continue
+        pts = np.concatenate(ps)
+        x1, y1 = pts.min(axis=0)
+        x2, y2 = pts.max(axis=0)
+        cands.append((length, [x1, y1, x2, y2]))
+    cands.sort(key=lambda c: -c[0])
+    if len(cands) > rule.max_boxes:
+        stats["crack_group_capped"] += len(cands) - rule.max_boxes
+        cands = cands[:rule.max_boxes]
+    out = []
+    for _, (x1, y1, x2, y2) in cands:
+        cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+        hw, hh = max(x2 - x1, rule.min_thick_px) / 2, max(y2 - y1, rule.min_thick_px) / 2
+        out.append(Box(cls, (cx - hw) / s, (cy - hh) / s, (cx + hw) / s, (cy + hh) / s).clipped(width, height))
+    stats["crack_polylines"] += len(lines)
+    stats["crack_merged_boxes"] += len(out)
+    return out
+
+
 def valid_bbox(bbox) -> bool:
     return isinstance(bbox, (list, tuple)) and len(bbox) == 4 and all(_num(v) for v in bbox)
 
@@ -149,7 +224,14 @@ class YoloDetWriter:
         """이미지 1장을 쓴다. boxes 가 비어 있으면 배경 이미지(빈 라벨)로 쓴다. 돌려주는 값은 split."""
         h, w = img.shape[:2]
         small = resize_max(img, self.max_side)
-        scale = small.shape[1] / w
+        split = split_for(group)
+        cv2.imwrite(str(self.root / "images" / split / f"{name}.jpg"), small,
+                    [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])
+        self.write_label(name, split, boxes, w, h, small.shape[1] / w)
+        return split
+
+    def write_label(self, name: str, split: str, boxes: list[Box], w: int, h: int, scale: float) -> int:
+        """라벨 파일만 쓴다 (원본 크기 w·h, 저장 이미지 배율 scale). `write` 와 `relabel_road_obstacle` 이 같이 쓴다."""
         lines = []
         for b in boxes:
             b = b.clipped(w, h)
@@ -159,14 +241,16 @@ class YoloDetWriter:
             cx, cy = (b.x1 + b.x2) / 2 / w, (b.y1 + b.y2) / 2 / h
             lines.append(f"{b.cls} {cx:.6f} {cy:.6f} {b.width / w:.6f} {b.height / h:.6f}")
             self.stats[f"box_{CLASS_NAMES[b.cls]}"] += 1
-        split = split_for(group)
-        cv2.imwrite(str(self.root / "images" / split / f"{name}.jpg"), small,
-                    [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality])
         (self.root / "labels" / split / f"{name}.txt").write_text("\n".join(lines) + ("\n" if lines else ""))
         self.stats[f"img_{split}"] += 1
         if not lines:
             self.stats["img_background"] += 1
-        return split
+        return len(lines)
+
+    def scale_for(self, w: int, h: int) -> float:
+        """`resize_max(img, max_side)` 로 저장할 때의 배율 (이미지를 읽지 않고)."""
+        s = self.max_side / max(w, h)
+        return 1.0 if s >= 1 else round(w * s) / w
 
 
 def facility_crop(
@@ -239,3 +323,28 @@ def write_data_yaml(root: Path) -> Path:
     p = root / "data.yaml"
     p.write_text(f"path: {root.resolve()}\ntrain: images/train\nval: images/val\ntest: images/test\nnames:\n{names}\n")
     return p
+
+
+SOURCE_PREFIXES = {"rdd2022": "rdd_", "road179": "ro_", "krid": "krid_"}  # 변환 때 붙인 파일 이름 접두사
+
+
+def source_subset(det_root: Path, out_root: Path, prefix: str, split: str = "test") -> Path:
+    """det_root 의 split 중 파일 이름이 prefix 로 시작하는 것만 모은 평가용 데이터셋 (심볼릭 링크) → data.yaml.
+
+    출처별 평가용 (예: RDD2022 test 만, 도로장애물(179) test 만). Ultralytics 는 이미지 경로의 /images/ 를 /labels/ 로
+    바꿔 라벨을 찾으므로 둘 다 링크한다. val·test 둘 다 이 split 을 가리킨다.
+    """
+    det_root, out_root = Path(det_root), Path(out_root)
+    for kind, ext in (("images", ".jpg"), ("labels", ".txt")):
+        d = out_root / kind / split
+        if d.exists():
+            for p in d.iterdir():
+                p.unlink()
+        d.mkdir(parents=True, exist_ok=True)
+        for p in sorted((det_root / kind / split).glob(f"{prefix}*{ext}")):
+            (d / p.name).symlink_to(p.resolve())
+    names = "\n".join(f"  {i}: {n}" for i, n in enumerate(CLASS_NAMES))
+    y = out_root / "data.yaml"
+    y.write_text(f"path: {out_root.resolve()}\ntrain: images/{split}\nval: images/{split}\ntest: images/{split}\n"
+                 f"names:\n{names}\n")
+    return y

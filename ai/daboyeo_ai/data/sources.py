@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from daboyeo_contracts import CLASS_NAMES
 
-from .yolo import Box, bbox_xywh, polygon_box, valid_bbox, valid_points
+from .yolo import Box, CrackMerge, bbox_xywh, merge_polylines, polygon_box, valid_bbox, valid_points, valid_rings
 
 POTHOLE, CRACK, GUARDRAIL, SIGN = (CLASS_NAMES.index(n) for n in ("pothole", "crack", "guardrail", "sign"))
 
@@ -87,7 +87,11 @@ def road_obstacle_class(category_name: str) -> int | str | None:
     return None
 
 
-def parse_coco_like(js: dict, stats: Counter[str] | None = None) -> list[LabeledImage]:
+ROAD_NOMINAL_SIZE = (1280, 720)  # 도로장애물(179) 원본 이미지 크기 (라벨 99% 이상)
+
+
+def parse_coco_like(js: dict, stats: Counter[str] | None = None,
+                    crack_merge: CrackMerge | None = None) -> list[LabeledImage]:
     """COCO 비슷한 형식(images / annotations / categories) 라벨을 파싱한다.
 
     도로장애물(179) 실제 형식 (2026-11-14 확인): JSON 하나에 이미지 1장이라 `images` 가 리스트가 아니라
@@ -96,6 +100,9 @@ def parse_coco_like(js: dict, stats: Counter[str] | None = None) -> list[Labeled
 
     좌표에 None 등 잘못된 값이 섞이면 그 점만 버린다 (`ann_bad_points`). 유효한 좌표가 하나도 안 남으면
     그 어노테이션은 건너뛴다 (`ann_bad_geometry`). 개수는 stats 에 더한다.
+
+    crack_merge 를 주면 (v3 규칙, 기본 None = v2 와 같음) bbox 없는 크랙은 어노테이션마다 박스를 만들지 않고
+    이미지의 크랙 선을 모두 모아 `merge_polylines` 로 묶음별 박스를 만든다.
     """
     stats = stats if stats is not None else Counter()
     missing = [k for k in ("images", "annotations", "categories") if k not in js]
@@ -105,6 +112,7 @@ def parse_coco_like(js: dict, stats: Counter[str] | None = None) -> list[Labeled
     cats = {c["id"]: road_obstacle_class(c["name"]) for c in js["categories"]}
     by_id = {im["id"]: LabeledImage(im["file_name"], int(im["width"]), int(im["height"])) for im in images}
     negatives: set = set()
+    crack_lines: dict = {}
     for a in js["annotations"]:
         cls = cats.get(a["category_id"])
         img = by_id.get(a["image_id"])
@@ -115,6 +123,13 @@ def parse_coco_like(js: dict, stats: Counter[str] | None = None) -> list[Labeled
             continue
         if valid_bbox(a.get("bbox")):
             box = bbox_xywh(cls, a["bbox"])
+        elif crack_merge is not None and cls == CRACK:
+            rings, dropped = valid_rings(a.get("segmentation") or a.get("polyline") or [])
+            stats["ann_bad_points"] += bool(dropped)
+            if not rings:
+                stats["ann_bad_geometry"] += 1
+            crack_lines.setdefault(a["image_id"], []).extend(rings)
+            continue
         else:
             seg = a.get("segmentation") or a.get("polyline") or []
             points, dropped = valid_points(seg)
@@ -124,6 +139,13 @@ def parse_coco_like(js: dict, stats: Counter[str] | None = None) -> list[Labeled
             stats["ann_bad_geometry"] += 1
             continue
         img.boxes.append(box)
+    for i, lines in crack_lines.items():
+        img = by_id[i]
+        w, h = img.width, img.height
+        if w <= 0 or h <= 0:  # 실제 179 라벨 일부(zip 당 1~49개)는 images 크기가 0 → 데이터셋 기본 크기로 묶는다
+            w, h = ROAD_NOMINAL_SIZE
+            stats["crack_size_assumed"] += 1
+        img.boxes.extend(merge_polylines(CRACK, lines, w, h, crack_merge, stats))
     for i in negatives:
         if not by_id[i].boxes:
             by_id[i].hard_negative = True

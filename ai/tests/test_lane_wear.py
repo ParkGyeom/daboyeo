@@ -348,6 +348,105 @@ def test_tracker_on_real_like_frames(meter):
     assert tr.update(meter.measure(patchy(draw_lanes(road_frame(51), (150, 150, 150)), keep=0.4, seed=51))).is_worn
 
 
+# ---- 연속 프레임 투표 (confirmed) ---------------------------------------------------------
+
+CLEAR_F, WORN_F = fake(0.5, paint_len=4.0), fake(0.5, paint_len=0.5)  # 기준 0.5 → score 4.0 / 0.5
+
+
+def warm(k=3, n=5, **kw):
+    tr = LaneWearTracker(threshold=1.0, window=50, warmup=3, confirm_k=k, confirm_n=n, **kw)
+    for _ in range(3):
+        assert not tr.update(CLEAR_F).ready
+    return tr
+
+
+def run(tr, seq, t0=None, dt=0.1):
+    """seq: 'w' 마모, 'c' 선명, '-' 차선 못 찾음. confirmed 프레임 번호 목록을 돌려준다."""
+    out = []
+    for i, ch in enumerate(seq):
+        r = {"w": WORN_F, "c": CLEAR_F, "-": fake(None, found=False)}[ch]
+        j = tr.update(r, t=None if t0 is None else t0 + i * dt)
+        if j.confirmed:
+            out.append(i)
+    return out
+
+
+def test_vote_defaults():
+    from daboyeo_ai.lane_wear import CONFIRM_K, CONFIRM_N, PROVISIONAL_WEAR_SCORE
+
+    tr = LaneWearTracker()
+    assert (tr.confirm_k, tr.confirm_n, tr.threshold) == (CONFIRM_K, CONFIRM_N, PROVISIONAL_WEAR_SCORE) == (3, 5, 1.0)
+
+
+def test_vote_two_of_five_not_confirmed():
+    tr = warm()
+    assert run(tr, "wcwcc" * 4) == []  # 창 안 마모가 2 개를 넘지 않는다
+    assert tr.update(CLEAR_F).votes <= 2
+
+
+def test_vote_three_of_five_confirmed_once():
+    tr = warm()
+    assert run(tr, "wcwcw") == [4]  # 세 번째 마모 프레임에서 확정
+    j = tr.update(WORN_F)
+    assert j.is_worn and not j.confirmed and j.votes == 3 and j.n_voted == 5  # 같은 구간에서 다시 내지 않는다
+
+
+def test_vote_skips_lane_not_found():
+    tr = warm()
+    # 사이의 못 찾은 프레임은 창에 들어가지도, 창을 비우지도 않는다 → 판정 프레임만 보면 w w w
+    assert run(tr, "w--w---w") == [7]
+    j = tr.update(fake(None, found=False))
+    assert not j.lane_found and not j.confirmed and j.votes == 3
+
+
+def test_vote_warmup_frames_do_not_vote():
+    tr = LaneWearTracker(threshold=1.0, window=50, warmup=3)
+    js = [tr.update(fake(0.5, paint_len=0.5)) for _ in range(3)]  # warmup 중 (낮아도 판정 안 함)
+    assert all(not j.ready and j.n_voted == 0 for j in js)
+    assert run(tr, "ww") == []  # warmup 뒤 2 개뿐 → 아직
+    assert run(tr, "w") == [0]
+
+
+def test_vote_rearms_after_window_clears():
+    tr = warm()
+    assert run(tr, "www" + "wwww" + "cccc") == [2]  # 마모가 이어져도, 4 개 선명만으로는 창이 안 비었다
+    assert run(tr, "c" + "www") == [3]  # 창이 비워진 뒤(선명 5 개 연속) 새 구간 → 다시 1건
+
+
+def test_vote_cooldown_reemits_in_long_stretch():
+    tr = warm(cooldown=10)
+    assert run(tr, "w" * 25) == [2, 12, 22]  # 긴 마모 구간에서 판정 10 프레임마다 1건
+
+
+def test_vote_gap_resets_window():
+    tr = warm()
+    assert run(tr, "ww", t0=0.0) == []
+    assert run(tr, "w", t0=10.0) == []  # 5 초 넘게 끊겼다 → 앞의 두 표는 버린다
+    assert run(tr, "ww", t0=10.1) == [1]
+    # 확정 뒤라도 끊김이 있으면 새 구간이라 다시 낼 수 있다 (기준은 그대로)
+    base = tr.baseline
+    assert run(tr, "www", t0=30.0) == [2] and tr.baseline is not None
+    assert tr.baseline == pytest.approx(base, rel=0.5)
+
+
+def test_vote_reset_clears_votes_and_baseline():
+    tr = warm()
+    assert run(tr, "ww") == []
+    tr.reset()
+    assert tr.baseline is None
+    for _ in range(3):
+        j = tr.update(CLEAR_F)
+        assert not j.ready and j.n_voted == 0
+    assert run(tr, "w") == []  # 이전 두 표는 사라졌다
+
+
+@pytest.mark.parametrize("kw", [{"confirm_k": 0}, {"confirm_k": 6, "confirm_n": 5}, {"cooldown": 0},
+                                {"max_gap_s": 0}])
+def test_vote_bad_args(kw):
+    with pytest.raises(ValueError):
+        LaneWearTracker(**kw)
+
+
 def test_eval_metrics():
     from daboyeo_ai.eval.lane_wear_eval import (
         auc_low_is_worn,
@@ -393,3 +492,16 @@ def test_eval_cli(tmp_path, capsys):
     assert "비교에 쓴 것(선명/마모) 11개 (마모 4)" in out
     row = next(ln for ln in out.splitlines() if ln.startswith("| ★ score (p25"))
     assert row.split("|")[3].strip() == "1.000"  # AUC
+    assert "★ score 기준값별" in out and "| 1 ★ |" in out  # 잠정 기준 1.0 행 표시
+
+
+def test_eval_threshold_rows():
+    from daboyeo_ai.eval.lane_wear_eval import threshold_rows
+
+    s = np.array([0.1, 0.5, 0.3, 0.8, 1.5, 2.0])
+    w = np.array([True, True, False, False, False, False])
+    r = {row["threshold"]: row for row in threshold_rows(s, w, [0.4, 1.0])}
+    assert r[0.4]["flag"] == pytest.approx(2 / 6) and r[0.4]["clear_to_worn"] == pytest.approx(1 / 4)
+    assert r[0.4]["precision"] == pytest.approx(0.5) and r[0.4]["recall"] == pytest.approx(0.5)
+    assert r[1.0]["flag"] == pytest.approx(4 / 6) and r[1.0]["clear_to_worn"] == pytest.approx(2 / 4)
+    assert r[1.0]["recall"] == 1.0

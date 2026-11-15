@@ -3,7 +3,18 @@ name = "daboyeo"
 version = "0.1.0"
 description = "블랙박스 탑재형 AI 도로 결함 탐지 및 간편 신고 시스템 (학술제 MVP)"
 requires-python = ">=3.11,<3.13"
-dependencies = ["daboyeo-contracts", "daboyeo-ai"]
+dependencies = [
+    "daboyeo-contracts",
+    "daboyeo-ai",
+    # 서버·화면·가상 블랙박스 (server/, ui/, edge/). 아직 워크스페이스 패키지가 아니라 레포 최상위에서 실행한다
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+    "psycopg[binary]>=3.1",
+    "httpx>=0.27",
+    "pillow>=10",
+    "streamlit>=1.35",
+]
 
 [dependency-groups]
 dev = ["pytest>=8"]
@@ -17,4 +28,5 @@ daboyeo-contracts = { workspace = true }
 daboyeo-ai = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["contracts/tests", "ai/tests", "tests"]
+testpaths = ["contracts/tests", "ai/tests", "tests", "server/tests", "edge/blackbox/tests"]
+pythonpath = ["."]

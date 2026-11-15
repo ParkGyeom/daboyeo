@@ -12,6 +12,18 @@ uv run pytest -q           # 전체 테스트 — push 전에 통과해야 한�
 docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 ```
 
+백엔드(이전 저장소에서 옮겨 온 코드, contracts 형식으로 옮기기 전). 서버는 `daboyeo_legacy` DB 를 따로 쓴다 (없으면 만든다):
+
+```bash
+scripts/demo.sh up                                  # DB → 서버(8000) → 화면(8501)
+uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 탐지 결과 보내기
+# 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --detect-every 10 --speed 4
+uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3
+scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+scripts/demo.sh down
+```
+
 ## 담당 영역 — 요청한 사람의 폴더만 고친다
 
 | 폴더 | 담당 |

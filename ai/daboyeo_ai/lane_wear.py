@@ -3,9 +3,10 @@
 가상 블랙박스는 `Detector` 와 같은 모양으로 쓴다:
 
     meter = LaneWearMeter()                 # 한 번 만들어 재사용
-    r = meter.measure(frame_bgr)            # OpenCV BGR 프레임 그대로
-    if r.lane_found and r.is_worn:
-        ...  # ObservationIn(defect_type=DefectType.LANE_WEAR, bbox=None, confidence=r.confidence, ...)
+    tracker = LaneWearTracker()             # 주행(영상)마다 하나
+    j = tracker.update(meter.measure(frame_bgr), t=timestamp_s)   # OpenCV BGR 프레임 그대로, t 는 선택
+    if j.confirmed:                         # 확정 1건마다 1번 (r.is_worn · j.is_worn 으로 보내지 않는다)
+        ...  # ObservationIn(defect_type=DefectType.LANE_WEAR, bbox=None, confidence=j.confidence, ...)
 
 방법 (CPU 약 4 ms, 1280×720 기준. 화소 단위 값은 모두 작업 해상도 폭 640 기준이라 해상도와 무관하게 같게 동작):
 1. 프레임을 폭 `work_width`(640) 로 줄이고, 아래쪽 육각형 ROI 만 본다.
@@ -28,7 +29,8 @@
 5. contrast < threshold 이면 마모(is_worn). **이 절대 판정은 호환용이다** — 손 라벨 143장에서 AUC 0.56.
 6. 페인트 양: `contrast_p25` (행마다 잰 대비의 하위 25%, 벗겨진 구간이 많으면 낮다) 와 `paint_len`
    (채택 선분 길이 합 ÷ 폭). 판정은 `LaneWearTracker` 가 같은 주행의 보통 수준과 비교해서 한다
-   (`score = contrast_p25 ÷ 주행 중앙값 × paint_len < 1.7`, 같은 라벨에서 AUC 0.79 · 2-fold F1 0.58).
+   (`score = contrast_p25 ÷ 주행 중앙값 × paint_len < 1.0`, 같은 라벨에서 AUC 0.79) 하고, 최근 판정 5 프레임 중
+   3 프레임 이상이 마모일 때만 "마모 관측" 1건으로 확정한다 (`WearJudgement.confirmed`).
 
 한계 (판정에 반드시 반영할 것):
 - **차선이 완전히 지워진 도로와 차선이 원래 없는 도로는 구별할 수 없다.** 그래서 차선 선분을 못 찾으면
@@ -284,32 +286,45 @@ class LaneWearMeter:
         return self._mask_cache[key]
 
 
-# 상대 판정 잠정값 (TBD) — 오픈 이슈 #6. 손 라벨 143장(KRID·AI Hub 도로장애물, 2026-11-15)에서 고른 값.
-# 시연 주행 영상으로 다시 확인한다 (`python -m daboyeo_ai.eval.lane_wear_eval`).
-PROVISIONAL_WEAR_SCORE = 1.7
+# 상대 판정 잠정값 (TBD) — 오픈 이슈 #6. 시연 주행 영상으로 다시 확인한다
+# (`python -m daboyeo_ai.eval.lane_wear_eval` 의 기준값별 표).
+# 11/15 1.7 → 1.0: 손 라벨 143장(KRID·AI Hub 도로장애물)에서 1.7 은 차선 찾은 프레임의 41% 를 마모로 보고
+# 선명 차선의 18% 를 마모로 잘못 봤다 (P 0.51 / R 0.68). 1.0 이면 28% · 12% (P 0.41 / R 0.29), 0.6 이면 19% · 4.5%.
+# 한 프레임 정밀도는 기준값과 상관없이 0.5 안팎이라, 엄격함은 기준값이 아니라 **반복 관측**(아래 연속 프레임 투표 +
+# 서버의 여러 차량 확정)에서 얻는다. 1.0 은 오탐을 줄이되 투표가 모을 마모 프레임은 남기는 절충이다.
+PROVISIONAL_WEAR_SCORE = 1.0
+# 연속 프레임 투표 (잠정, #6): 최근 판정 프레임 confirm_n 개 중 confirm_k 개 이상이 마모면 "마모 관측" 1건.
+CONFIRM_K, CONFIRM_N = 3, 5
+# 타임스탬프를 주면, 차선을 찾은 프레임 사이가 이 초보다 벌어질 때 투표 창을 비운다 (다른 구간으로 본다).
+MAX_GAP_S = 5.0
 
 
 @dataclass(frozen=True)
 class WearJudgement:
-    """`LaneWearTracker.update` 결과. 한 프레임의 상대 판정."""
+    """`LaneWearTracker.update` 결과. 한 프레임의 상대 판정 + 연속 프레임 투표."""
 
     lane_found: bool
     ready: bool  # 기준(baseline) 을 만들 만큼 차선 프레임이 모였나 (warmup 이 끝났나)
     baseline: float | None  # 이 주행의 보통 contrast_p25 (최근 window 개 차선 프레임의 중앙값)
     score: float | None  # (contrast_p25 ÷ baseline) × paint_len. 낮을수록 마모. ready=False 면 None
-    is_worn: bool  # ready 이고 score < threshold 일 때만 True
+    is_worn: bool  # 이 프레임 하나의 판정: ready 이고 score < threshold. **이것만으로 보내지 않는다**
     confidence: float  # 0~1, is_worn 판정의 신뢰도
+    # 투표 (기본값이 있어 예전 코드는 그대로 동작)
+    confirmed: bool = False  # 이 프레임에서 "마모 관측" 이 확정됐나. True 인 프레임에서만 ObservationIn 1건을 보낸다
+    votes: int = 0  # 투표 창(최근 판정 프레임 confirm_n 개) 안의 마모 프레임 수
+    n_voted: int = 0  # 투표 창에 든 판정 프레임 수 (≤ confirm_n)
 
 
 class LaneWearTracker:
-    """한 주행(같은 카메라·비슷한 조명) 안에서 **상대적으로** 마모를 판정한다. 주행마다 하나씩 만든다.
+    """한 주행(같은 카메라·비슷한 조명) 안에서 **상대적으로** 마모를 판정하고, 연속 프레임 투표로 확정한다.
+    주행마다 하나씩 만든다.
 
         meter, tracker = LaneWearMeter(), LaneWearTracker()   # 주행 시작
-        j = tracker.update(meter.measure(frame_bgr))
-        if j.is_worn:
-            ...  # ObservationIn(defect_type=LANE_WEAR, confidence=j.confidence, ...)
+        j = tracker.update(meter.measure(frame_bgr), t=timestamp_s)   # t 는 선택 (초)
+        if j.confirmed:   # j.is_worn 이 아니라 confirmed 일 때만, 확정 1건마다 1번
+            ...  # ObservationIn(defect_type=LANE_WEAR, bbox=None, confidence=j.confidence, ...)
 
-    왜: 절대 대비(contrast)는 마모보다 카메라·노면색·조명에 더 크게 좌우된다 (KRID 선명 중앙값 0.47 vs
+    왜 상대 판정: 절대 대비(contrast)는 마모보다 카메라·노면색·조명에 더 크게 좌우된다 (KRID 선명 중앙값 0.47 vs
     AI Hub 도로장애물 마모 0.72). 그래서 대비는 같은 주행의 보통 값으로 나누고, 페인트가 남은 길이를 곱한다.
 
     score = (contrast_p25 ÷ baseline) × paint_len
@@ -319,19 +334,54 @@ class LaneWearTracker:
     차선을 찾은 프레임이 `warmup` 개 모이기 전에는 판정하지 않는다 (is_worn=False, ready=False).
     현재 프레임은 판정한 **다음에** 기준에 넣는다.
 
+    왜 투표: 한 프레임 판정은 기준값과 상관없이 절반쯤 오탐이다 (손 라벨 정밀도 ~0.5). 그래서
+      - 투표 창 = 최근 **판정한** 프레임(차선 찾음 + warmup 뒤) `confirm_n` 개의 is_worn.
+        `lane_found=False` 프레임은 창에 들어가지도, 창을 비우지도 않는다 (가림·교차로 한두 프레임은 건너뛴다).
+      - 창 안 마모가 `confirm_k` 개 이상이 되면 그 프레임에서 `confirmed=True` (마모 관측 1건).
+      - 같은 구간에서 매 프레임 다시 내지 않도록, 확정한 뒤에는 **창 안 마모가 0 개가 될 때까지**
+        (선명 프레임이 confirm_n 개 이어질 때까지) 다시 확정하지 않는다. `cooldown` 을 주면 확정 뒤 판정 프레임
+        `cooldown` 개가 지나도 다시 확정할 수 있다 (긴 마모 구간에서 주기적으로 1건씩).
+      - 구간 끊김: `update(r, t=...)` 로 타임스탬프(초)를 주면, 차선 찾은 프레임 사이가 `max_gap_s` 보다 벌어질 때
+        투표 창을 비우고 다시 확정할 수 있게 한다 (기준은 그대로 — 같은 주행). t 를 안 주면 끊김을 모르므로
+        영상이 바뀌거나 오래 멈췄다면 호출 쪽이 `reset()` 한다 (기준과 투표 모두 비운다).
+    투표 규칙의 효과는 독립 프레임(손 라벨)으로는 잴 수 없다 — 시연 주행 영상으로 확인한다 (#6).
+
     한계: 주행 전체가 마모 도로면 기준 자체가 낮아져 마모를 놓친다. 터널·야간으로 조명이 크게 바뀌면
     `reset()` 하거나 새 tracker 를 쓴다. paint_len 은 보이는 차로 수에 따라 달라진다 (편도 1차로는 짧다).
     """
 
-    def __init__(self, threshold: float = PROVISIONAL_WEAR_SCORE, window: int = 100, warmup: int = 20):
+    def __init__(
+        self,
+        threshold: float = PROVISIONAL_WEAR_SCORE,
+        window: int = 100,
+        warmup: int = 20,
+        confirm_k: int = CONFIRM_K,
+        confirm_n: int = CONFIRM_N,
+        cooldown: int | None = None,
+        max_gap_s: float = MAX_GAP_S,
+    ):
         if threshold <= 0:
             raise ValueError("threshold 는 0보다 커야 한다")
         if window < 1 or not 1 <= warmup <= window:
             raise ValueError("1 <= warmup <= window 여야 한다")
+        if not 1 <= confirm_k <= confirm_n:
+            raise ValueError("1 <= confirm_k <= confirm_n 이어야 한다")
+        if cooldown is not None and cooldown < 1:
+            raise ValueError("cooldown 은 None 또는 1 이상")
+        if max_gap_s <= 0:
+            raise ValueError("max_gap_s 는 0보다 커야 한다")
         self.threshold = float(threshold)
         self.window = int(window)
         self.warmup = int(warmup)
+        self.confirm_k = int(confirm_k)
+        self.confirm_n = int(confirm_n)
+        self.cooldown = cooldown
+        self.max_gap_s = float(max_gap_s)
         self._recent: deque[float] = deque(maxlen=self.window)
+        self._votes: deque[bool] = deque(maxlen=self.confirm_n)
+        self._armed = True  # 다음 확정을 낼 수 있나
+        self._since_confirm = 0  # 마지막 확정 뒤 판정한 프레임 수
+        self._last_t: float | None = None  # 마지막으로 차선을 찾은 프레임의 타임스탬프
 
     @property
     def baseline(self) -> float | None:
@@ -340,25 +390,53 @@ class LaneWearTracker:
         return float(np.median(self._recent))
 
     def reset(self) -> None:
+        """기준과 투표를 모두 비운다 (새 주행·영상, 조명이 크게 바뀜)."""
         self._recent.clear()
+        self._reset_votes()
+        self._last_t = None
+
+    def _reset_votes(self) -> None:
+        self._votes.clear()
+        self._armed = True
+        self._since_confirm = 0
 
     def score(self, r: LaneWearResult, baseline: float) -> float:
         """기준값이 주어졌을 때의 점수. 오프라인 평가(주행 전체 중앙값을 기준으로)에도 쓴다."""
         return float(r.contrast_p25) / max(baseline, 1e-3) * r.paint_len
 
-    def update(self, r: LaneWearResult) -> WearJudgement:
+    def _vote_fields(self) -> dict:
+        return {"votes": sum(self._votes), "n_voted": len(self._votes)}
+
+    def update(self, r: LaneWearResult, t: float | None = None) -> WearJudgement:
+        """프레임 하나를 판정한다. t = 프레임 타임스탬프(초, 선택) — 주면 끊김(`max_gap_s`) 뒤 투표를 비운다."""
         if not r.lane_found or r.contrast_p25 is None:
             return WearJudgement(lane_found=False, ready=self.baseline is not None, baseline=self.baseline,
-                                 score=None, is_worn=False, confidence=0.0)
+                                 score=None, is_worn=False, confidence=0.0, **self._vote_fields())
+        if t is not None:
+            if self._last_t is not None and t - self._last_t > self.max_gap_s:
+                self._reset_votes()
+            self._last_t = float(t)
         base = self.baseline
         self._recent.append(float(r.contrast_p25))
         if base is None:
             return WearJudgement(lane_found=True, ready=False, baseline=None, score=None, is_worn=False,
-                                 confidence=0.0)
+                                 confidence=0.0, **self._vote_fields())
         s = self.score(r, base)
+        worn = s < self.threshold
         certainty = min(1.0, abs(s - self.threshold) / self.threshold)
-        return WearJudgement(lane_found=True, ready=True, baseline=base, score=s, is_worn=s < self.threshold,
-                             confidence=float(0.5 + 0.5 * certainty))
+
+        self._votes.append(worn)
+        self._since_confirm += 1
+        votes = sum(self._votes)
+        if not self._armed and (votes == 0 or (self.cooldown is not None and self._since_confirm >= self.cooldown)):
+            self._armed = True
+        confirmed = self._armed and votes >= self.confirm_k
+        if confirmed:
+            self._armed = False
+            self._since_confirm = 0
+        return WearJudgement(lane_found=True, ready=True, baseline=base, score=s, is_worn=worn,
+                             confidence=float(0.5 + 0.5 * certainty), confirmed=confirmed, votes=votes,
+                             n_voted=len(self._votes))
 
 
 def _vanishing_inliers(segs: np.ndarray, w: int, h: int, tol_deg: float, max_segs: int = 40) -> list[int]:

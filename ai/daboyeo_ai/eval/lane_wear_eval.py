@@ -9,6 +9,12 @@
 
 점수(낮을수록 마모)마다 출력: AUC, 전체에서 고른 best-F1 과 그 기준값, 2-fold F1 (절반에서 기준값을 고르고
 나머지 절반에서 잰 F1 의 평균 — 기준값을 맞춘 데이터에서 잰 F1 은 낙관적이다), 잠정 기준값에서의 F1.
+
+이어서 ★ score(주행 중앙값 기준)의 **기준값별 표**: 마모로 본 비율(차선 찾은 프레임 전체 = `제외` 포함, 그리고
+선명/마모 라벨 프레임만), 선명 차선을 마모로 본 비율(선명→마모), 정밀도·재현율·F1. 기준값은 `--thresholds` 로 바꾼다.
+
+한계: 이 도구는 **한 프레임 판정**만 잰다. `LaneWearTracker` 의 연속 프레임 투표(5 중 3, `confirmed`)는 라벨 프레임이
+서로 독립(다른 날·장소)이라 여기서 잴 수 없다 — 시연 주행 영상(연속 프레임)으로 확인한다 (#6).
 """
 
 from __future__ import annotations
@@ -163,7 +169,29 @@ def candidate_scores(items: list[Item], window: int, warmup: int) -> dict[str, t
     }
 
 
-def report(items: list[Item], window: int = 100, warmup: int = 20) -> str:
+DEFAULT_THRESHOLDS = (0.6, 0.8, 1.0, 1.2, 1.4, 1.7, 2.0)
+
+
+def threshold_rows(score: np.ndarray, worn: np.ndarray, thresholds) -> list[dict[str, float]]:
+    """기준값마다 flag(마모로 본 비율), clear_to_worn(선명 중 마모로 본 비율), precision, recall, f1."""
+    rows = []
+    for t in thresholds:
+        pred = score < t
+        tp = int(np.sum(pred & worn))
+        fp = int(np.sum(pred & ~worn))
+        rows.append({
+            "threshold": float(t),
+            "flag": float(pred.mean()) if len(pred) else float("nan"),
+            "clear_to_worn": fp / max(1, int((~worn).sum())),
+            "precision": tp / max(1, int(pred.sum())),
+            "recall": tp / max(1, int(worn.sum())),
+            "f1": f1_at(score, worn, float(t)),
+        })
+    return rows
+
+
+def report(items: list[Item], window: int = 100, warmup: int = 20,
+           thresholds=DEFAULT_THRESHOLDS) -> str:
     found = [it for it in items if it.result.lane_found]
     use = np.array([it.label != SKIP for it in found])
     worn = np.array([it.label == WORN for it in found])[use]
@@ -177,7 +205,8 @@ def report(items: list[Item], window: int = 100, warmup: int = 20) -> str:
     lines.append("")
     lines.append("| 점수 (낮을수록 마모) | n (마모) | AUC | best F1 | 기준값 | 2-fold F1 | 잠정 기준 F1 |")
     lines.append("|---|---|---|---|---|---|---|")
-    for name, (score, prov) in candidate_scores(items, window, warmup).items():
+    cands = candidate_scores(items, window, warmup)
+    for name, (score, prov) in cands.items():
         ok = ~np.isnan(score[use])
         s, w, fd = score[use][ok], worn[ok], fold[ok]
         f, t = best_f1(s, w)
@@ -187,6 +216,21 @@ def report(items: list[Item], window: int = 100, warmup: int = 20) -> str:
     lines.append("")
     lines.append(f"주행 중앙값 = 그 주행의 차선 프레임 전체(제외 포함) 중앙값. tracker 순차: window={window}, "
                  f"warmup={warmup}, 정렬된 키 순서, warmup 동안의 프레임은 빼고 셌다.")
+    score_all = cands["★ score (p25 ÷ 중앙값 × paint_len)"][0]
+    score = score_all[use]
+    lines.append("")
+    lines.append(f"★ score 기준값별 (선명/마모 {len(score)}개, 한 프레임 판정, 잠정 기준 {PROVISIONAL_WEAR_SCORE}):")
+    lines.append("")
+    lines.append(f"| 기준값 (score <) | 마모로 본 비율 (차선 찾음 {len(score_all)}개) | 마모로 본 비율 (선명/마모) "
+                 "| 선명→마모 | 정밀도 | 재현율 | F1 |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for row in threshold_rows(score, worn, thresholds):
+        mark = " ★" if row["threshold"] == PROVISIONAL_WEAR_SCORE else ""
+        flag_all = float(np.mean(score_all < row["threshold"])) if len(score_all) else float("nan")
+        lines.append(f"| {row['threshold']:g}{mark} | {flag_all:.1%} | {row['flag']:.1%} | {row['clear_to_worn']:.1%} | "
+                     f"{row['precision']:.2f} | {row['recall']:.2f} | {row['f1']:.3f} |")
+    lines.append("")
+    lines.append("연속 프레임 투표(LaneWearTracker.confirmed)는 이 독립 프레임으로 잴 수 없다 — 시연 영상으로 확인.")
     return "\n".join(lines)
 
 
@@ -196,12 +240,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("frames", type=Path, help="프레임 폴더 (라벨 키의 기준 폴더)")
     ap.add_argument("--window", type=int, default=100, help="tracker 기준 창 크기 (기본 100)")
     ap.add_argument("--warmup", type=int, default=20, help="tracker 판정 시작 전 차선 프레임 수 (기본 20)")
+    ap.add_argument("--thresholds", type=float, nargs="+", default=list(DEFAULT_THRESHOLDS),
+                    help="★ score 기준값별 표에 쓸 기준값들 (기본 0.6 0.8 1.0 1.2 1.4 1.7 2.0)")
     a = ap.parse_args(argv)
     labels = load_labels(a.labels)
     items, missing = measure_all(labels, a.frames, LaneWearMeter())
     if missing:
         print(f"읽지 못한 프레임 {missing}개", file=sys.stderr)
-    print(report(items, a.window, a.warmup))
+    print(report(items, a.window, a.warmup, a.thresholds))
     return 0
 
 

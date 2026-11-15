@@ -105,7 +105,7 @@ DB enum(`server/sql/001_init.sql`)과 `DefectType`·`RiskLevel` 이 어긋나면
 ## 8. 차선 마모 (제안 — 정현우 확인 필요)
 
 > 계획 2.6, PRD FR-1.3. 학습 모델이 아니라 OpenCV 영상 처리다. **입력·출력 형식은 아래가 제안이고, 11/18 인터페이스 맞춤 때 같이 확정한다.**
-> 마모 기준값은 **잠정값 0.3 (TBD)** — 실제 프레임 분포를 보고 오픈 이슈 #6(11/22)에서 정한다.
+> **11/15 변경: 판정은 `LaneWearTracker` (상대 판정) 를 쓴다.** `r.is_worn`(절대 기준 0.3)은 호환용으로 남겼지만 손 라벨에서 거의 맞지 않는다 (아래 표). 기준값은 잠정 (TBD) — 시연 주행 영상으로 오픈 이슈 #6(11/22)에서 다시 확인한다.
 
 ```python
 from daboyeo_ai.lane_wear import LaneWearMeter
@@ -118,12 +118,42 @@ r.is_worn           # lane_found 이고 contrast < threshold
 r.confidence        # 0~1, 판정 신뢰도 → ObservationIn.confidence
 r.lane_pixel_ratio  # 진단용: ROI 중 차선 화소 비율
 r.n_segments        # 진단용: 차선으로 인정된 선분 수
+r.contrast_p25      # 선분을 따라 행마다 잰 대비의 하위 25% — 페인트가 군데군데 벗겨지면 낮다 (못 찾으면 None)
+r.paint_len         # 남은 차선 선분 길이 합 ÷ 화면 폭 — 지워져 토막 난 차선은 짧다 (못 찾으면 0)
 ```
+
+**상대 판정 (권장).** 절대 대비는 마모보다 카메라·노면색·조명에 더 좌우된다 (KRID 선명 중앙값 0.47 < AI Hub 도로장애물 *마모* 중앙값 0.72). 그래서 같은 주행의 보통 수준과 비교한다.
+
+```python
+from daboyeo_ai.lane_wear import LaneWearMeter, LaneWearTracker
+
+meter = LaneWearMeter()
+tracker = LaneWearTracker()           # 주행(영상·차량) 하나에 하나. threshold=1.7 잠정, window=100, warmup=20
+j = tracker.update(meter.measure(frame_bgr))
+j.ready       # 차선 프레임이 warmup(20)개 모였나. 그 전에는 판정 안 함 (is_worn=False)
+j.baseline    # 이 주행의 보통 contrast_p25 (최근 차선 프레임 100개의 중앙값)
+j.score       # (contrast_p25 ÷ baseline) × paint_len. 낮을수록 마모
+j.is_worn     # ready 이고 score < 1.7
+j.confidence  # 0~1 → ObservationIn.confidence
+```
+
+손 라벨 143장 비교 (선명 112 / 마모 31, 낮을수록 마모, `uv run python -m daboyeo_ai.eval.lane_wear_eval <labels.json> <frames>`):
+
+| 점수 | AUC | best F1 | 2-fold F1 |
+|---|---|---|---|
+| contrast (절대, 지금 `is_worn`) | 0.56 | 0.37 | 0.32 |
+| contrast ÷ 주행 중앙값 | 0.67 | 0.44 | 0.40 |
+| paint_len | 0.74 | 0.51 | 0.49 |
+| **score (상대 p25 × paint_len)** | **0.79** | **0.58** (기준 1.7) | **0.58** |
+| score, tracker 를 순서대로 돌림 (warmup 뒤 111장) | 0.78 | 0.55 | 0.50 |
+
+기준 1.7 에서 정밀도 0.51 · 재현율 0.68 — **한 프레임 판정은 절반이 오탐**이므로 같은 지점 여러 번 관측으로 확정하는 것이 필수다.
 
 | 항목 | 제안 |
 |---|---|
 | 언제 부르나 | **품질 판별을 통과한 프레임**에서만, 탐지보다 긴 주기로 (PRD 8.3 — 주기 값은 `scheduler.py` 에서 정함) |
-| 서버 전송 | `is_worn` 일 때 `ObservationIn(defect_type=DefectType.LANE_WEAR, bbox=None, confidence=r.confidence, ...)` |
+| tracker 를 어디에 두나 | **미정 — 정현우와 정할 것.** (가) 블랙박스가 주행(영상)마다 `LaneWearTracker` 하나를 두고 `j.is_worn` 만 보낸다 — 간단, 서버 변경 없음. (나) 블랙박스는 `contrast_p25`·`paint_len` 을 보내고 서버가 차량별로 기준을 만든다 — 기준값을 서버에서 바꿀 수 있지만 `ObservationIn` 필드 추가(계약 변경)가 필요하다 |
+| 서버 전송 | `j.is_worn` 일 때 (`r.is_worn` 대신) `ObservationIn(defect_type=DefectType.LANE_WEAR, bbox=None, confidence=r.confidence, ...)` |
 | 확정 | 한 프레임으로 확정하지 않는다. **같은 지점 여러 번 관측**해서 확정 (규칙은 #6, 블랙박스 연속 프레임 묶기와 서버 군집 중 어디서 할지 같이 정하기) |
 | 못 찾음 | `lane_found=False` 면 `is_worn=False`. **완전히 지워진 차선과 차선 없는 도로는 구별 못 하므로** 마모로 보내지 않는다 |
 
@@ -131,6 +161,8 @@ r.n_segments        # 진단용: 차선으로 인정된 선분 수
 - 야간·비·역광·그림자에서는 밝기 대비가 크게 흔들린다. 낮·맑은 품질 통과 프레임만 쓰는 걸 권장.
 - ROI 기본값(11/15 변경)은 화면 높이 0.35~0.92 의 육각형 — 지평선이 화면 0.2~0.5 사이인 블랙박스(KRID·AI Hub 도로장애물 실제 프레임)에 맞췄고, 아래 8% 는 보닛·대시보드로 뺀다. 영상 화각이 다르면 `LaneWearMeter(roi=...)` 로 바꾼다 (정규화 좌표 다각형).
 - 11/15 실제 프레임 300장 기준 차선을 찾는 비율은 약 73% (교차로·차선 없는 도로·앞차에 가려진 프레임은 `lane_found=False`). 1280×720 과 1920×1080 은 폭 640 으로 줄여서 재므로 결과가 같다.
+- 상대 판정의 한계: 주행 전체가 마모 도로면 기준 자체가 낮아져 놓친다. 터널·야간 진입처럼 조명이 크게 바뀌면 `tracker.reset()` 하거나 새로 만든다. `paint_len` 은 보이는 차로 수·점선 여부에 따라 달라진다 (편도 1차로·점선 도로는 짧게 나와 마모 쪽으로 기운다).
+- 위 숫자의 한계: 라벨은 썸네일로 붙여 잡음이 있고, 카메라가 두 종류뿐이며, KRID 101장은 여러 날·지역 프레임을 "한 주행"으로 묶었다. 기준 1.7 은 이 라벨에서 고른 값이라 시연 영상에서 다시 확인해야 한다.
 - 보정 도구: `uv run python -m daboyeo_ai.eval.lane_wear_calib <프레임 폴더|영상> --overlay-dir out/` — 프레임별 contrast CSV, 백분위수, ROI·선분 오버레이.
 
 ## 9. 시설물 파손 분류 — **사용 안 함 (11/15 대체안 확정)**

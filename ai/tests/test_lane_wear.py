@@ -3,7 +3,12 @@ import time
 import cv2
 import numpy as np
 import pytest
-from daboyeo_ai.lane_wear import PROVISIONAL_THRESHOLD, LaneWearMeter, LaneWearResult
+from daboyeo_ai.lane_wear import (
+    PROVISIONAL_THRESHOLD,
+    LaneWearMeter,
+    LaneWearResult,
+    LaneWearTracker,
+)
 
 W, H = 1280, 720
 ROAD = 80  # 회색 노면 밝기
@@ -233,3 +238,158 @@ def test_calib_cli_on_folder_and_video(tmp_path, capsys):
     assert [r["frame"] for r in rows] == [0, 5, 10, 15]
     assert rows[1]["t_s"] == pytest.approx(0.5)
     assert all(r["lane_found"] for r in rows)
+
+
+# ---- 페인트 양 · 상대 판정 (LaneWearTracker) ----------------------------------------------
+
+
+def patchy(img, keep=0.6, seed=0):
+    """차선 페인트를 6행 띠마다 확률 (1-keep) 로 지운다 — 군데군데 벗겨진 차선."""
+    clean = road_frame(seed)
+    rng = np.random.default_rng(seed)
+    out = img.copy()
+    for y0 in range(0, H, 6):
+        if rng.random() > keep:
+            out[y0:y0 + 6] = clean[y0:y0 + 6]
+    return out
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_patchy_lane_has_low_p25_and_less_paint(meter, seed):
+    solid = meter.measure(draw_lanes(road_frame(seed), (150, 150, 150)))
+    worn = meter.measure(patchy(draw_lanes(road_frame(seed), (150, 150, 150)), seed=seed))
+    assert solid.lane_found and worn.lane_found
+    assert solid.contrast_p25 > 0.6
+    assert worn.contrast_p25 < 0.5 * solid.contrast_p25  # 벗겨진 구간이 하위 25% 를 끌어내린다
+    assert worn.paint_len < solid.paint_len
+
+
+def test_dashes_keep_p25(meter):
+    """점선의 빈칸은 선분이 아니라서 하위 25% 를 낮추지 않는다 (길이만 줄어든다)."""
+    solid = meter.measure(draw_lanes(road_frame(3), (150, 150, 150)))
+    dashed = meter.measure(draw_lanes(road_frame(3), (150, 150, 150), dashed=True))
+    assert dashed.contrast_p25 == pytest.approx(solid.contrast_p25, rel=0.15)
+    assert dashed.paint_len < solid.paint_len
+
+
+def test_paint_fields_default_when_not_found(meter):
+    r = meter.measure(road_frame(4))
+    assert not r.lane_found and r.contrast_p25 is None and r.paint_len == 0.0
+
+
+def test_paint_len_resolution_independent():
+    big = draw_lanes(road_frame(5), (210, 210, 210))
+    a = LaneWearMeter().measure(big)
+    b = LaneWearMeter().measure(cv2.resize(big, (640, 360), interpolation=cv2.INTER_AREA))
+    assert a.paint_len == pytest.approx(b.paint_len, rel=0.1)
+
+
+def fake(p25, paint_len=2.0, found=True):
+    return LaneWearResult(lane_found=found, contrast=p25 if found else None, is_worn=False, confidence=0.5,
+                          lane_pixel_ratio=0.01, n_segments=10, contrast_p25=p25 if found else None,
+                          paint_len=paint_len if found else 0.0)
+
+
+def test_tracker_warmup_then_baseline():
+    tr = LaneWearTracker(threshold=1.0, window=10, warmup=3)
+    for _ in range(3):
+        j = tr.update(fake(0.2, paint_len=0.1))  # 아주 낮아도 warmup 중에는 판정하지 않는다
+        assert not j.ready and j.score is None and not j.is_worn and j.confidence == 0.0
+    assert tr.baseline == pytest.approx(0.2)
+    j = tr.update(fake(0.2, paint_len=2.0))
+    assert j.ready and j.baseline == pytest.approx(0.2) and j.score == pytest.approx(2.0) and not j.is_worn
+    j = tr.update(fake(0.1, paint_len=1.0))  # 기준의 절반 × 1.0 = 0.5 < 1.0
+    assert j.is_worn and j.score == pytest.approx(0.5) and 0.5 < j.confidence <= 1.0
+
+
+def test_tracker_is_relative_to_drive():
+    """같은 프레임 값이라도 주행의 보통 수준에 따라 판정이 갈린다 (카메라마다 대비가 다르다)."""
+    bright, dark = LaneWearTracker(window=20, warmup=5), LaneWearTracker(window=20, warmup=5)
+    for _ in range(5):
+        bright.update(fake(1.0))
+        dark.update(fake(0.3))
+    frame = fake(0.4, paint_len=2.0)
+    assert bright.update(frame).is_worn  # 0.4 / 1.0 × 2 = 0.8
+    assert not dark.update(frame).is_worn  # 0.4 / 0.3 × 2 = 2.7
+
+
+def test_tracker_ignores_not_found_and_is_robust():
+    tr = LaneWearTracker(window=50, warmup=5)
+    for _ in range(10):
+        j = tr.update(fake(None, found=False))
+        assert not j.lane_found and not j.is_worn
+    assert tr.baseline is None
+    for v in [0.5] * 9 + [5.0]:  # 튀는 값 하나는 중앙값을 움직이지 않는다
+        tr.update(fake(v))
+    assert tr.baseline == pytest.approx(0.5)
+
+
+def test_tracker_window_rolls_and_reset():
+    tr = LaneWearTracker(window=4, warmup=2)
+    for v in [1.0] * 4 + [0.2] * 4:
+        tr.update(fake(v))
+    assert tr.baseline == pytest.approx(0.2)  # 오래된 값은 창 밖으로 나간다
+    tr.reset()
+    assert tr.baseline is None
+
+
+@pytest.mark.parametrize("kw", [{"threshold": 0}, {"window": 0}, {"window": 5, "warmup": 6}, {"warmup": 0}])
+def test_tracker_bad_args(kw):
+    with pytest.raises(ValueError):
+        LaneWearTracker(**kw)
+
+
+def test_tracker_on_real_like_frames(meter):
+    """주행 중 선명 차선 프레임이 기준이 되고, 벗겨진 차선 프레임만 마모로 나온다."""
+    tr = LaneWearTracker(window=50, warmup=5)
+    for s in range(6):
+        assert not tr.update(meter.measure(draw_lanes(road_frame(40 + s), (150, 150, 150)))).is_worn
+    assert not tr.update(meter.measure(draw_lanes(road_frame(50), (150, 150, 150)))).is_worn
+    assert tr.update(meter.measure(patchy(draw_lanes(road_frame(51), (150, 150, 150)), keep=0.4, seed=51))).is_worn
+
+
+def test_eval_metrics():
+    from daboyeo_ai.eval.lane_wear_eval import (
+        auc_low_is_worn,
+        best_f1,
+        f1_at,
+        make_folds,
+        two_fold_f1,
+    )
+
+    s = np.array([0.1, 0.15, 0.3, 0.8, 0.9, 1.0])
+    w = np.array([True, True, False, False, False, False])
+    assert auc_low_is_worn(s, w) == 1.0
+    assert auc_low_is_worn(-s, w) == 0.0
+    f, t = best_f1(s, w)
+    assert f == 1.0 and 0.15 < t < 0.3
+    assert f1_at(s, w, 0.15) == pytest.approx(2 / 3)
+    fold = make_folds(["a"] * 6, w)
+    assert sorted(fold[w]) == [0, 1] and sorted(fold[~w]) == [0, 0, 1, 1]
+    # fold 0 (0.1·0.3·0.9) 로 맞춘 기준 0.2 → fold 1 F1 1.0, fold 1 (0.15·0.8·1.0) 로 맞춘 기준 0.475 → fold 0 에서
+    # 0.3 이 오탐이라 F1 2/3
+    assert two_fold_f1(s, w, fold) == pytest.approx((1 + 2 / 3) / 2)
+
+
+def test_eval_cli(tmp_path, capsys):
+    import json
+
+    from daboyeo_ai.eval import lane_wear_eval
+
+    labels = {}
+    for drive in ("cam_a", "cam_b"):
+        (tmp_path / drive).mkdir()
+        for i in range(6):
+            name = f"{drive}/f{i}.png"
+            img = draw_lanes(road_frame(60 + i), (150, 150, 150))
+            if i >= 4:
+                img = patchy(img, seed=60 + i)
+            cv2.imwrite(str(tmp_path / name), img)
+            labels[name] = ["마모" if i >= 4 else "선명", 0.0]
+    labels["cam_a/f0.png"] = "제외"  # 문자열 값도 받는다
+    (tmp_path / "labels.json").write_text(json.dumps(labels, ensure_ascii=False), encoding="utf-8")
+    assert lane_wear_eval.main([str(tmp_path / "labels.json"), str(tmp_path), "--warmup", "2", "--window", "10"]) == 0
+    out = capsys.readouterr().out
+    assert "비교에 쓴 것(선명/마모) 11개 (마모 4)" in out
+    row = next(ln for ln in out.splitlines() if ln.startswith("| ★ score (p25"))
+    assert row.split("|")[3].strip() == "1.000"  # AUC

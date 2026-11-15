@@ -16,6 +16,8 @@ from psycopg.rows import dict_row
 from server import config
 
 SCHEMA_SQL = Path(__file__).resolve().parent / "sql" / "001_init.sql"
+# 001 뒤에 덧붙이는 변경(002_address.sql …). 여러 번 실행해도 안전하게 써서 서버를 켤 때마다 실행한다
+EXTRA_SQL = sorted(p for p in SCHEMA_SQL.parent.glob("0*.sql") if p != SCHEMA_SQL)
 
 # 시연용 시민과 차량. 차량 이름(label)은 가상 블랙박스의 --device-id 와 같다
 DEMO = [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
@@ -71,11 +73,13 @@ def seed_demo(conn: psycopg.Connection) -> None:
 
 
 def init_db() -> None:
-    """DB 와 테이블이 없으면 만들고(001_init.sql) 시연용 시민·차량을 넣는다. 여러 번 불러도 안전하다."""
+    """DB 와 테이블이 없으면 만들고(001_init.sql), 덧붙인 변경(002_…)을 적용하고, 시연용 시민·차량을 넣는다. 여러 번 불러도 안전하다."""
     ensure_database(config.DATABASE_URL)
     with connect() as conn:
         if not _has_schema(conn):
             conn.execute(SCHEMA_SQL.read_text(encoding="utf-8"))
+        for f in EXTRA_SQL:
+            conn.execute(f.read_text(encoding="utf-8"))
         seed_demo(conn)
 
 
@@ -90,7 +94,7 @@ def reset_db() -> None:
 DEFECT_COLS = """
     d.id, d.defect_type, ST_Y(d.location::geometry) AS lat, ST_X(d.location::geometry) AS lon,
     d.risk_level, d.status, d.observation_count, d.vehicle_count, d.confidence, d.is_suspected,
-    d.reward_eligible_road, d.first_seen_at, d.last_seen_at,
+    d.reward_eligible_road, d.first_seen_at, d.last_seen_at, d.address,
     (SELECT o.snapshot_path FROM observations o
       WHERE o.defect_id = d.id AND o.snapshot_path IS NOT NULL
       ORDER BY o.confidence DESC, o.observed_at LIMIT 1) AS snapshot_path

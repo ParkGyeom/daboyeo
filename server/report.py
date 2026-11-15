@@ -15,7 +15,8 @@ def build_payload(defect: dict, user_name: str, now: datetime) -> dict:
         "defect_type": defect["defect_type"],
         "risk_level": defect["risk_level"],
         "location": {"lat": defect["lat"], "lon": defect["lon"],
-                     "jurisdiction": rules.jurisdiction(defect["lat"], defect["lon"])},
+                     "jurisdiction": rules.jurisdiction(defect["lat"], defect["lon"]),
+                     "address": defect.get("address")},  # 없으면 None (server/geocode.py)
         "snapshot": defect["snapshot_path"],
         "confidence": round(float(defect["confidence"]), 3),
         "vehicle_count": defect["vehicle_count"],

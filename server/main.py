@@ -18,11 +18,11 @@ from uuid import UUID
 import psycopg
 import psycopg.types.json
 from daboyeo_contracts import DefectType, ObservationIn
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
-from server import config, db, dedup, findings, report, rules
+from server import config, db, dedup, findings, geocode, report, rules
 
 
 @asynccontextmanager
@@ -132,7 +132,7 @@ def trip_findings(trip_id: UUID):
 
 
 @app.post(f"{API}/observations", status_code=201)
-def post_observation(meta: str = Form(...), snapshot: UploadFile | None = File(None)):
+def post_observation(bg: BackgroundTasks, meta: str = Form(...), snapshot: UploadFile | None = File(None)):
     """관측 한 건 (multipart: meta = ObservationIn JSON, snapshot = 결함 주변 JPEG).
     같은 client_observation_id 를 다시 보내면 저장하지 않고 처음 결과를 duplicate=true 로 돌려준다."""
     try:
@@ -168,6 +168,8 @@ def post_observation(meta: str = Form(...), snapshot: UploadFile | None = File(N
             raise
         if r.duplicate and path:
             path.unlink(missing_ok=True)
+    if r.is_new_defect:
+        bg.add_task(geocode.fill_missing)  # 새 결함의 주소는 응답 뒤에 받는다. 블랙박스를 기다리게 하지 않는다
     return {"observation_id": r.observation_id, "defect_id": r.defect_id,
             "is_new_defect": r.is_new_defect, "duplicate": r.duplicate}
 
@@ -209,6 +211,7 @@ def report_defect(defect_id: UUID, body: UserBody):
         ).fetchone()
         if seen is None:
             raise HTTPException(403, "이 시민의 차량이 관측한 결함이 아니다")
+        geocode.fill_one(conn, defect_id)  # 아직 주소가 없으면 신고서에 넣으려고 한 번 더 시도한다
         # 상태를 바꾸는 UPDATE 가 한 번에 한 요청만 통과시킨다
         won = conn.execute(
             "UPDATE defects SET status = 'reported' WHERE id = %s AND status = 'unreported' RETURNING id", (defect_id,)
@@ -298,7 +301,7 @@ class StatusBody(BaseModel):
 
 
 @app.get(f"{API}/defects")
-def list_defects(type: str | None = None, status: str | None = None):
+def list_defects(bg: BackgroundTasks, type: str | None = None, status: str | None = None):
     if type is not None and type not in {t.value for t in DefectType}:
         raise HTTPException(422, "type 이 올바르지 않다")
     if status is not None and status not in rules.STATUSES:
@@ -312,6 +315,8 @@ def list_defects(type: str | None = None, status: str | None = None):
             """,
             (type, type, status, status),
         ).fetchall()
+    if any(d["address"] is None for d in rows):
+        bg.add_task(geocode.fill_missing)  # 주소를 못 받은 결함은 관리자 지도가 새로 고칠 때 다시 시도한다
     return [_view(d) for d in rows]
 
 

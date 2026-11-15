@@ -101,3 +101,72 @@ def test_class_conf_list_and_loader(tmp_path):
     (tmp_path / "b.json").write_text("{}")
     with pytest.raises(KeyError):
         load_class_conf(tmp_path / "b.json")
+
+
+def test_road_tiles_cover_road_with_overlap():
+    from daboyeo_ai.inference import road_tiles
+    from daboyeo_ai.inference.onnx_detector import FULL_FRAME
+
+    w = road_tiles(cols=2)
+    assert w[0] == FULL_FRAME and len(w) == 3
+    (a1, at, a2, ab), (b1, bt, b2, bb) = w[1:]
+    assert (a1, b2) == (0.0, 1.0) and at == bt == 0.45 and ab == bb == 1.0
+    assert a2 - b1 == pytest.approx(0.1 * (a2 - a1), abs=1e-5)  # 조각 너비의 10% 겹침
+    assert len(road_tiles(3, full_frame=False)) == 3 and road_tiles(3, full_frame=False)[-1][2] == 1.0
+    with pytest.raises(ValueError):
+        road_tiles(cols=0)
+    with pytest.raises(ValueError):
+        road_tiles(top=0.9, bottom=0.5)
+
+
+def test_merge_nms_dedups_same_class_across_windows():
+    from daboyeo_ai.inference.onnx_detector import merge_nms
+
+    dets = [(0, 0.6, 100, 100, 200, 200), (0, 0.8, 105, 105, 205, 205), (1, 0.5, 100, 100, 200, 200)]
+    assert [(c, s) for c, s, *_ in merge_nms(dets)] == [(0, 0.8), (1, 0.5)]
+    assert merge_nms([]) == []
+
+
+class _FakeSession:
+    """입력 640 고정 모델 흉내: 입력 이미지 정중앙에 pothole 하나를 낸다 (0.9)."""
+
+    class _IO:
+        def __init__(self, name, shape):
+            self.name, self.shape = name, shape
+
+    def get_inputs(self):
+        return [self._IO("images", [1, 3, 640, 640])]
+
+    def get_outputs(self):
+        return [self._IO("output0", [1, 8, 8400])]
+
+    def run(self, _, feeds):
+        return [fake_output([(0, 0.9, 320, 320, 40, 40)], n_noise=0)]
+
+
+def _fake_detector(monkeypatch, **kw):
+    import onnxruntime as ort
+
+    from daboyeo_ai.inference import OnnxDetector
+
+    monkeypatch.setattr(ort, "InferenceSession", lambda *a, **k: _FakeSession())
+    return OnnxDetector("fake.onnx", **kw)
+
+
+def test_windows_default_is_single_full_frame(monkeypatch):
+    det = _fake_detector(monkeypatch)
+    assert det.windows is None
+    (c, s, x1, y1, x2, y2), = det.raw(np.zeros((1080, 1920, 3), np.uint8))
+    assert (x1 + x2) / 2 == pytest.approx(960) and (y1 + y2) / 2 == pytest.approx(540)
+
+
+def test_windows_map_boxes_back_to_frame(monkeypatch):
+    from daboyeo_ai.inference import road_tiles
+
+    det = _fake_detector(monkeypatch, windows=road_tiles(cols=2, overlap=0.0, full_frame=False))
+    res = det.raw(np.zeros((1080, 1920, 3), np.uint8))
+    centers = sorted(((x1 + x2) / 2, (y1 + y2) / 2) for _, _, x1, y1, x2, y2 in res)
+    # 조각 (0~960, 486~1080), (960~1920, 486~1080) 의 중앙 → 프레임 좌표
+    assert centers == [pytest.approx((480, 783), abs=1), pytest.approx((1440, 783), abs=1)]
+    with pytest.raises(ValueError):
+        _fake_detector(monkeypatch, windows=[(0.5, 0, 0.4, 1)])

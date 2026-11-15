@@ -137,6 +137,8 @@ def main(argv: Sequence[str] | None = None, detector_factory=None) -> int:
     ap.add_argument("--no-lane", action="store_true")
     ap.add_argument("--fps", type=float)
     ap.add_argument("--threads", type=int, default=2)
+    ap.add_argument("--road-tiles", type=int, default=0,
+                    help="0 = 프레임 전체만 (기본). N 이면 전체 + 도로 영역 N 조각 (OnnxDetector(windows=road_tiles(N)), handoff 14장)")
     ap.add_argument("--cache-dir", type=Path, help="프레임별 탐지 캐시 (예: data/eval_cache). 두 번째 실행부터 빠르다")
     ap.add_argument("--out", type=Path, default=Path("experiments/interval_sweep"))
     a = ap.parse_args(argv)
@@ -149,9 +151,11 @@ def main(argv: Sequence[str] | None = None, detector_factory=None) -> int:
     lane = not a.no_lane
     if detector_factory is None:
         def detector_factory(c: float):
-            from daboyeo_ai.inference import OnnxDetector
+            from daboyeo_ai.inference import OnnxDetector, road_tiles
 
-            return OnnxDetector(a.model, threads=a.threads, conf=c)
+            return OnnxDetector(a.model, threads=a.threads, conf=c, windows=road_tiles(a.road_tiles) if a.road_tiles else None)
+
+    model_tag = a.model.name + (f"+road_tiles{a.road_tiles}" if a.road_tiles else "")  # 캐시가 섞이지 않게
 
     videos, gts = [], {}
     for v in a.videos:
@@ -159,7 +163,7 @@ def main(argv: Sequence[str] | None = None, detector_factory=None) -> int:
         if gt_path is None:
             print(f"[{v.stem}] 정답 {a.gt_dir / (v.stem + '.csv')} 이 없어 건너뜀", file=sys.stderr)
             continue
-        vr = scan_or_load(v, 1, floor, detector_factory, lane, a.cache_dir, a.fps, a.model.name)
+        vr = scan_or_load(v, 1, floor, detector_factory, lane, a.cache_dir, a.fps, model_tag)
         videos.append(vr)
         gts[vr.video_id] = load_gt(gt_path, vr.video_id, a.point_half)
     if not videos:

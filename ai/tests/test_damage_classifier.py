@@ -107,3 +107,14 @@ def test_detector_without_damage_model_is_unchanged(tmp_path, fake_ort):
     assert det.damage is None
     assert all(d.damage is None and d.damage_conf is None for d in det.detect(np.zeros((720, 1280, 3), np.uint8)))
     assert len(fake_ort.calls) == 1
+
+
+def test_detector_per_class_conf(tmp_path, fake_ort):
+    """가짜 탐지 출력: guardrail 0.9, pothole 0.8, sign 0.7 → pothole 기준만 0.85 로 올리면 pothole 만 빠진다."""
+    frame = np.zeros((720, 1280, 3), np.uint8)
+    assert OnnxDetector(tmp_path / "det.onnx").conf == 0.25  # 기본값은 그대로
+    det = OnnxDetector(tmp_path / "det.onnx", conf={"pothole": 0.85, "guardrail": 0.3})
+    assert det.class_conf == [0.85, 0.25, 0.3, 0.25] and det.conf == 0.25
+    assert sorted(d.class_name for d in det.detect(frame)) == ["guardrail", "sign"]
+    det = OnnxDetector(tmp_path / "det.onnx", conf=0.75)
+    assert sorted(d.class_name for d in det.detect(frame)) == ["guardrail", "pothole"]

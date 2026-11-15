@@ -57,3 +57,47 @@ def test_decode_clips_and_filters():
     assert len(res) == 1
     _, _, x1, y1, x2, y2 = res[0]
     assert x2 == 640 and y1 == 0
+
+
+def test_decode_per_class_conf():
+    lb = Letterbox(1.0, 0, 0)
+    out = fake_output([
+        (0, 0.5, 100, 100, 40, 40),  # pothole 0.5 < 0.6 → 버림
+        (1, 0.3, 300, 300, 40, 40),  # crack 0.3 ≥ 0.2 → 유지
+        (2, 0.65, 500, 500, 40, 40),  # guardrail 0.65 ≥ 0.6 → 유지
+    ])
+    res = decode_yolo(out, lb, 640, 640, conf=[0.6, 0.2, 0.6, 0.6])
+    assert [(c, round(s, 2)) for c, s, *_ in res] == [(2, 0.65), (1, 0.3)]
+    assert decode_yolo(out, lb, 640, 640, conf=0.25) == decode_yolo(out, lb, 640, 640, conf=[0.25] * 4)
+    with pytest.raises(ValueError):
+        decode_yolo(out, lb, 640, 640, conf=[0.5, 0.5])
+
+
+def test_decode_low_conf_then_filter_equals_direct():
+    """낮은 기준으로 한 번 돌리고 점수로 거른 것 = 그 기준으로 바로 돌린 것 (conf_thresholds 가 기대는 성질)."""
+    lb = Letterbox(1.0, 0, 0)
+    rng = np.random.default_rng(1)
+    boxes = [(int(rng.integers(4)), float(rng.uniform(0.05, 1)), *rng.uniform(100, 500, 2), 80, 80) for _ in range(60)]
+    out = fake_output(boxes, n_noise=0)
+    low = decode_yolo(out, lb, 640, 640, conf=0.05)
+    thr = [0.3, 0.5, 0.4, 0.7]
+    assert decode_yolo(out, lb, 640, 640, conf=thr) == [d for d in low if d[1] >= thr[d[0]]]
+
+
+def test_class_conf_list_and_loader(tmp_path):
+    import json
+
+    from daboyeo_ai.inference import load_class_conf
+    from daboyeo_ai.inference.onnx_detector import class_conf_list
+
+    assert class_conf_list(0.3) == [0.3] * 4
+    assert class_conf_list({"sign": 0.5}) == [0.25, 0.25, 0.25, 0.5]
+    with pytest.raises(ValueError):
+        class_conf_list({"lane_wear": 0.5})
+    (tmp_path / "a.json").write_text(json.dumps({"class_conf": {"pothole": 0.4}, "classes": {}}))
+    (tmp_path / "card.json").write_text(json.dumps({"recommended_conf": 0.25, "class_conf_draft": {"sign": 0.5}}))
+    assert load_class_conf(tmp_path / "a.json") == {"pothole": 0.4}
+    assert load_class_conf(tmp_path / "card.json") == {"sign": 0.5}
+    (tmp_path / "b.json").write_text("{}")
+    with pytest.raises(KeyError):
+        load_class_conf(tmp_path / "b.json")

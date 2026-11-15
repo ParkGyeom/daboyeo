@@ -59,13 +59,47 @@ v2 test mAP50 (자세한 값은 `detector_v2.json`):
 |---|---|---|
 | `model_path` | — | `.onnx` 경로 |
 | `threads` | `1` | ONNX Runtime CPU 스레드 수. **PRD FR-1.6 의 "CPU 1~2코어 제한"을 여기서 건다** (1 또는 2) |
-| `conf` | `0.25` | 이 값 미만 탐지는 버린다. 블랙박스가 기록할 최소 신뢰도 |
+| `conf` | `0.25` | 이 값 미만 탐지는 버린다. 블랙박스가 기록할 최소 신뢰도. 숫자 하나 또는 클래스별 dict (아래 4-1) |
 | `iou` | `0.45` | 같은 클래스 박스끼리 겹침 제거(NMS) 기준 |
 
 - `conf` 는 **블랙박스 기록 기준**이다. 시민에게 보여줄지 정하는 **노출 기준 θ(오픈 이슈 #3)는 별개**로, 서버(F7)에서 따로 정한다.
 - 입력 크기는 모델 파일에서 자동으로 읽는다 (v1: 640).
 - 클래스 수가 계약(4개)과 다른 모델을 넣으면 생성할 때 바로 `ValueError` 가 난다.
 - `det.raw(frame)` 은 `[(class_id, conf, x1, y1, x2, y2), ...]` 를 **픽셀 좌표**로 준다 (오버레이 그릴 때 편함).
+
+### 4-1. 클래스별 신뢰도 기준 (제안 — 정현우 확인 필요, 오픈 이슈 #3)
+
+`conf` 에 클래스별 dict 를 넘길 수 있다. 빠진 클래스는 0.25. 숫자 하나를 넘기는 예전 방식은 그대로 동작한다.
+
+```python
+from daboyeo_ai.inference import OnnxDetector, load_class_conf
+
+det = OnnxDetector("ai/models/detector_v2.onnx", threads=1,
+                   conf={"pothole": 0.22, "crack": 0.25, "guardrail": 0.26, "sign": 0.24})
+# 또는 파일에서: experiments/conf_thresholds.json 의 "class_conf", 모델 카드의 "class_conf_draft"
+det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, conf=load_class_conf("experiments/conf_thresholds.json"))
+det.class_conf   # [0.22, 0.25, 0.26, 0.24] — class_id 순서
+det.conf         # 0.22 — 그중 최솟값 (예전 코드 호환)
+```
+
+초안 값 (2026-11-15, `uv run python -m daboyeo_ai.eval.conf_thresholds --model ... --parts-dir data/aihub/parts`).
+test 사진에서 IoU 0.5 로 맞춘 **탐지 1건 단위** 정밀도(P)·재현율(R):
+
+| 클래스 | 정밀도 ≥ 0.7 (`class_conf`) | 0.25 일 때 | 정밀도 ≥ 0.8 | 정밀도 ≥ 0.9 | 데이터 |
+|---|---|---|---|---|---|
+| pothole | **0.22** (P 0.70 / R 0.50) | P 0.72 / R 0.47 | 0.33 (0.82 / 0.40) | 0.48 (0.90 / 0.31) | 도로장애물(179) test 392장 (RDD2022 미포함) |
+| crack | **0.25** (데이터 없음, 그대로) | — | — | — | RDD2022 test 필요 (179 크랙 라벨은 매칭 불가) |
+| guardrail | **0.26** (0.70 / 0.57) | 0.69 / 0.58 | 0.42 (0.81 / 0.50) | 0.62 (0.90 / 0.37) | KRID test 1,165장 |
+| sign | **0.24** (0.70 / 0.62) | 0.71 / 0.62 | 0.37 (0.81 / 0.56) | 0.56 (0.90 / 0.45) | KRID test 1,165장 |
+
+- 정밀도 0.7 을 목표로 하면 네 클래스 모두 **지금의 0.25 와 거의 같다** — test 에서 0.25 가 이미 정밀도 약 0.7 이다.
+  시민 화면에 헛것을 덜 보이려면 0.8 열(0.33 / 0.42 / 0.37)이 후보. 재현율을 6~8%p 잃는다.
+- **어디에 쓰나 (정할 것)**: (가) 블랙박스 `conf` — 기준 미만은 아예 서버로 안 간다. (나) 서버 노출 기준 θ
+  (`exposure.py`: `conf ≥ θ OR vehicle_count ≥ k`) — 블랙박스는 0.25 로 기록하고, 서버가 클래스별 θ 로 '한 대만 봐도
+  보여줄지'를 정한다. θ 는 차량 한 대의 탐지만으로 보여주는 기준이라 (나)라면 0.8~0.9 열이 맞다. **k(최소 차량 수)는
+  서버 값이라 여기서 정하지 않는다.**
+- 한계: 학습 데이터와 같은 출처의 사진이다. 시연 영상에서는 정밀도가 달라지므로 #3(11/24)에서 시연 영상으로 다시 확인한다.
+  crack·pothole 은 RDD2022 test(`data/aihub/parts/rdd2022.zip`)를 받으면 같은 명령으로 다시 낸다.
 
 ## 5. 계약 패키지 (`daboyeo_contracts`)
 

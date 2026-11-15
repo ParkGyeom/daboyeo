@@ -62,7 +62,7 @@ cmd_up() {
         say "  서버는 이미 떠 있다"
     else
         port_busy "$SERVER_PORT" && die "포트 $SERVER_PORT 을(를) 다른 프로그램이 쓰고 있다"
-        start_bg server "$PY" -m uvicorn server.main:app --port "$SERVER_PORT"
+        PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-http://localhost:$WEB_PORT}" start_bg server "$PY" -m uvicorn server.main:app --port "$SERVER_PORT"
         wait_http "http://localhost:$SERVER_PORT/health" server
         say "  서버 준비됨 http://localhost:$SERVER_PORT"
     fi

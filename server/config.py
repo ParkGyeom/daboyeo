@@ -30,3 +30,6 @@ def get(name: str, default: str) -> str:
 DATABASE_URL = get("DATABASE_URL", "postgresql://daboyeo:daboyeo@localhost:5432/daboyeo")
 SNAPSHOT_DIR = ROOT / get("SNAPSHOT_DIR", "server_data/snapshots")
 MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024
+# 모의 문자에 넣을 링크의 주소(화면 주소). scripts/demo.sh 가 화면 포트에 맞춰 준다
+PUBLIC_BASE_URL = get("PUBLIC_BASE_URL", "http://localhost:8501").rstrip("/")
+LINK_TTL_HOURS = int(get("LINK_TTL_HOURS", "72"))

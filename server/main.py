@@ -22,7 +22,7 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadF
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
-from server import config, db, dedup, findings, geocode, report, rules
+from server import config, db, dedup, findings, geocode, notify, report, rules
 
 
 @asynccontextmanager
@@ -116,7 +116,9 @@ def end_trip(trip_id: UUID):
             raise HTTPException(404, "없는 주행")
         findings.refresh_trip(conn, trip_id)
         n = conn.execute("SELECT count(*) AS n FROM findings WHERE trip_id = %s", (trip_id,)).fetchone()["n"]
-    return {"trip_id": trip_id, "ended_at": t["ended_at"], "finding_count": n}
+        # 확인할 결함이 있으면 그 차량 주인에게 모의 문자(링크 포함)를 만든다. 실제 발송은 하지 않는다
+        notified = notify.create_for_trip(conn, trip_id) is not None
+    return {"trip_id": trip_id, "ended_at": t["ended_at"], "finding_count": n, "notified": notified}
 
 
 @app.get(f"{API}/trips/{{trip_id}}/findings")
@@ -198,46 +200,60 @@ def user_notices(user_id: UUID):
         return findings.notices(conn, user_id)
 
 
+def _do_report(conn, u: dict, defect_id: UUID) -> dict:
+    """신고 한 건을 처리한다 (시민 선택 화면의 API 와 문자 링크의 API 가 같이 쓴다)."""
+    _defect(conn, defect_id)
+    seen = conn.execute(
+        """SELECT 1 FROM observations o JOIN vehicles v ON v.id = o.vehicle_id
+           WHERE o.defect_id = %s AND v.owner_user_id = %s LIMIT 1""",
+        (defect_id, u["id"]),
+    ).fetchone()
+    if seen is None:
+        raise HTTPException(403, "이 시민의 차량이 관측한 결함이 아니다")
+    geocode.fill_one(conn, defect_id)  # 아직 주소가 없으면 신고서에 넣으려고 한 번 더 시도한다
+    # 상태를 바꾸는 UPDATE 가 한 번에 한 요청만 통과시킨다
+    won = conn.execute(
+        "UPDATE defects SET status = 'reported' WHERE id = %s AND status = 'unreported' RETURNING id", (defect_id,)
+    ).fetchone()
+    if won is None:
+        raise HTTPException(409, "이미 신고됨")
+    d = _defect(conn, defect_id)
+    now = datetime.now(rules.KST)
+    payload = report.build_payload(d, u["name"], now)
+    rep = conn.execute(
+        """INSERT INTO reports (defect_id, user_id, quarter, payload, submission_status, reward_valid, created_at)
+           VALUES (%s, %s, %s, %s, 'mock_submitted', %s, %s)
+           ON CONFLICT (defect_id) DO NOTHING RETURNING id""",
+        (defect_id, u["id"], rules.quarter_label(now), psycopg.types.json.Jsonb(payload),
+         d["reward_eligible_road"], now),
+    ).fetchone()
+    if rep is None:
+        raise HTTPException(409, "이미 신고됨")
+    # 신고한 시민의 항목은 신고함, 같은 결함을 기다리던 다른 시민의 항목은 이미 신고됨
+    conn.execute(
+        """UPDATE findings SET response = CASE WHEN user_id = %s THEN 'reported' ELSE 'already_reported' END::finding_response,
+                               responded_at = now()
+           WHERE defect_id = %s AND response = 'pending'""",
+        (u["id"], defect_id),
+    )
+    return {"report_id": rep["id"], "status": rules.REPORTED, "payload": payload}
+
+
+def _do_skip(conn, user_id: UUID, defect_id: UUID) -> None:
+    n = conn.execute(
+        """UPDATE findings SET response = 'skipped', responded_at = now()
+           WHERE user_id = %s AND defect_id = %s AND response = 'pending'""",
+        (user_id, defect_id),
+    ).rowcount
+    if n == 0:
+        raise HTTPException(404, "그 시민의 확인 목록에 없는 결함")
+
+
 @app.post(f"{API}/defects/{{defect_id}}/report")
 def report_defect(defect_id: UUID, body: UserBody):
     """신고. 결함당 신고서는 1건 (FR-5.5). 이미 신고됐으면 409."""
     with db.connect() as conn:
-        u = _user(conn, body.user_id)
-        _defect(conn, defect_id)
-        seen = conn.execute(
-            """SELECT 1 FROM observations o JOIN vehicles v ON v.id = o.vehicle_id
-               WHERE o.defect_id = %s AND v.owner_user_id = %s LIMIT 1""",
-            (defect_id, u["id"]),
-        ).fetchone()
-        if seen is None:
-            raise HTTPException(403, "이 시민의 차량이 관측한 결함이 아니다")
-        geocode.fill_one(conn, defect_id)  # 아직 주소가 없으면 신고서에 넣으려고 한 번 더 시도한다
-        # 상태를 바꾸는 UPDATE 가 한 번에 한 요청만 통과시킨다
-        won = conn.execute(
-            "UPDATE defects SET status = 'reported' WHERE id = %s AND status = 'unreported' RETURNING id", (defect_id,)
-        ).fetchone()
-        if won is None:
-            raise HTTPException(409, "이미 신고됨")
-        d = _defect(conn, defect_id)
-        now = datetime.now(rules.KST)
-        payload = report.build_payload(d, u["name"], now)
-        rep = conn.execute(
-            """INSERT INTO reports (defect_id, user_id, quarter, payload, submission_status, reward_valid, created_at)
-               VALUES (%s, %s, %s, %s, 'mock_submitted', %s, %s)
-               ON CONFLICT (defect_id) DO NOTHING RETURNING id""",
-            (defect_id, u["id"], rules.quarter_label(now), psycopg.types.json.Jsonb(payload),
-             d["reward_eligible_road"], now),
-        ).fetchone()
-        if rep is None:
-            raise HTTPException(409, "이미 신고됨")
-        # 신고한 시민의 항목은 신고함, 같은 결함을 기다리던 다른 시민의 항목은 이미 신고됨
-        conn.execute(
-            """UPDATE findings SET response = CASE WHEN user_id = %s THEN 'reported' ELSE 'already_reported' END::finding_response,
-                                   responded_at = now()
-               WHERE defect_id = %s AND response = 'pending'""",
-            (u["id"], defect_id),
-        )
-    return {"report_id": rep["id"], "status": rules.REPORTED, "payload": payload}
+        return _do_report(conn, _user(conn, body.user_id), defect_id)
 
 
 @app.post(f"{API}/defects/{{defect_id}}/skip")
@@ -246,14 +262,89 @@ def skip_defect(defect_id: UUID, body: UserBody):
     with db.connect() as conn:
         _user(conn, body.user_id)
         _defect(conn, defect_id)
-        n = conn.execute(
-            """UPDATE findings SET response = 'skipped', responded_at = now()
-               WHERE user_id = %s AND defect_id = %s AND response = 'pending'""",
-            (body.user_id, defect_id),
-        ).rowcount
-        if n == 0:
-            raise HTTPException(404, "그 시민의 확인 목록에 없는 결함")
+        _do_skip(conn, body.user_id, defect_id)
     return {"ok": True}
+
+
+# ---------- 문자 링크 (가입·로그인 없이 토큰으로) ----------
+
+def _token(conn, token: str) -> dict:
+    """링크의 토큰으로 그 시민과 주행을 찾는다. 없으면 404, 기한이 지났으면 410."""
+    n = conn.execute(
+        """SELECT n.id, n.user_id, n.trip_id, u.name, n.expires_at, n.expires_at <= now() AS expired
+           FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.token = %s""",
+        (token,),
+    ).fetchone()
+    if n is None:
+        raise HTTPException(404, "없는 링크")
+    if n["expired"]:
+        raise HTTPException(410, "링크의 유효 시간이 지났다")
+    return n
+
+
+def _link_finding(conn, n: dict, defect_id: UUID) -> str:
+    """이 링크 주인의 이 주행 확인 항목의 응답 상태. 목록에 없는 결함이면 404."""
+    f = conn.execute(
+        "SELECT response FROM findings WHERE user_id = %s AND trip_id = %s AND defect_id = %s",
+        (n["user_id"], n["trip_id"], defect_id),
+    ).fetchone()
+    if f is None:
+        raise HTTPException(404, "이 링크의 확인 목록에 없는 결함")
+    return f["response"]
+
+
+@app.get(f"{API}/m/{{token}}/findings")
+def link_findings(token: str):
+    """문자 링크를 열었을 때 보여 줄 그 주행의 확인 목록 (아직 답하지 않은 것)."""
+    with db.connect() as conn:
+        n = _token(conn, token)
+        conn.execute("UPDATE notifications SET opened_at = coalesce(opened_at, now()) WHERE id = %s", (n["id"],))
+        items = [_view(d) for d in findings.pending(conn, n["user_id"], n["trip_id"])]
+    return {"user_name": n["name"], "expires_at": n["expires_at"], "findings": items}
+
+
+@app.post(f"{API}/m/{{token}}/defects/{{defect_id}}/report")
+def link_report(token: str, defect_id: UUID):
+    """링크에서 [신고] 한 번. 시민은 토큰으로 정한다. 이미 신고됐으면 409."""
+    with db.connect() as conn:
+        n = _token(conn, token)
+        resp = _link_finding(conn, n, defect_id)
+        if resp in ("reported", "already_reported"):
+            raise HTTPException(409, "이미 신고됨")
+        if resp != "pending":
+            raise HTTPException(404, "이 링크의 확인 목록에 없는 결함")
+        return _do_report(conn, {"id": n["user_id"], "name": n["name"]}, defect_id)
+
+
+@app.post(f"{API}/m/{{token}}/defects/{{defect_id}}/skip")
+def link_skip(token: str, defect_id: UUID):
+    with db.connect() as conn:
+        n = _token(conn, token)
+        _link_finding(conn, n, defect_id)
+        _do_skip(conn, n["user_id"], defect_id)
+    return {"ok": True}
+
+
+@app.get(f"{API}/m/{{token}}/reports/{{report_id}}")
+def link_get_report(token: str, report_id: UUID):
+    """링크 주인이 낸 신고서만 볼 수 있다."""
+    with db.connect() as conn:
+        n = _token(conn, token)
+        r = conn.execute(
+            """SELECT id, defect_id, quarter, payload, submission_status, reward_valid, created_at
+               FROM reports WHERE id = %s AND user_id = %s""",
+            (report_id, n["user_id"]),
+        ).fetchone()
+    if r is None:
+        raise HTTPException(404, "없는 신고서")
+    return r
+
+
+@app.get(f"{API}/notifications")
+def notifications():
+    """모의 문자 목록 (시연용 메시지함 화면). 받는 번호는 가운데를 가린다. 실제 서비스라면 공개하면 안 된다 (링크 토큰이 들어 있다)."""
+    with db.connect() as conn:
+        return notify.recent(conn)
 
 
 @app.get(f"{API}/reports/{{report_id}}")

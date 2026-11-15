@@ -9,6 +9,9 @@
     det = OnnxDetector("ai/models/detector_v2.onnx", conf={"pothole": 0.3, "crack": 0.25, "guardrail": 0.4, "sign": 0.45})
     det = OnnxDetector("ai/models/detector_v2.onnx", conf=load_class_conf("experiments/conf_thresholds.json"))
 
+    # (선택) 도로 영역을 좌우 2조각으로 잘라 한 번 더 본다 — 멀리 있는 작은 포트홀·균열용, 기본은 꺼짐 (handoff 14장)
+    det = OnnxDetector("ai/models/detector_v2.onnx", windows=road_tiles(cols=2))
+
     # 시설물 파손 분류도 켜려면 (계획 2.7): guardrail·sign 탐지에 damage / damage_conf 가 채워진다
     det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, damage_model="ai/models/damage_cls_v1.onnx")
 
@@ -53,6 +56,41 @@ def load_class_conf(path: str | Path) -> dict[str, float]:
         if key in data:
             return {k: float(x) for k, x in data[key].items()}
     raise KeyError(f"{path}: no 'class_conf' or 'class_conf_draft' key")
+
+
+Window = tuple[float, float, float, float]  # (x1, y1, x2, y2) 프레임 크기로 나눈 0~1 — 프레임의 어느 부분을 모델에 넣을지
+FULL_FRAME: Window = (0.0, 0.0, 1.0, 1.0)
+
+
+def road_tiles(cols: int = 2, top: float = 0.45, bottom: float = 1.0, overlap: float = 0.1,
+               full_frame: bool = True) -> tuple[Window, ...]:
+    """도로 영역(높이 top~bottom, 가로 전체)을 가로로 cols 조각(조각끼리 overlap 만큼 겹침)으로 나눈 창 목록.
+
+    full_frame=True 면 맨 앞에 프레임 전체(지금과 같은 640 한 번)를 넣는다 — 표지판처럼 지평선 위에 있는 것을 놓치지 않게.
+    1920×1080 에서 cols=2 면 조각 하나가 약 1056×594 → 640 으로 줄이는 비율이 0.61 (전체 프레임은 0.33) 이라
+    도로 위 물체가 약 1.8배 크게 들어간다. 모델을 cols(+1) 번 돌리므로 시간도 그만큼 든다.
+    """
+    if cols < 1 or not 0 <= top < bottom <= 1 or not 0 <= overlap < 1:
+        raise ValueError(f"bad road_tiles(cols={cols}, top={top}, bottom={bottom}, overlap={overlap})")
+    w = 1.0 / (cols - (cols - 1) * overlap)  # 조각 너비: cols 개가 overlap 비율씩 겹쳐서 정확히 0~1 을 덮는다
+    step = w * (1 - overlap)
+    tiles = tuple((round(i * step, 6), top, round(min(1.0, i * step + w), 6), bottom) for i in range(cols))
+    return ((FULL_FRAME,) if full_frame else ()) + tiles
+
+
+def window_pixels(win: Window, w: int, h: int) -> tuple[int, int, int, int]:
+    x1, y1, x2, y2 = win
+    return round(x1 * w), round(y1 * h), round(x2 * w), round(y2 * h)
+
+
+def merge_nms(dets: Sequence[tuple[int, float, float, float, float, float]], iou: float = 0.45
+              ) -> list[tuple[int, float, float, float, float, float]]:
+    """여러 창에서 나온 [(cls, score, x1, y1, x2, y2)] (프레임 픽셀) 를 클래스별 NMS 로 합친다 (점수 높은 순)."""
+    if len(dets) <= 1:
+        return list(dets)
+    rects = [[d[2], d[3], d[4] - d[2], d[5] - d[3]] for d in dets]
+    idx = cv2.dnn.NMSBoxesBatched(rects, [d[1] for d in dets], [d[0] for d in dets], 0.0, iou)
+    return sorted((dets[i] for i in np.asarray(idx).reshape(-1)), key=lambda t: -t[1])
 
 
 @dataclass(frozen=True)
@@ -117,6 +155,8 @@ class OnnxDetector:
     """`Detector` 프로토콜 구현. threads 로 CPU 코어 사용을 제한한다 (PRD FR-1.6, 1~2코어).
 
     conf: 숫자 하나(모든 클래스) 또는 `{"pothole": 0.3, ...}` 클래스별 기준 (빠진 클래스는 0.25).
+    windows: 프레임의 어느 부분들을 모델에 넣을지 (0~1 비율 창 목록, 예: `road_tiles(cols=2)`). 기본 None = 프레임 전체 한 번
+    (지금까지와 같음). 창마다 640 letterbox 로 돌리고 결과를 프레임 좌표로 옮겨 클래스별 NMS 로 합친다 → 창 수만큼 느려진다.
     `self.class_conf` 는 class_id 순서 리스트, `self.conf` 는 그 최솟값 (예전 코드 호환).
     """
 
@@ -127,6 +167,7 @@ class OnnxDetector:
         conf: float | Mapping[str, float] = DEFAULT_CONF,
         iou: float = 0.45,
         damage_model: str | Path | DamageClassifier | None = None,
+        windows: Sequence[Window] | None = None,
     ):
         import onnxruntime as ort  # 학습 환경 등 추론이 필요 없는 곳에서는 import 하지 않도록
 
@@ -143,6 +184,10 @@ class OnnxDetector:
             raise ValueError(f"model has {nc} classes, contract expects {len(CLASS_NAMES)} {CLASS_NAMES}")
         self.class_conf = class_conf_list(conf)
         self.conf, self.iou = min(self.class_conf), iou
+        self.windows = tuple(tuple(float(v) for v in win) for win in windows) if windows else None
+        for x1, y1, x2, y2 in self.windows or ():
+            if not (0 <= x1 < x2 <= 1 and 0 <= y1 < y2 <= 1):
+                raise ValueError(f"window must be 0~1 (x1<x2, y1<y2): {(x1, y1, x2, y2)}")
         # 파손 분류기: 경로면 같은 threads 로 연다. 탐지 → 분류가 차례로 돌아서 코어를 더 쓰지 않는다
         if damage_model is None or not isinstance(damage_model, (str, Path)):
             self.damage = damage_model
@@ -152,6 +197,17 @@ class OnnxDetector:
             self.damage = DamageClassifier(damage_model, threads=threads)
 
     def raw(self, frame_bgr: np.ndarray) -> list[tuple[int, float, float, float, float, float]]:
+        if not self.windows:
+            return self._run(frame_bgr)
+        h, w = frame_bgr.shape[:2]
+        dets = []
+        for win in self.windows:
+            x1, y1, x2, y2 = window_pixels(win, w, h)
+            for c, s, a, b, cc, d in self._run(frame_bgr[y1:y2, x1:x2]):
+                dets.append((c, s, a + x1, b + y1, cc + x1, d + y1))
+        return merge_nms(dets, self.iou)
+
+    def _run(self, frame_bgr: np.ndarray) -> list[tuple[int, float, float, float, float, float]]:
         h, w = frame_bgr.shape[:2]
         img, lb = letterbox(frame_bgr, self.size)
         x = np.ascontiguousarray(img[:, :, ::-1].transpose(2, 0, 1), dtype=np.float32)[None] / 255.0

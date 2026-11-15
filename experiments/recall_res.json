@@ -1,0 +1,1277 @@
+{
+ "model": "detector_v2.onnx",
+ "class_conf_draft": {
+  "pothole": 0.27,
+  "crack": 0.29,
+  "guardrail": 0.26,
+  "sign": 0.24
+ },
+ "n_sample": 300,
+ "sample_conditions": {
+  "light_clear_smooth": 50,
+  "light_clear_traffic": 50,
+  "light_foggy_smooth": 50,
+  "light_rainy_smooth": 50,
+  "light_rainy_traffic": 50,
+  "night_clear_smooth": 50
+ },
+ "variants": {
+  "base": {
+   "windows": null,
+   "runs_per_frame": 1,
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": {
+     "class": "pothole",
+     "target_best_conf": 0.25656452775001526,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 1,
+     "window_best_conf": {
+      "130": 0.21,
+      "131": null,
+      "132": 0.086,
+      "133": null,
+      "134": 0.08,
+      "135": 0.284,
+      "136": 0.257,
+      "137": null,
+      "138": 0.098,
+      "139": null,
+      "140": null,
+      "141": null,
+      "142": null
+     }
+    },
+    "0401_light_rainy_smooth_03000120": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "114": null,
+      "115": null,
+      "116": null,
+      "117": null,
+      "118": null,
+      "119": null,
+      "120": null,
+      "121": null,
+      "122": null,
+      "123": null,
+      "124": null,
+      "125": null,
+      "126": null
+     }
+    },
+    "0401_light_rainy_smooth_03000130": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "124": null,
+      "125": null,
+      "126": null,
+      "127": null,
+      "128": null,
+      "129": null,
+      "130": null,
+      "131": null,
+      "132": null,
+      "133": null,
+      "134": null,
+      "135": null,
+      "136": null
+     }
+    },
+    "0401_light_clear_smooth_07000023": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "17": null,
+      "18": null,
+      "19": null,
+      "20": null,
+      "21": null,
+      "22": null,
+      "23": null,
+      "24": null,
+      "25": null,
+      "26": null,
+      "27": null,
+      "28": null,
+      "29": null
+     }
+    }
+   },
+   "sample": {
+    "dets_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.11,
+     "sign": 0.26
+    },
+    "new_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "lost_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "frames_with_any_det": 52,
+    "frames_with_new": 0,
+    "dets_per_frame_by_condition": {
+     "light_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.02,
+      "sign": 0.08
+     },
+     "light_clear_traffic": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.12
+     },
+     "light_foggy_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.42,
+      "sign": 0.56
+     },
+     "light_rainy_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.12,
+      "sign": 0.12
+     },
+     "light_rainy_traffic": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.14
+     },
+     "night_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.1,
+      "sign": 0.54
+     }
+    }
+   },
+   "speed": {
+    "1t": {
+     "mean_ms": 20.8,
+     "p95_ms": 21.4
+    },
+    "2t": {
+     "mean_ms": 16.6,
+     "p95_ms": 17.4
+    }
+   }
+  },
+  "roi": {
+   "windows": [
+    [
+     0.0,
+     0.45,
+     1.0,
+     1.0
+    ]
+   ],
+   "runs_per_frame": 1,
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": {
+     "class": "pothole",
+     "target_best_conf": 0.19181856513023376,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 1,
+     "window_best_conf": {
+      "130": 0.184,
+      "131": null,
+      "132": 0.16,
+      "133": null,
+      "134": null,
+      "135": 0.309,
+      "136": 0.192,
+      "137": null,
+      "138": 0.148,
+      "139": null,
+      "140": null,
+      "141": null,
+      "142": null
+     }
+    },
+    "0401_light_rainy_smooth_03000120": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "114": null,
+      "115": null,
+      "116": null,
+      "117": null,
+      "118": null,
+      "119": null,
+      "120": null,
+      "121": null,
+      "122": null,
+      "123": null,
+      "124": null,
+      "125": null,
+      "126": null
+     }
+    },
+    "0401_light_rainy_smooth_03000130": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "124": null,
+      "125": null,
+      "126": null,
+      "127": null,
+      "128": null,
+      "129": null,
+      "130": null,
+      "131": null,
+      "132": null,
+      "133": null,
+      "134": null,
+      "135": null,
+      "136": null
+     }
+    },
+    "0401_light_clear_smooth_07000023": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "17": null,
+      "18": null,
+      "19": null,
+      "20": null,
+      "21": null,
+      "22": null,
+      "23": null,
+      "24": null,
+      "25": null,
+      "26": null,
+      "27": null,
+      "28": null,
+      "29": null
+     }
+    }
+   },
+   "sample": {
+    "dets_per_frame": {
+     "pothole": 0.007,
+     "crack": 0.003,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "new_vs_base_per_frame": {
+     "pothole": 0.007,
+     "crack": 0.003,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "lost_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.11,
+     "sign": 0.26
+    },
+    "frames_with_any_det": 3,
+    "frames_with_new": 3,
+    "dets_per_frame_by_condition": {
+     "light_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_clear_traffic": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_foggy_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_rainy_smooth": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_rainy_traffic": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "night_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.0
+     }
+    }
+   },
+   "speed": {
+    "1t": {
+     "mean_ms": 21.1,
+     "p95_ms": 24.5
+    },
+    "2t": {
+     "mean_ms": 16.7,
+     "p95_ms": 17.3
+    }
+   }
+  },
+  "full_2x2": {
+   "windows": [
+    [
+     0.0,
+     0.0,
+     0.526316,
+     0.526316
+    ],
+    [
+     0.473684,
+     0.0,
+     1.0,
+     0.526316
+    ],
+    [
+     0.0,
+     0.473684,
+     0.526316,
+     1.0
+    ],
+    [
+     0.473684,
+     0.473684,
+     1.0,
+     1.0
+    ]
+   ],
+   "runs_per_frame": 4,
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": {
+     "class": "pothole",
+     "target_best_conf": 0.5399965643882751,
+     "target_hit": true,
+     "window_frames": 13,
+     "window_hits": 3,
+     "window_best_conf": {
+      "130": 0.403,
+      "131": 0.068,
+      "132": 0.138,
+      "133": null,
+      "134": 0.063,
+      "135": 0.158,
+      "136": 0.54,
+      "137": null,
+      "138": 0.369,
+      "139": null,
+      "140": null,
+      "141": null,
+      "142": 0.11
+     }
+    },
+    "0401_light_rainy_smooth_03000120": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "114": null,
+      "115": null,
+      "116": null,
+      "117": null,
+      "118": null,
+      "119": null,
+      "120": null,
+      "121": null,
+      "122": null,
+      "123": null,
+      "124": null,
+      "125": null,
+      "126": null
+     }
+    },
+    "0401_light_rainy_smooth_03000130": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "124": null,
+      "125": null,
+      "126": null,
+      "127": null,
+      "128": null,
+      "129": null,
+      "130": null,
+      "131": null,
+      "132": null,
+      "133": null,
+      "134": null,
+      "135": null,
+      "136": null
+     }
+    },
+    "0401_light_clear_smooth_07000023": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "17": null,
+      "18": null,
+      "19": null,
+      "20": null,
+      "21": null,
+      "22": null,
+      "23": null,
+      "24": null,
+      "25": null,
+      "26": null,
+      "27": null,
+      "28": null,
+      "29": null
+     }
+    }
+   },
+   "sample": {
+    "dets_per_frame": {
+     "pothole": 0.033,
+     "crack": 0.013,
+     "guardrail": 0.043,
+     "sign": 0.197
+    },
+    "new_vs_base_per_frame": {
+     "pothole": 0.033,
+     "crack": 0.013,
+     "guardrail": 0.03,
+     "sign": 0.133
+    },
+    "lost_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.097,
+     "sign": 0.197
+    },
+    "frames_with_any_det": 45,
+    "frames_with_new": 42,
+    "dets_per_frame_by_condition": {
+     "light_clear_smooth": {
+      "pothole": 0.06,
+      "crack": 0.04,
+      "guardrail": 0.0,
+      "sign": 0.06
+     },
+     "light_clear_traffic": {
+      "pothole": 0.06,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.02
+     },
+     "light_foggy_smooth": {
+      "pothole": 0.04,
+      "crack": 0.0,
+      "guardrail": 0.22,
+      "sign": 0.72
+     },
+     "light_rainy_smooth": {
+      "pothole": 0.02,
+      "crack": 0.04,
+      "guardrail": 0.04,
+      "sign": 0.08
+     },
+     "light_rainy_traffic": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.26
+     },
+     "night_clear_smooth": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.04
+     }
+    }
+   },
+   "speed": {
+    "1t": {
+     "mean_ms": 85.2,
+     "p95_ms": 89.1
+    },
+    "2t": {
+     "mean_ms": 65.5,
+     "p95_ms": 66.9
+    }
+   }
+  },
+  "roi_t2": {
+   "windows": [
+    [
+     0.0,
+     0.45,
+     0.526316,
+     1.0
+    ],
+    [
+     0.473684,
+     0.45,
+     1.0,
+     1.0
+    ]
+   ],
+   "runs_per_frame": 2,
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": {
+     "class": "pothole",
+     "target_best_conf": 0.4500853419303894,
+     "target_hit": true,
+     "window_frames": 13,
+     "window_hits": 4,
+     "window_best_conf": {
+      "130": 0.495,
+      "131": 0.105,
+      "132": 0.305,
+      "133": null,
+      "134": 0.055,
+      "135": 0.103,
+      "136": 0.45,
+      "137": null,
+      "138": 0.414,
+      "139": null,
+      "140": 0.175,
+      "141": null,
+      "142": 0.089
+     }
+    },
+    "0401_light_rainy_smooth_03000120": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "114": null,
+      "115": null,
+      "116": null,
+      "117": null,
+      "118": null,
+      "119": null,
+      "120": null,
+      "121": null,
+      "122": null,
+      "123": null,
+      "124": null,
+      "125": null,
+      "126": null
+     }
+    },
+    "0401_light_rainy_smooth_03000130": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "124": null,
+      "125": null,
+      "126": null,
+      "127": null,
+      "128": null,
+      "129": null,
+      "130": null,
+      "131": null,
+      "132": null,
+      "133": null,
+      "134": null,
+      "135": null,
+      "136": null
+     }
+    },
+    "0401_light_clear_smooth_07000023": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "17": null,
+      "18": null,
+      "19": null,
+      "20": null,
+      "21": null,
+      "22": null,
+      "23": null,
+      "24": null,
+      "25": null,
+      "26": null,
+      "27": null,
+      "28": null,
+      "29": null
+     }
+    }
+   },
+   "sample": {
+    "dets_per_frame": {
+     "pothole": 0.023,
+     "crack": 0.007,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "new_vs_base_per_frame": {
+     "pothole": 0.023,
+     "crack": 0.007,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "lost_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.11,
+     "sign": 0.26
+    },
+    "frames_with_any_det": 7,
+    "frames_with_new": 7,
+    "dets_per_frame_by_condition": {
+     "light_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_clear_traffic": {
+      "pothole": 0.08,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_foggy_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_rainy_smooth": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_rainy_traffic": {
+      "pothole": 0.04,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "night_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.0
+     }
+    }
+   },
+   "speed": {
+    "1t": {
+     "mean_ms": 42.5,
+     "p95_ms": 44.7
+    },
+    "2t": {
+     "mean_ms": 33.6,
+     "p95_ms": 35.5
+    }
+   }
+  },
+  "roi_t3": {
+   "windows": [
+    [
+     0.0,
+     0.45,
+     0.357143,
+     1.0
+    ],
+    [
+     0.321429,
+     0.45,
+     0.678571,
+     1.0
+    ],
+    [
+     0.642857,
+     0.45,
+     1.0,
+     1.0
+    ]
+   ],
+   "runs_per_frame": 3,
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": {
+     "class": "pothole",
+     "target_best_conf": 0.442148357629776,
+     "target_hit": true,
+     "window_frames": 13,
+     "window_hits": 2,
+     "window_best_conf": {
+      "130": 0.554,
+      "131": 0.112,
+      "132": 0.192,
+      "133": 0.051,
+      "134": 0.109,
+      "135": 0.264,
+      "136": 0.442,
+      "137": 0.063,
+      "138": 0.224,
+      "139": null,
+      "140": 0.087,
+      "141": 0.065,
+      "142": 0.075
+     }
+    },
+    "0401_light_rainy_smooth_03000120": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "114": null,
+      "115": null,
+      "116": null,
+      "117": null,
+      "118": null,
+      "119": null,
+      "120": null,
+      "121": null,
+      "122": null,
+      "123": null,
+      "124": null,
+      "125": null,
+      "126": null
+     }
+    },
+    "0401_light_rainy_smooth_03000130": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "124": null,
+      "125": null,
+      "126": null,
+      "127": null,
+      "128": null,
+      "129": null,
+      "130": null,
+      "131": null,
+      "132": null,
+      "133": null,
+      "134": null,
+      "135": null,
+      "136": null
+     }
+    },
+    "0401_light_clear_smooth_07000023": {
+     "class": "crack",
+     "target_best_conf": 0.15972751379013062,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 2,
+     "window_best_conf": {
+      "17": null,
+      "18": null,
+      "19": null,
+      "20": 0.476,
+      "21": null,
+      "22": 0.085,
+      "23": 0.16,
+      "24": null,
+      "25": 0.203,
+      "26": null,
+      "27": null,
+      "28": null,
+      "29": 0.486
+     }
+    }
+   },
+   "sample": {
+    "dets_per_frame": {
+     "pothole": 0.06,
+     "crack": 0.013,
+     "guardrail": 0.0,
+     "sign": 0.003
+    },
+    "new_vs_base_per_frame": {
+     "pothole": 0.06,
+     "crack": 0.013,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "lost_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.11,
+     "sign": 0.257
+    },
+    "frames_with_any_det": 16,
+    "frames_with_new": 15,
+    "dets_per_frame_by_condition": {
+     "light_clear_smooth": {
+      "pothole": 0.12,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_clear_traffic": {
+      "pothole": 0.14,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_foggy_smooth": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_rainy_smooth": {
+      "pothole": 0.06,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "light_rainy_traffic": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.0
+     },
+     "night_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.02
+     }
+    }
+   },
+   "speed": {
+    "1t": {
+     "mean_ms": 65.5,
+     "p95_ms": 69.1
+    },
+    "2t": {
+     "mean_ms": 50.9,
+     "p95_ms": 52.9
+    }
+   }
+  },
+  "base+roi_t2": {
+   "windows": [
+    [
+     0.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.45,
+     0.526316,
+     1.0
+    ],
+    [
+     0.473684,
+     0.45,
+     1.0,
+     1.0
+    ]
+   ],
+   "runs_per_frame": 3,
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": {
+     "class": "pothole",
+     "target_best_conf": 0.4500853419303894,
+     "target_hit": true,
+     "window_frames": 13,
+     "window_hits": 5,
+     "window_best_conf": {
+      "130": 0.495,
+      "131": 0.105,
+      "132": 0.305,
+      "133": null,
+      "134": 0.08,
+      "135": 0.284,
+      "136": 0.45,
+      "137": null,
+      "138": 0.414,
+      "139": null,
+      "140": 0.175,
+      "141": null,
+      "142": 0.089
+     }
+    },
+    "0401_light_rainy_smooth_03000120": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "114": null,
+      "115": null,
+      "116": null,
+      "117": null,
+      "118": null,
+      "119": null,
+      "120": null,
+      "121": null,
+      "122": null,
+      "123": null,
+      "124": null,
+      "125": null,
+      "126": null
+     }
+    },
+    "0401_light_rainy_smooth_03000130": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "124": null,
+      "125": null,
+      "126": null,
+      "127": null,
+      "128": null,
+      "129": null,
+      "130": null,
+      "131": null,
+      "132": null,
+      "133": null,
+      "134": null,
+      "135": null,
+      "136": null
+     }
+    },
+    "0401_light_clear_smooth_07000023": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "17": null,
+      "18": null,
+      "19": null,
+      "20": null,
+      "21": null,
+      "22": null,
+      "23": null,
+      "24": null,
+      "25": null,
+      "26": null,
+      "27": null,
+      "28": null,
+      "29": null
+     }
+    }
+   },
+   "sample": {
+    "dets_per_frame": {
+     "pothole": 0.023,
+     "crack": 0.007,
+     "guardrail": 0.11,
+     "sign": 0.26
+    },
+    "new_vs_base_per_frame": {
+     "pothole": 0.023,
+     "crack": 0.007,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "lost_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "frames_with_any_det": 58,
+    "frames_with_new": 7,
+    "dets_per_frame_by_condition": {
+     "light_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.02,
+      "guardrail": 0.02,
+      "sign": 0.08
+     },
+     "light_clear_traffic": {
+      "pothole": 0.08,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.12
+     },
+     "light_foggy_smooth": {
+      "pothole": 0.0,
+      "crack": 0.0,
+      "guardrail": 0.42,
+      "sign": 0.56
+     },
+     "light_rainy_smooth": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.12,
+      "sign": 0.12
+     },
+     "light_rainy_traffic": {
+      "pothole": 0.04,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.14
+     },
+     "night_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.02,
+      "guardrail": 0.1,
+      "sign": 0.54
+     }
+    }
+   },
+   "speed": {
+    "1t": {
+     "mean_ms": 65.5,
+     "p95_ms": 68.4
+    },
+    "2t": {
+     "mean_ms": 49.2,
+     "p95_ms": 51.1
+    }
+   }
+  },
+  "base+roi_t3": {
+   "windows": [
+    [
+     0.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.45,
+     0.357143,
+     1.0
+    ],
+    [
+     0.321429,
+     0.45,
+     0.678571,
+     1.0
+    ],
+    [
+     0.642857,
+     0.45,
+     1.0,
+     1.0
+    ]
+   ],
+   "runs_per_frame": 4,
+   "mustkeep": {
+    "0401_light_rainy_smooth_03000136": {
+     "class": "pothole",
+     "target_best_conf": 0.442148357629776,
+     "target_hit": true,
+     "window_frames": 13,
+     "window_hits": 3,
+     "window_best_conf": {
+      "130": 0.554,
+      "131": 0.112,
+      "132": 0.192,
+      "133": 0.051,
+      "134": 0.109,
+      "135": 0.284,
+      "136": 0.442,
+      "137": 0.063,
+      "138": 0.224,
+      "139": null,
+      "140": 0.087,
+      "141": 0.065,
+      "142": 0.075
+     }
+    },
+    "0401_light_rainy_smooth_03000120": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "114": null,
+      "115": null,
+      "116": null,
+      "117": null,
+      "118": null,
+      "119": null,
+      "120": null,
+      "121": null,
+      "122": null,
+      "123": null,
+      "124": null,
+      "125": null,
+      "126": null
+     }
+    },
+    "0401_light_rainy_smooth_03000130": {
+     "class": "crack",
+     "target_best_conf": null,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 0,
+     "window_best_conf": {
+      "124": null,
+      "125": null,
+      "126": null,
+      "127": null,
+      "128": null,
+      "129": null,
+      "130": null,
+      "131": null,
+      "132": null,
+      "133": null,
+      "134": null,
+      "135": null,
+      "136": null
+     }
+    },
+    "0401_light_clear_smooth_07000023": {
+     "class": "crack",
+     "target_best_conf": 0.15972751379013062,
+     "target_hit": false,
+     "window_frames": 13,
+     "window_hits": 2,
+     "window_best_conf": {
+      "17": null,
+      "18": null,
+      "19": null,
+      "20": 0.476,
+      "21": null,
+      "22": 0.085,
+      "23": 0.16,
+      "24": null,
+      "25": 0.203,
+      "26": null,
+      "27": null,
+      "28": null,
+      "29": 0.486
+     }
+    }
+   },
+   "sample": {
+    "dets_per_frame": {
+     "pothole": 0.06,
+     "crack": 0.013,
+     "guardrail": 0.11,
+     "sign": 0.26
+    },
+    "new_vs_base_per_frame": {
+     "pothole": 0.06,
+     "crack": 0.013,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "lost_vs_base_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.0,
+     "sign": 0.0
+    },
+    "frames_with_any_det": 67,
+    "frames_with_new": 15,
+    "dets_per_frame_by_condition": {
+     "light_clear_smooth": {
+      "pothole": 0.12,
+      "crack": 0.02,
+      "guardrail": 0.02,
+      "sign": 0.08
+     },
+     "light_clear_traffic": {
+      "pothole": 0.14,
+      "crack": 0.02,
+      "guardrail": 0.0,
+      "sign": 0.12
+     },
+     "light_foggy_smooth": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.42,
+      "sign": 0.56
+     },
+     "light_rainy_smooth": {
+      "pothole": 0.06,
+      "crack": 0.02,
+      "guardrail": 0.12,
+      "sign": 0.12
+     },
+     "light_rainy_traffic": {
+      "pothole": 0.02,
+      "crack": 0.0,
+      "guardrail": 0.0,
+      "sign": 0.14
+     },
+     "night_clear_smooth": {
+      "pothole": 0.0,
+      "crack": 0.02,
+      "guardrail": 0.1,
+      "sign": 0.54
+     }
+    }
+   },
+   "speed": {
+    "1t": {
+     "mean_ms": 85.3,
+     "p95_ms": 89.9
+    },
+    "2t": {
+     "mean_ms": 66.2,
+     "p95_ms": 68.5
+    }
+   }
+  }
+ },
+ "speed_note": "Apple M4 Pro, onnxruntime CPU, 30 frames 1920×1080, 실제 블랙박스 노트북에서 다시 잴 것"
+}

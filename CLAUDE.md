@@ -12,11 +12,11 @@ uv run pytest -q           # 전체 테스트 — push 전에 통과해야 한�
 docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 ```
 
-백엔드(이전 저장소에서 옮겨 온 코드, contracts 형식으로 옮기기 전). 서버는 `daboyeo_legacy` DB 를 따로 쓴다 (없으면 만든다):
+백엔드. 서버는 `server/sql/001_init.sql` 스키마와 contracts 의 `ObservationIn` 을 쓴다 (`/api/v1`). 블랙박스는 주행(trip)을 열고 관측을 보낸 뒤 닫는다:
 
 ```bash
 scripts/demo.sh up                                  # DB → 서버(8000) → 화면(8501)
-uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 탐지 결과 보내기
+uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 관측 보내기 (주행을 닫으면 시민 확인 목록이 생긴다)
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --detect-every 10 --speed 4
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3

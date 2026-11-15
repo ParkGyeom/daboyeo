@@ -14,12 +14,13 @@ class FakeOnnx:
         return [(1, 0.4, 10.2, 20.7, 50.4, 60.6), (2, 0.9, 0, 0, 5, 5), (0, 0.8, -3.0, 5.0, 130.0, 90.0)]
 
 
-def test_detector_keeps_server_types_sorted_and_clipped(monkeypatch):
+def test_detector_returns_all_classes_sorted_and_clipped(monkeypatch):
     monkeypatch.setattr(detect, "OnnxDetector", FakeOnnx)
     dets = detect.Detector("x.onnx").detect(np.zeros((100, 120, 3), np.uint8))
-    assert [d.type for d in dets] == ["pothole", "crack"]  # guardrail 은 빠지고 신뢰도 순
-    assert dets[0].bbox == (0, 5, 120, 90)  # 프레임 밖은 잘린다
-    assert dets[1].bbox == (10, 20, 50, 61)
+    assert [d.type for d in dets] == ["guardrail", "pothole", "crack"]  # 신뢰도 순
+    assert dets[1].bbox == (0, 5, 120, 90)  # 프레임 밖은 잘린다
+    assert dets[2].bbox == (10, 20, 50, 61)
+    assert [d.type for d in dets if d.type in detect.SENT_TYPES] == ["pothole", "crack"]  # 시설물은 안 보낸다
 
 
 def test_detector_passes_class_conf(monkeypatch):

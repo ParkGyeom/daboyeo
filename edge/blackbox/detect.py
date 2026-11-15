@@ -15,13 +15,13 @@ from daboyeo_ai.inference import OnnxDetector
 from daboyeo_ai.lane_wear import LaneWearMeter, LaneWearTracker
 from daboyeo_contracts import CLASS_NAMES
 
-# 지금 서버가 받는 탐지 유형. guardrail·sign 은 서버로 보낼 유형을 박겸과 정하기 전까지 보내지 않는다
-SENT_CLASSES = {"pothole", "crack"}
+# 서버로 보내는 유형. guardrail·sign 은 탐지·화면 표시는 하지만, 서버로 보낼 유형을 박겸과 정하기 전까지 보내지 않는다
+SENT_TYPES = {"pothole", "crack", "lane_wear"}
 
 
 @dataclass
 class Detection:
-    type: str  # "pothole" | "crack" | "lane_wear"
+    type: str  # "pothole" | "crack" | "guardrail" | "sign" | "lane_wear"
     confidence: float  # 0~1
     bbox: tuple[int, int, int, int]  # 원본 프레임 픽셀 좌표 x1, y1, x2, y2
 
@@ -32,13 +32,11 @@ class Detector:
         self._det = OnnxDetector(model_path, threads=threads, conf=conf)
 
     def detect(self, image: np.ndarray) -> list[Detection]:
-        """프레임 한 장(BGR)에서 결함을 찾는다. 신뢰도 높은 순."""
+        """프레임 한 장(BGR)에서 4클래스를 모두 찾는다. 신뢰도 높은 순. 보낼지는 SENT_TYPES 로 고른다."""
         h, w = image.shape[:2]
         out = []
         for cls, score, x1, y1, x2, y2 in self._det.raw(image):
             name = CLASS_NAMES[int(cls)]
-            if name not in SENT_CLASSES:
-                continue
             box = (max(0, int(x1)), max(0, int(y1)), min(w, int(round(x2))), min(h, int(round(y2))))
             out.append(Detection(name, float(score), box))
         return sorted(out, key=lambda d: d.confidence, reverse=True)

@@ -1,5 +1,7 @@
 """영상 + GPS CSV 입력 (edge/blackbox/source.py) 과 그 입력으로 도는 drive()."""
 
+import json
+
 import cv2
 import numpy as np
 import pytest
@@ -66,15 +68,22 @@ class FakeDetector:
         return [Detection("pothole", 0.9, (1, 1, 20, 20))]
 
 
-def test_drive_video_dry_run(video, monkeypatch, capsys):
+def test_drive_video_dry_run(video, monkeypatch, tmp_path):
     monkeypatch.setattr(run, "Detector", FakeDetector)
     args = run.parse_args(["--video", str(video), "--model", "m.onnx", "--conf", "0.25", "--speed", "0",
-                           "--dry-run", "--detect-every", "5", "--lane-every", "0", "--no-quality"])
+                           "--dry-run", "--detect-every", "5", "--lane-every", "0", "--no-quality",
+                           "--live-dir", str(tmp_path / "live")])
     r = run.drive(args)
     assert r["frames"] == N
     # 0, 5, 10, 15, 20 번째 프레임만 탐지 (25 프레임째는 없음). 21~24 는 위치 없음
     assert r["detected_frames"] == 5
     assert r["skipped_no_gps"] == 4
+    # 블랙박스 화면: 박스를 그린 마지막 프레임과 끝난 상태가 남는다
+    live = tmp_path / "live"
+    img = cv2.imread(str(live / "bb-01.jpg"))
+    assert img is not None and img.shape[:2] == (48, 64)
+    status = json.loads((live / "bb-01.json").read_text())
+    assert status["ended"] is True and status["source"] == "v1.mp4" and status["found"] == 5
 
 
 def test_video_and_segment_are_exclusive():

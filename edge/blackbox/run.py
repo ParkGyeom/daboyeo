@@ -25,12 +25,15 @@ import random
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import numpy as np
 
-from edge.blackbox.quality import measure
 from daboyeo_ai.inference import load_class_conf
-from edge.blackbox.detect import Detection, Detector, LaneWear
+
+from edge.blackbox.quality import measure
+from edge.blackbox.detect import SENT_TYPES, Detection, Detector, LaneWear
+from edge.blackbox.live import LIVE_DIR, LiveView
 from edge.blackbox.sender import Sender, crop_snapshot
 from edge.blackbox.source import open_source
 
@@ -104,6 +107,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--seed", type=int, default=None, help="GPS 오차 난수 씨앗")
     ap.add_argument("--dry-run", action="store_true", help="서버로 보내지 않고 화면에만 출력")
     ap.add_argument("--no-quality", action="store_true", help="품질 판별을 끈다 (실험용)")
+    ap.add_argument("--live-fps", type=float, default=5.0,
+                    help="블랙박스 화면에 초당 몇 장 내보낼지. 0이면 화면을 쓰지 않는다")
+    ap.add_argument("--live-dir", default=str(LIVE_DIR), help="블랙박스 화면 파일을 둘 폴더 (화면 ui/ 가 읽는다)")
     args = ap.parse_args(argv)
     if args.detect_every < 1 or args.lane_every < 0:
         ap.error("주기는 1 이상이어야 한다")
@@ -134,6 +140,8 @@ def drive(args: argparse.Namespace) -> dict:
     detected_frames = skipped_no_gps = skipped_quality = 0
 
     lane_meter = LaneWear() if args.lane_every > 0 else None
+    live = (LiveView(args.device_id, Path(args.video).name if args.video else args.segment, SENT_TYPES,
+                     out_dir=args.live_dir, fps=args.live_fps) if args.live_fps > 0 else None)
 
     def send(d: Detection, image, fix, i: int, name: str) -> None:
         x1, y1, x2, y2 = d.bbox
@@ -178,31 +186,42 @@ def drive(args: argparse.Namespace) -> dict:
                 skipped_no_gps += 1
                 print(f"  {frame.name}: 위치 없음, 건너뜀")
                 continue
+            ft = fix.time_s if fix.time_s is not None else float(i)
             run_detect = i % args.detect_every == 0
             run_lane = args.lane_every > 0 and i % args.lane_every == 0
-            if not (run_detect or run_lane):
+            show = live is not None and live.due(ft)
+            if not (run_detect or run_lane or show):
                 continue
 
             image = adjust_brightness(frame.load(), args.brightness)
-            if not args.no_quality:
+            note = ""
+            if (run_detect or run_lane) and not args.no_quality:
                 q = measure(image)
                 if not q.ok:
                     skipped_quality += 1
-                    print(f"  {frame.name}: 품질 나쁨({q.reason}), 탐지 건너뜀 "
+                    run_detect = run_lane = False
+                    note = f"품질 나쁨({q.reason}), 탐지 건너뜀"
+                    print(f"  {frame.name}: {note} "
                           f"[밝기 {q.brightness:.0f}, 선명도 {q.sharpness:.0f}, 대비 {q.contrast:.0f}]")
-                    continue
             if run_detect:
                 t0 = time.perf_counter()
                 dets = detector.detect(image)
                 detect_s += time.perf_counter() - t0
                 detected_frames += 1
+                if live:
+                    live.add(dets, ft)
                 for d in dets:
-                    send(d, image, fix, i, frame.name)
+                    if d.type in SENT_TYPES:
+                        send(d, image, fix, i, frame.name)
 
             if run_lane:
                 lw = lane_meter.check(image, t=fix.time_s)
                 if lw:
+                    if live:
+                        live.add([lw], ft, replace=False)
                     send(lw, image, fix, i, frame.name)
+            if show:
+                live.update(image, ft, frame.name, note=note, sent=sender.sent)
     except KeyboardInterrupt:
         print("중단")
     finally:
@@ -211,6 +230,8 @@ def drive(args: argparse.Namespace) -> dict:
         end = sender.end_drive(args.device_id, started.replace(microsecond=0))
         if end is not None:
             print(f"[{args.device_id}] 주행 종료 알림 보냄: 시민에게 보여줄 결함 {end['defect_count']}건")
+        if live:
+            live.finish(sender.sent)
         sender.close()
 
     avg = detect_s / detected_frames * 1000 if detected_frames else 0

@@ -15,7 +15,10 @@ pages = st.navigation(
             st.Page("views/report.py", title="신고서", icon="📄"),
             st.Page("views/reward.py", title="포상 현황", icon="🏅"),
         ],
-        "관리자": [st.Page("views/dashboard.py", title="지도 대시보드", icon="🗺️")],
+        "관리자": [
+            st.Page("views/dashboard.py", title="지도 대시보드", icon="🗺️"),
+            st.Page("views/blackbox.py", title="블랙박스 화면", icon="🎥"),
+        ],
     }
 )
 pages.run()

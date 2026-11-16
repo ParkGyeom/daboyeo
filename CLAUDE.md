@@ -18,9 +18,14 @@ docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 scripts/demo.sh up                                  # DB → 서버(8000) → 화면(8501)
 uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 관측 보내기 (주행을 닫으면 시민 확인 목록이 생긴다)
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
-uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --detect-every 10 --speed 4
-uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3
-scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+# 차선 마모는 기본으로 끈다(--lane-every 0, handoff 17장). 켜려면 --lane-every 3
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --detect-every 10 --speed 4
+uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --devices 3
+scripts/demo.sh drive ai/models/detector_v3.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+# GPS 없는 유튜브 영상의 경로 재구성 (tools/gps/README.md): routes/<id>.gpx + anchors/<id>.csv → data/videos/<id>.gps.csv
+uv run python -m tools.gps.reconstruct gn_a                 # 클립이면 --clip-start <clip_start_in_source_s> --out data/videos/<클립>.gps.csv
+uv run python -m tools.gps.preview_map gn_a --fetch-roads   # 경로·기준점 HTML (오프라인 도로선). --fetch-roads 는 처음 한 번 (인터넷)
+uv run python -m tools.gps.holdout_error gn_a gn_b          # 기준점 hold-out 오차 → experiments/gps_error.csv (AC-13)
 # 블랙박스가 보는 프레임과 탐지 박스: 화면의 관리자 → 블랙박스 화면 (server_data/live/, --live-fps 0 이면 끔)
 # 관리자 지도를 네이버 지도로: .env 에 NAVER_MAP_KEY_ID=<Client ID>, 콘솔 Web 서비스 URL 에 http://localhost:8501 등록 (인터넷 필요). 없으면 도로선 지도
 # 네이버 지도: 관리자는 전국 지도(깜빡이는 신호·숫자 묶음·새 결함 강조), 시민 카드·신고서는 결함마다 작은 지도. 지도 페이지는 ui/static/*.html

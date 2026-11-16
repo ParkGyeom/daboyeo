@@ -3,7 +3,8 @@
 기준점을 하나씩 빼고 나머지로 보간한 위치와, 뺀 기준점의 실제 위치 사이 거리(m)를 잰다.
 첫·마지막 기준점은 빼면 보간할 수 없어 재지 않는다. 위치를 비운 기준점(정지)은 앞 기준점 위치가 정답이다.
 
-멈춤의 시작·끝 기준점을 빼면 멈춤을 모른 채 보간해서 크게 나오므로, 그것을 뺀 평균(mean_moving_m)도 같이 쓴다.
+멈춤의 시작·끝이나 편집 컷 양쪽 기준점을 빼면 그 멈춤·건너뜀을 모른 채 보간해서 크게 나오므로,
+그것을 뺀 평균(mean_moving_m)도 같이 쓴다. 편집 컷 = 기준점 사이 평균 속도가 JUMP_KMH 를 넘는 구간.
 기준점 사이가 두 배로 벌어진 상태에서 재므로, 모든 기준점을 쓴 실제 재구성 오차보다 크게 나온다 (보수적).
 결과는 영상마다 한 줄씩 experiments/gps_error.csv 에 쓴다 (같은 video_id 줄은 바꾸고 다른 줄은 둔다).
 
@@ -37,6 +38,7 @@ from tools.gps.reconstruct import (
 )
 
 OUT = ROOT / "experiments" / "gps_error.csv"
+JUMP_KMH = 150.0  # 기준점 사이가 이보다 빠르면 영상 편집으로 건너뛴 구간으로 본다
 COLUMNS = ["video_id", "n_anchors", "n_holdout", "mean_m", "median_m", "max_m", "max_at", "route_m",
            "n_moving", "mean_moving_m"]
 
@@ -47,17 +49,21 @@ class Holdout:
     lat: float  # 빼고 보간한 위치
     lon: float
     error_m: float
-    stop_edge: bool  # 멈춤의 시작·끝 기준점 (빼면 멈춤을 모른 채 보간해서 오차가 크게 나온다)
+    stop_edge: bool  # 멈춤의 시작·끝 또는 편집 컷 양쪽 기준점 (빼면 그것을 모른 채 보간해서 오차가 크게 나온다)
 
 
 def holdout(route: Route, snapped: list[Snapped]) -> list[Holdout]:
     """가운데 기준점마다: 그것만 빼고 보간한 위치와 기준점 위치의 거리."""
+    # 편집 컷: 바로 앞 기준점과의 평균 속도가 JUMP_KMH 보다 빠른 기준점 k (k-1 과 k 사이를 영상이 건너뜀)
+    jumps = {k for k in range(1, len(snapped))
+             if (snapped[k].s - snapped[k - 1].s) / (snapped[k].anchor.t_s - snapped[k - 1].anchor.t_s) * 3.6 > JUMP_KMH}
+    jumps |= {k - 1 for k in jumps}
     out = []
     for k in range(1, len(snapped) - 1):
         rest = snapped[:k] + snapped[k + 1:]
         p = snapped[k]
         lat, lon = position_at(route, rest, p.anchor.t_s)
-        edge = p.anchor.lat is None or snapped[k + 1].anchor.lat is None
+        edge = p.anchor.lat is None or snapped[k + 1].anchor.lat is None or k in jumps
         out.append(Holdout(p, lat, lon, haversine_m(lat, lon, p.lat, p.lon), edge))
     return out
 
@@ -73,7 +79,7 @@ def summarize(video_id: str, route: Route, snapped: list[Snapped], results: list
         "mean_m": f"{statistics.fmean(errs):.1f}" if errs else "",
         "median_m": f"{statistics.median(errs):.1f}" if errs else "",
         "max_m": f"{worst.error_m:.1f}" if worst else "",
-        "max_at": f"{fmt_time(worst.snapped.anchor.t_s)} {worst.snapped.anchor.memo}".strip() if worst else "",
+        "max_at": f"{fmt_time(worst.snapped.anchor.t_s)} {worst.snapped.anchor.memo.split(' (')[0]}".strip() if worst else "",
         "route_m": f"{route.length_m:.0f}",
         "n_moving": len(moving),
         "mean_moving_m": f"{statistics.fmean(moving):.1f}" if moving else "",
@@ -128,11 +134,11 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(f"[{vid}] 오류: {e}")
         print(f"[{vid}] 경로 {route.length_m:.0f} m, 기준점 {len(snapped)}개")
         for h in results:
-            edge = "  (멈춤 경계)" if h.stop_edge else ""
+            edge = "  (멈춤·컷 경계)" if h.stop_edge else ""
             print(f"  {fmt_time(h.snapped.anchor.t_s):>8}  {h.error_m:6.1f} m  {h.snapped.anchor.memo}{edge}")
         row = summarize(vid, route, snapped, results)
         print(f"  평균 {row['mean_m']} m, 중앙값 {row['median_m']} m, 최대 {row['max_m']} m ({row['max_at']})")
-        print(f"  멈춤 경계를 뺀 {row['n_moving']}개 평균 {row['mean_moving_m'] or '-'} m")
+        print(f"  멈춤·컷 경계를 뺀 {row['n_moving']}개 평균 {row['mean_moving_m'] or '-'} m")
         if len(snapped) < 8:
             print(f"  주의: 기준점 {len(snapped)}개 — 영상당 8개 이상을 권장한다 (tools/gps/README.md)")
         rows.append(row)

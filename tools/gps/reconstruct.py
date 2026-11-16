@@ -282,7 +282,7 @@ def summary(route: Route, snapped: list[Snapped]) -> list[str]:
     lines = [f"경로 {route.length_m:.0f} m, 기준점 {len(snapped)}개, {span}"]
     for a, b in pairwise(snapped):
         v = (b.s - a.s) / (b.anchor.t_s - a.anchor.t_s) * 3.6
-        warn = "  ← 너무 빠름: 기준점 시각·위치 확인" if v > FAST_KMH else ""
+        warn = "  ← 너무 빠름: 기준점 시각·위치 확인 (영상 편집으로 건너뛴 곳이면 그대로 둔다)" if v > FAST_KMH else ""
         lines.append(f"  {fmt_time(a.anchor.t_s):>8} → {fmt_time(b.anchor.t_s):>8}  {b.s - a.s:6.0f} m  "
                      f"{v:5.1f} km/h  {b.anchor.memo}{warn}")
     far = [p for p in snapped if p.snap_m > 15]

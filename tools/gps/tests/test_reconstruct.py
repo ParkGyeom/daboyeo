@@ -176,3 +176,12 @@ def test_cli_end_to_end(tmp_path):
     preview_map.main(["--gpx", gpx, "--anchors", anchors, "--gps", str(out), "--name", "v", "--out", str(html)])
     text = html.read_text(encoding="utf-8")
     assert "<svg" in text and text.count('class="anchor"') == 5 and 'class="hold"' in text
+
+
+def test_holdout_marks_edit_cut_edges(tmp_path):
+    # 10~11 초 사이에 500 m 를 건너뜀 (편집 컷) → 10·11 초 기준점은 경계, 나머지는 보통 기준점
+    gpx = write_gpx(tmp_path / "r.gpx", STRAIGHT)
+    anchors = write_anchors(tmp_path / "a.csv", [(0, (0, 0), ""), (5, (0, 50), ""), (10, (0, 100), "컷 전"),
+                                                 (11, (0, 600), "컷 뒤"), (16, (0, 650), ""), (21, (0, 700), "")])
+    _, _, results = holdout_error.evaluate(gpx, anchors)
+    assert {h.snapped.anchor.t_s: h.stop_edge for h in results} == {5: False, 10: True, 11: True, 16: False}

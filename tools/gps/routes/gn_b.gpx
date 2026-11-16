@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 양식: gpx.studio 에서 gn_b 의 강남대로 강남역→신논현역 북행 구간(33:20~36:20)을 주행 방향으로 그려 내보낸 파일로 바꾼다.
+     기준점보다 조금 앞에서 시작해 조금 뒤에서 끝나게 그린다. tools/gps/README.md 참고 -->
+<gpx version="1.1" creator="daboyeo template" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>gn_b</name>
+    <trkseg>
+    </trkseg>
+  </trk>
+</gpx>

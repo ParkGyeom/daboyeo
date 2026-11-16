@@ -105,7 +105,7 @@ daboyeo/
 │       ├── reconstruct.py        # GPX + 기준점 → 거리 비례 보간 → <video_id>.gps.csv
 │       ├── holdout_error.py      # 기준점 1개씩 빼고 보간 오차(m) 측정
 │       ├── bdd_to_csv.py         # (P2) BDD100K info JSON → 같은 CSV
-│       └── preview_map.py        # 경로·기준점을 folium 지도로 확인
+│       └── preview_map.py        # 경로·기준점을 오프라인 HTML(SVG, data/basemap 도로선)로 확인
 ├── ai/                           # 박겸
 │   ├── daboyeo_ai/data/          # ★ 구현됨
 │   │   ├── aihub.py              # AI Hub 파일 트리·다운로드·분할 병합 (aihubshell 과 같은 API)

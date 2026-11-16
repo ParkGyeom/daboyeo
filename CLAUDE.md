@@ -18,6 +18,7 @@ docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 scripts/demo.sh up                                  # DB → 서버(8000) → 화면(8501)
 uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 관측 보내기 (주행을 닫으면 시민 확인 목록이 생긴다)
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
+# 차선 마모는 기본으로 끈다(--lane-every 0, handoff 17장). 켜려면 --lane-every 3
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --detect-every 10 --speed 4
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --devices 3
 scripts/demo.sh drive ai/models/detector_v3.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)

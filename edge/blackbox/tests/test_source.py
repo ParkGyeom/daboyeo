@@ -91,3 +91,9 @@ def test_video_and_segment_are_exclusive():
         run.parse_args(["--video", "a.mp4", "--segment", "x:00000001-00000002", "--model", "m.onnx"])
     with pytest.raises(SystemExit):
         run.parse_args(["--model", "m.onnx"])
+
+
+def test_lane_wear_is_off_by_default():
+    """시연 기본은 차선 마모를 끈다 (handoff 17장, plan r3.15). 켜려면 --lane-every 3."""
+    assert run.parse_args(["--video", "a.mp4", "--model", "m.onnx"]).lane_every == 0
+    assert run.parse_args(["--video", "a.mp4", "--model", "m.onnx", "--lane-every", "3"]).lane_every == 3

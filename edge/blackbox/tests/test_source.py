@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import pytest
 
-from edge.blackbox import run
+from edge.blackbox import detectors, run
 from edge.blackbox.detect import Detection
 from edge.blackbox.source import VideoSource, default_gps_path
 
@@ -69,8 +69,10 @@ class FakeDetector:
 
 
 def test_drive_video_dry_run(video, monkeypatch, tmp_path):
-    monkeypatch.setattr(run, "Detector", FakeDetector)
-    args = run.parse_args(["--video", str(video), "--model", "m.onnx", "--conf", "0.25", "--speed", "0",
+    monkeypatch.setattr(detectors, "Detector", FakeDetector)
+    model = tmp_path / "m.onnx"
+    model.write_bytes(b"")
+    args = run.parse_args(["--video", str(video), "--model", str(model), "--conf", "0.25", "--speed", "0",
                            "--dry-run", "--detect-every", "5", "--lane-every", "0", "--no-quality",
                            "--live-dir", str(tmp_path / "live")])
     r = run.drive(args)

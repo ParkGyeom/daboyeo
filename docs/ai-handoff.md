@@ -919,3 +919,30 @@ uv run python -m daboyeo_ai.eval.eval_detector data/videos/gn_a_2050-2510.mp4 da
   (3) `memo` 가 `amb` 로 시작하는 행을 가짜 탐지기에서 낼지 (제안: 내지 않기 — 확실한 정답만 서버로).
 - 가짜 탐지기로 시연할 때 서버로 갈 결함 관측: gn_b 균열 9 · 포트홀 1 · (차선 마모 1, 17장 따라 끄면 0), gn_a 균열 1. 시설물은 서버로 안 보냄 (11/16 확정).
 - 시각은 **클립 시작 기준 초**다. 원본 영상 기준이 필요하면 파일 이름의 시작 초를 더한다 (gn_a +2050, gn_b +3320).
+
+## 19. 발표용 RDD2022 포트홀·균열 예시 이미지 (11/16, 결과: **슬라이드 추천 6장 (잘 잡음 4 · 놓침 1 · 헛것 1), 이미지는 `data/presentation/rdd_pothole/` (커밋 안 함)**)
+
+시연 클립에는 모델이 잡는 포트홀이 없어서, AI 탐지 능력은 학습에 쓰지 않은 RDD2022 **test** 이미지로 보여 준다 (포트홀 서버 흐름은 정현우의 가짜 탐지기로 모의).
+
+재현 (추론 결과는 `<out>/preds.json` 에 캐시, Mac CPU 약 6분):
+
+```bash
+uv run python -m daboyeo_ai.eval.rdd_figs --zip data/aihub/parts/rdd2022.zip --model ai/models/detector_v3.onnx --out data/presentation/rdd_pothole
+# 정해진 이미지만: --pick rdd_Czech_001437,rdd_Japan_007378,rdd_Japan_006427,rdd_India_000781,rdd_Czech_000270,rdd_India_009182 --out <다른 폴더>
+```
+
+그림: 얇은 초록 = 정답, 굵은 빨강 = 모델 포트홀, 굵은 노랑 = 모델 균열 (카드 `class_conf_draft`: 포트홀 0.31, 균열 0.42). 가드레일·표지판은 RDD 에 라벨이 없어 그리지 않는다.
+
+숫자 (RDD test 3,526장, IoU 0.5, `experiments/rdd_figs_v3.json`):
+
+| | mAP50 (카드) | 기준 | 정밀도 | 재현율 |
+|---|---|---|---|---|
+| 포트홀 | 0.425 | 0.31 | 0.693 (196/283) | 0.307 (196/638) |
+| 균열 | 0.582 | 0.42 | 0.804 | 0.378 |
+
+- 국가별 포트홀 재현율 (기준 0.31): Japan 0.37 · India 0.28 · Czech 0.17 · Norway 0.03 · US 0.07 · China_MotorBike 0.93 (14개). 블랙박스와 화각이 가장 비슷한 Czech(앞유리 안쪽) 에서도 0.17 — 멀고 작은 포트홀은 거의 놓친다 (14장과 같은 한계).
+- 헛것 중 일부는 정답 라벨이 빠진 진짜 포트홀이다 (예: Japan_010072·005044). 슬라이드의 헛것 예(India_009182, 흙길 바퀴 자국 → 포트홀 0.53)는 진짜 헛것으로 골랐다.
+
+**라이선스**: figshare 공식 기록(doi:10.6084/m9.figshare.21431547)은 **CC BY 4.0**, GitHub `sekilab/RoadDamageDetector` README 는 "이미지는 **CC BY-SA 4.0**" — 서로 다르다. 더 엄격한 CC BY-SA 4.0 조건(출처·라이선스 표기, 박스를 그려 변경했음을 표시, 이 그림을 다시 배포하면 같은 라이선스)으로 표기하면 둘 다 만족한다. 발표에 보여 주는 것 자체는 문제없음. **United_States 이미지는 Google 스트리트뷰 워터마크가 있어 쓰지 않는다.** 출처 문구:
+
+> 이미지: RDD2022 (Arya et al., 2022, figshare doi:10.6084/m9.figshare.21431547; Geoscience Data Journal 2024), CC BY-SA 4.0 · 탐지 박스는 다보여 팀이 추가

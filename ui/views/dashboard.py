@@ -123,10 +123,11 @@ def _detail(df: pd.DataFrame, rows: list[dict]) -> None:
     photo = api.snapshot_bytes(d["snapshot_path"])
     if photo:
         right.image(photo, width=260)
+    where = naver_map.place(d.get("address")) or f"{d['lat']:.6f}, {d['lon']:.6f}"
     right.markdown(
         f"**#{api.short(d['id'])} {api.TYPE_KO[d['defect_type']]}** · {api.RISK_KO[d['risk_level']]} · "
         f"**{api.STATUS_KO[d['status']]}**  \n"
-        f"{d['lat']:.6f}, {d['lon']:.6f} · {d['jurisdiction']}  \n"
+        f"{where} · {d['jurisdiction']}  \n"
         f"관측 {d['observation_count']}건 · 차량 {d['vehicle_count']}대 · 신뢰도 {d['confidence']:.2f}"
     )
     nxt = NEXT_STATUS.get(d["status"])

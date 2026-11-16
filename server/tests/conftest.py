@@ -57,6 +57,9 @@ def client(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     monkeypatch.setattr(config, "SNAPSHOT_DIR", tmp_path)
+    from server import geocode
+
+    monkeypatch.setattr(geocode, "keys", lambda: None)  # 테스트는 네이버를 부르지 않는다 (.env 에 키가 있어도)
     from server.main import app
 
     db.reset_db()

@@ -3,6 +3,7 @@
 import streamlit as st
 
 import api
+import naver_map
 
 # 휴대폰 폭처럼 보이게 본문 폭을 줄인다
 st.markdown("<style>.block-container{max-width:430px;padding-top:2rem}</style>", unsafe_allow_html=True)
@@ -62,8 +63,11 @@ for d in items:
             st.image(photo, width="stretch")
         badge = "🔴" if d["risk_level"] == "urgent" else "🟡"
         st.markdown(f"**{api.TYPE_KO.get(d['defect_type'], d['defect_type'])}** · {badge} {api.RISK_KO[d['risk_level']]}")
+        if addr := naver_map.place(d.get("address")):
+            st.markdown(f"📍 {addr}")
+        naver_map.mini(d["lat"], d["lon"], d["risk_level"])
         st.caption(
-            f"위치 {d['lat']:.5f}, {d['lon']:.5f} · {d['jurisdiction']}  \n"
+            f"관할 {d['jurisdiction']}  \n"
             f"AI 신뢰도 {d['confidence']:.2f} · 관측 차량 {d['vehicle_count']}대 · "
             f"포상 {'대상' if d['reward_eligible_road'] else '대상 아님'}"
         )

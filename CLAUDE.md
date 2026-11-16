@@ -23,6 +23,8 @@ uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gp
 scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
 # 블랙박스가 보는 프레임과 탐지 박스: 화면의 관리자 → 블랙박스 화면 (server_data/live/, --live-fps 0 이면 끔)
 # 관리자 지도를 네이버 지도로: .env 에 NAVER_MAP_KEY_ID=<Client ID>, 콘솔 Web 서비스 URL 에 http://localhost:8501 등록 (인터넷 필요). 없으면 도로선 지도
+# 네이버 지도: 관리자는 전국 지도(깜빡이는 신호·숫자 묶음·새 결함 강조), 시민 카드·신고서는 결함마다 작은 지도. 지도 페이지는 ui/static/*.html
+# 결함 주소: .env 에 NAVER_MAP_CLIENT_SECRET (콘솔 Application 에서 Reverse Geocoding 켜기). 결함이 처음 생길 때 한 번 받아 defects.address 에 저장 (server/geocode.py, server/sql/002_address.sql). 없거나 실패하면 주소 없이 진행하고 1분 뒤 다시 시도
 scripts/demo.sh down
 ```
 

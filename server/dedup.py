@@ -29,7 +29,7 @@ class Ingested:
 
 
 def ingest(conn: psycopg.Connection, obs: ObservationIn, snapshot_path: str | None,
-           snapshot_bytes: int | None) -> Ingested:
+           snapshot_bytes: int | None, clip_path: str | None = None, clip_bytes: int | None = None) -> Ingested:
     """관측을 저장하고 결함에 묶는다. 호출한 쪽이 커밋한다."""
     conn.execute("SELECT pg_advisory_xact_lock(%s)", (_LOCK_KEY,))
 
@@ -68,12 +68,12 @@ def ingest(conn: psycopg.Connection, obs: ObservationIn, snapshot_path: str | No
         f"""
         INSERT INTO observations
           (client_observation_id, trip_id, vehicle_id, defect_type, confidence, bbox, size_metric, is_suspected,
-           location, t_s, observed_at, quality_score, snapshot_path, snapshot_bytes, defect_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, {_POINT}, %s, %s, %s, %s, %s, %s) RETURNING id
+           location, t_s, observed_at, quality_score, snapshot_path, snapshot_bytes, clip_path, clip_bytes, defect_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, {_POINT}, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
         """,
         (obs.client_observation_id, obs.trip_id, obs.vehicle_id, t, obs.confidence, bbox, obs.size_metric,
          obs.is_suspected, obs.lon, obs.lat, obs.t_s, obs.observed_at, obs.quality_score, snapshot_path,
-         snapshot_bytes, defect_id),
+         snapshot_bytes, clip_path, clip_bytes, defect_id),
     ).fetchone()["id"]
 
     # 관측 수·차량 수·시각·대표 위치(관측 평균)·대표 신뢰도(최고)·파손 의심(하나라도)을 관측들로 다시 계산한다

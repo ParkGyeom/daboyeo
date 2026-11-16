@@ -1,13 +1,17 @@
 """관측을 서버로 보내고 전송 용량을 센다 (계획 1.2·1.3).
 
-주행 하나 = 서버의 trip 하나. start_trip → send(ObservationIn, 사진) … → end_trip 순서로 부른다.
+주행 하나 = 서버의 trip 하나. start_trip → send(ObservationIn, 사진, 클립) … → end_trip 순서로 부른다.
 dry_run 이면 보내지 않고 용량만 센다 (주행·차량 id 는 임의로 만든다).
+용량은 보내는 내용(메타 JSON + 사진 + 클립)의 바이트 합이다. HTTP·multipart 머리는 세지 않는다.
+keep_dir 를 주면 보낸(dry_run 이면 보냈을) 사진·클립을 <keep_dir>/<주행 id 앞 8자리>/ 에 남긴다 (PRD FR-1.5:
+블랙박스 원본이 덮어써져도 결함 구간은 따로 남는다).
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 import cv2
 import httpx
@@ -35,14 +39,19 @@ def crop_snapshot(image: np.ndarray, bbox: tuple[int, int, int, int], margin: fl
 
 
 class Sender:
-    def __init__(self, server: str, dry_run: bool = False, timeout: float = 10.0):
+    def __init__(self, server: str, dry_run: bool = False, timeout: float = 10.0, keep_dir: str | Path | None = None):
         self.dry_run = dry_run
+        self.keep_dir = Path(keep_dir) if keep_dir else None
         self.client = None if dry_run else httpx.Client(base_url=server, timeout=timeout)
         self.trip_id: uuid.UUID | None = None
         self.vehicle_id: uuid.UUID | None = None
         self.sent = 0
         self.failed = 0
         self.bytes_sent = 0
+        self.bytes_meta = 0
+        self.bytes_snapshot = 0
+        self.bytes_clip = 0
+        self.clips = 0
 
     def start_trip(self, vehicle_label: str, started_at: datetime) -> bool:
         """주행을 연다. 서버에 닿지 않거나 없는 차량이면 False (그러면 관측을 보내지 않는다)."""
@@ -60,24 +69,46 @@ class Sender:
         self.trip_id, self.vehicle_id = uuid.UUID(data["trip_id"]), uuid.UUID(data["vehicle_id"])
         return True
 
-    def send(self, obs: ObservationIn, snapshot: bytes | None) -> dict | None:
+    def _count(self, meta: str, snapshot: bytes | None, clip: bytes | None) -> None:
+        m, s, c = len(meta.encode("utf-8")), len(snapshot or b""), len(clip or b"")
+        self.sent += 1
+        self.bytes_meta += m
+        self.bytes_snapshot += s
+        self.bytes_clip += c
+        self.bytes_sent += m + s + c
+        self.clips += clip is not None
+
+    def _keep(self, obs: ObservationIn, snapshot: bytes | None, clip: bytes | None) -> None:
+        if self.keep_dir is None or self.trip_id is None:
+            return
+        d = self.keep_dir / str(self.trip_id)[:8]
+        d.mkdir(parents=True, exist_ok=True)
+        name = f"{obs.t_s:09.3f}_{obs.defect_type.value}_{str(obs.client_observation_id)[:8]}"
+        if snapshot:
+            (d / f"{name}.jpg").write_bytes(snapshot)
+        if clip:
+            (d / f"{name}.mp4").write_bytes(clip)
+
+    def send(self, obs: ObservationIn, snapshot: bytes | None, clip: bytes | None = None) -> dict | None:
         meta = obs.model_dump_json()
-        size = len(meta.encode("utf-8")) + (len(snapshot) if snapshot else 0)
+        self._keep(obs, snapshot, clip)
         if self.dry_run:
-            self.sent += 1
-            self.bytes_sent += size
+            self._count(meta, snapshot, clip)
             return None
-        files = {"snapshot": ("snapshot.jpg", snapshot, "image/jpeg")} if snapshot else None
+        files = {}
+        if snapshot:
+            files["snapshot"] = ("snapshot.jpg", snapshot, "image/jpeg")
+        if clip:
+            files["clip"] = ("clip.mp4", clip, "video/mp4")
         try:
-            r = self.client.post("/api/v1/observations", data={"meta": meta}, files=files)
+            r = self.client.post("/api/v1/observations", data={"meta": meta}, files=files or None)
             r.raise_for_status()
         except httpx.HTTPError as e:
             # 서버가 잠깐 멈춰도 주행(재생)은 계속한다
             self.failed += 1
             print(f"  전송 실패: {e}")
             return None
-        self.sent += 1
-        self.bytes_sent += size
+        self._count(meta, snapshot, clip)
         return r.json()
 
     def end_trip(self) -> dict | None:

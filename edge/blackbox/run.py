@@ -17,6 +17,8 @@
 개선해 보고 통과하면 --lane-every 3 으로 켠다. 켜면 --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고
 LaneWearTracker 로 판정한다. 같은 주행의 평소 차선과 비교해 연속 판정 5장 중 3장이 마모일 때 그 프레임 위치로
 1건 보내고, 마모 구간이 끝날 때까지 다시 보내지 않는다 (docs/ai-handoff.md 8장).
+클립(계획 1.3): 영상 입력이면 결함마다 전후 2초를 480p H.264 로 잘라 사진과 함께 보낸다 (edge/blackbox/clipper.py,
+앞 클립과 겹치면 다시 자르지 않는다). 보낸 사진·클립은 --keep-dir/<기기>/<주행>/ 에도 남는다. --no-clip 으로 끈다.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ import numpy as np
 from daboyeo_ai.inference import load_class_conf
 from daboyeo_contracts import DefectType, ObservationIn
 
+from edge.blackbox.clipper import ClipCutter
 from edge.blackbox.quality import measure
 from edge.blackbox.detect import SENT_TYPES, Detection, Detector, LaneWear
 from edge.blackbox.live import LIVE_DIR, LiveView
@@ -110,6 +113,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--start-offset", type=int, default=0, help="건너뛸 앞쪽 프레임 수")
     ap.add_argument("--seed", type=int, default=None, help="GPS 오차 난수 씨앗")
     ap.add_argument("--dry-run", action="store_true", help="서버로 보내지 않고 화면에만 출력")
+    ap.add_argument("--no-clip", action="store_true", help="결함 구간 클립을 만들지 않는다 (사진·메타만)")
+    ap.add_argument("--keep-dir", default="server_data/blackbox",
+                    help="보낸 사진·클립을 남길 폴더 (<폴더>/<기기>/<주행>/). 빈 문자열이면 남기지 않는다")
     ap.add_argument("--no-quality", action="store_true", help="품질 판별을 끈다 (실험용)")
     ap.add_argument("--live-fps", type=float, default=5.0,
                     help="블랙박스 화면에 초당 몇 장 내보낼지. 0이면 화면을 쓰지 않는다")
@@ -135,13 +141,15 @@ def drive(args: argparse.Namespace) -> dict:
 
     conf = args.conf if args.conf is not None else load_class_conf(args.conf_json)
     detector = Detector(args.model, conf=conf, threads=args.threads)
-    sender = Sender(args.server, dry_run=args.dry_run)
+    sender = Sender(args.server, dry_run=args.dry_run,
+                    keep_dir=Path(args.keep_dir) / args.device_id if args.keep_dir else None)
     rng = random.Random(args.seed)
     started = datetime.now(KST).replace(microsecond=0)
     if not sender.start_trip(args.device_id, started):
         print(f"[{args.device_id}] 서버에 주행을 열지 못했다 ({args.server}). --dry-run 이면 서버 없이 돈다", file=sys.stderr)
         sender.close()
         return {"frames": 0}
+    clipper = ClipCutter(args.video) if args.video and not args.no_clip else None
     first_t: float | None = None
     pacer = Pacer()
     detect_s = 0.0
@@ -169,7 +177,9 @@ def drive(args: argparse.Namespace) -> dict:
             confidence=round(d.confidence, 4), bbox=bbox, lat=round(lat, 7), lon=round(lon, 7),
             t_s=round(offset, 3), observed_at=started + timedelta(seconds=offset),
         )
-        res = sender.send(obs, crop_snapshot(image, d.bbox))
+        # 클립 시각은 영상 시각(fix.time_s). 차선 마모도 결함 구간이라 같이 자른다
+        clip = clipper.cut(fix.time_s) if clipper is not None and fix.time_s is not None else None
+        res = sender.send(obs, crop_snapshot(image, d.bbox), clip)
         tag = "" if res is None else f" → 결함 {str(res['defect_id'])[:8]}{' (새 결함)' if res['is_new_defect'] else ''}"
         print(f"  {name}: {d.type} {d.confidence:.2f}{tag}")
 
@@ -237,17 +247,27 @@ def drive(args: argparse.Namespace) -> dict:
         if live:
             live.finish(sender.sent)
         sender.close()
+        if clipper is not None:
+            clipper.close()
 
     avg = detect_s / detected_frames * 1000 if detected_frames else 0
     print(f"[{args.device_id}] 끝. 탐지한 프레임 {detected_frames}, 보낸 결과 {sender.sent}건 "
-          f"({sender.bytes_sent / 1024:.1f}KB), 전송 실패 {sender.failed}, 위치 없음 {skipped_no_gps}, "
+          f"({sender.bytes_sent / 1024:.1f}KB: 메타 {sender.bytes_meta / 1024:.1f} · 사진 {sender.bytes_snapshot / 1024:.1f} · "
+          f"클립 {sender.clips}개 {sender.bytes_clip / 1024:.1f}), 전송 실패 {sender.failed}, 위치 없음 {skipped_no_gps}, "
           f"품질 나쁨 {skipped_quality}, "
           f"탐지 평균 {avg:.0f}ms/장")
     return {
         "frames": len(frames),
+        "trip_id": None if args.dry_run else str(sender.trip_id),
         "detected_frames": detected_frames,
         "sent": sender.sent,
         "bytes_sent": sender.bytes_sent,
+        "bytes_meta": sender.bytes_meta,
+        "bytes_snapshot": sender.bytes_snapshot,
+        "bytes_clip": sender.bytes_clip,
+        "clips": sender.clips,
+        "clip_codec": clipper.codec if clipper is not None else "",
+        "clips_skipped_overlap": clipper.skipped_overlap if clipper is not None else 0,
         "failed": sender.failed,
         "skipped_no_gps": skipped_no_gps,
         "skipped_quality": skipped_quality,

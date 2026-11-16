@@ -72,12 +72,17 @@ def test_drive_video_dry_run(video, monkeypatch, tmp_path):
     monkeypatch.setattr(run, "Detector", FakeDetector)
     args = run.parse_args(["--video", str(video), "--model", "m.onnx", "--conf", "0.25", "--speed", "0",
                            "--dry-run", "--detect-every", "5", "--lane-every", "0", "--no-quality",
-                           "--live-dir", str(tmp_path / "live")])
+                           "--live-dir", str(tmp_path / "live"), "--keep-dir", str(tmp_path / "keep")])
     r = run.drive(args)
     assert r["frames"] == N
     # 0, 5, 10, 15, 20 번째 프레임만 탐지 (25 프레임째는 없음). 21~24 는 위치 없음
     assert r["detected_frames"] == 5
     assert r["skipped_no_gps"] == 4
+    # 클립: 0초 탐지 → 0~2초 클립. 0.5~2.0초 탐지는 그 클립 안이라 다시 자르지 않는다 (사진은 5장 모두)
+    assert r["sent"] == 5 and r["clips"] == 1 and r["clips_skipped_overlap"] == 4
+    assert r["bytes_sent"] == r["bytes_meta"] + r["bytes_snapshot"] + r["bytes_clip"] and r["bytes_clip"] > 0
+    kept = list((tmp_path / "keep" / "bb-01").glob("*/*"))
+    assert sum(f.suffix == ".jpg" for f in kept) == 5 and sum(f.suffix == ".mp4" for f in kept) == 1
     # 블랙박스 화면: 박스를 그린 마지막 프레임과 끝난 상태가 남는다
     live = tmp_path / "live"
     img = cv2.imread(str(live / "bb-01.jpg"))

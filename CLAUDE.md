@@ -33,6 +33,18 @@ uv run python -m tools.gps.holdout_error gn_a gn_b          # 기준점 hold-out
 scripts/demo.sh down
 ```
 
+통신량·중복 정리 측정 (계획 4.5, 결과는 `docs/plan.md` 11장). 블랙박스는 결함마다 전후 2초 480p H.264 클립을 사진과 함께 보내고 `server_data/blackbox/` 에 남긴다 (`edge/blackbox/clipper.py`, `--no-clip`·`--keep-dir ""` 로 끔). 모델이 있으면 `--fake-every 60` 대신 `--model ai/models/detector_v2.onnx`:
+
+```bash
+uv run python experiments/bandwidth.py --video data/videos/gn_a.mp4 --gps <GPS CSV> --fake-every 60 --devices 1 --dry-run --detect-every 10 --keep-dir "" --json experiments/bandwidth_gn_a_full_fake.json
+uv run python experiments/bandwidth.py --video data/videos/gn_a_2050-2510.mp4 --gps <GPS CSV> --fake-every 60 --devices 3 --detect-every 10 --server http://localhost:8010 --json experiments/bandwidth_gn_a_demo_fake.json   # 서버를 띄운 뒤
+uv run python experiments/dedup_distance.py --yes --replay experiments/bandwidth_gn_a_demo_fake.json --distances 10,20,30   # DB 를 비운다
+uv run python experiments/dedup_distance.py --yes --distances 10,20,30
+```
+
+- 11/16 측정은 시연용 DB 를 건드리지 않으려고 따로 띄운 서버(`DATABASE_URL=postgresql://daboyeo:daboyeo@localhost:5432/daboyeo_bw uv run python -m uvicorn server.main:app --port 8010`)로 쟀고, 위 명령에도 같은 `DATABASE_URL` 을 붙였다. `scripts/demo.sh up` 서버로 재면 `--server http://localhost:8000`, 끝나고 `scripts/demo.sh reset`.
+- DB 컨테이너는 여러 작업이 함께 쓴다. 테스트가 서로의 `daboyeo_test` 를 비우며 깨지면 `TEST_DATABASE_URL=…/<다른 이름>_test uv run pytest -q`.
+
 ## 담당 영역 — 요청한 사람의 폴더만 고친다
 
 | 폴더 | 담당 |

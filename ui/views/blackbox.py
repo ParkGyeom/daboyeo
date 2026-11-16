@@ -77,7 +77,10 @@ def view() -> None:
             found = ", ".join(f"{LABELS.get(b['type'], b['type'])} {b['confidence']:.2f}" for b in boxes) or "없음"
             st.caption(f"{s.get('source', '')}" + (f" · {t:.1f}초" if isinstance(t, (int, float)) else ""))
             st.markdown(f"지금 보이는 탐지: **{found}**")
-            st.metric("서버로 보낸 탐지", f"{s.get('sent', 0)}건")
+            # sent 는 관측 수다. 블랙박스가 연속 프레임의 같은 결함을 1건으로 합쳐(edge/blackbox/track_merge.py)
+            # 결함이 화면에서 사라진 뒤에 보내므로 탐지 횟수(found)보다 작고 조금 늦게 오른다
+            st.metric("서버로 보낸 관측", f"{s.get('sent', 0)}건",
+                      help=f"프레임마다 찾은 탐지 {s.get('found', 0)}회를 결함마다 1건으로 합쳐 보낸 수")
             if s.get("note"):
                 st.warning(s["note"])
 

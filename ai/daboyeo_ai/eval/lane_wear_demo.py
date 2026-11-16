@@ -59,13 +59,26 @@ def to_result(rec: dict) -> LaneWearResult:
 
 
 def replay(recs: list[dict], threshold: float = PROVISIONAL_WEAR_SCORE, k: int = CONFIRM_K,
-           n: int = CONFIRM_N) -> list[dict]:
-    """블랙박스와 같게: 품질 통과 프레임만 tracker 에 넣는다. 프레임마다 {t, score, is_worn, confirmed}."""
-    tr = LaneWearTracker(threshold=threshold, confirm_k=k, confirm_n=n)
+           n: int = CONFIRM_N, variant: dict | None = None) -> list[dict]:
+    """블랙박스와 같게: 품질 통과 프레임만 tracker 에 넣는다. 프레임마다 {t, score, is_worn, confirmed}.
+
+    variant (§17-6 개선 후보, `lane_wear_variants`): {"seg": 횡단보도 거른 측정 이름 (rec["xw"] 키),
+    "min_motion": 노면 차이가 이보다 작으면 (정지) 넣지 않음, "mode": 점수 식, "min_found": 차선 찾은 비율 보호}."""
+    v = variant or {}
+    if v.get("mode") or v.get("min_found"):
+        from .lane_wear_variants import VariantTracker
+        tr = VariantTracker(mode=v.get("mode") or "p25_x_len", min_found=v.get("min_found", 0.0),
+                            threshold=threshold, confirm_k=k, confirm_n=n)
+    else:
+        tr = LaneWearTracker(threshold=threshold, confirm_k=k, confirm_n=n)
     out = []
     for rec in recs:
         if not rec["q_ok"]:
             continue
+        if v.get("min_motion") is not None and rec.get("motion") is not None and rec["motion"] < v["min_motion"]:
+            continue
+        if v.get("seg"):
+            rec = rec | rec["xw"][v["seg"]]
         j = tr.update(to_result(rec), t=rec["t"])
         out.append({"i": rec["i"], "t": rec["t"], "lane_found": j.lane_found, "score": j.score,
                     "is_worn": j.is_worn, "confirmed": j.confirmed, "votes": j.votes})
@@ -151,10 +164,17 @@ def sweep(recs: list[dict], clusters: list[tuple[float, float]], labels: dict[in
 
 # ---------- 영상 (Mac) ----------
 
-def measure_clip(video: Path, every: int = 3) -> list[dict]:
+XW_CONFIGS = {"xw_k4_n3": {"k": 4.0, "min_lines": 3}, "xw_k6_n4": {"k": 6.0, "min_lines": 4}}
+
+
+def measure_clip(video: Path, every: int = 3, variants: bool = False) -> list[dict]:
+    """variants=True 면 같은 프레임에서 횡단보도 거른 측정(XW_CONFIGS)과 노면 움직임(motion)도 남긴다 (§17-6)."""
     from edge.blackbox.quality import measure as quality  # 정현우 코드 — 읽기 전용으로 부른다
 
+    from .lane_wear_variants import MotionProbe, measure_without_crosswalk
+
     meter = LaneWearMeter()
+    probe = MotionProbe()
     cap = cv2.VideoCapture(str(video))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     recs, i = [], 0
@@ -164,8 +184,21 @@ def measure_clip(video: Path, every: int = 3) -> list[dict]:
             if not ok:
                 break
             q = quality(frame)
-            r, segs = meter.measure_debug(frame) if q.ok else (None, [])
-            recs.append(record(i, i / fps, q.ok, q.reason, r, segs))
+            if not (q.ok and variants):
+                r, segs = meter.measure_debug(frame) if q.ok else (None, [])
+                recs.append(record(i, i / fps, q.ok, q.reason, r, segs))
+            else:
+                parts = meter._segments(frame)
+                r, segs = meter._finish(parts)
+                rec = record(i, i / fps, q.ok, q.reason, r, segs)
+                rec["xw"] = {}
+                for name, kw in XW_CONFIGS.items():
+                    rx, sx, nd = measure_without_crosswalk(meter, frame, parts=parts, **kw)
+                    rec["xw"][name] = {k: v for k, v in record(i, 0, True, "", rx, sx).items()
+                                       if k not in ("i", "t", "q_ok", "q_reason")} | {"n_dropped": nd}
+                recs.append(rec)
+            if variants:
+                recs[-1]["motion"] = probe.update(frame, i / fps)
         i += 1
     cap.release()
     return recs
@@ -255,6 +288,41 @@ def make_sheets(clip_dir: Path, video: Path, recs: list[dict], near: int = 12, s
     return info
 
 
+# §17-6 개선 후보 (lane_wear_variants). 이름 → replay(variant=...)
+VARIANTS = {
+    "base": {},
+    "motion": {"min_motion": 3.0},
+    "crosswalk_k4": {"seg": "xw_k4_n3"},
+    "crosswalk_k6": {"seg": "xw_k6_n4"},
+    "p25_only": {"mode": "p25_only"},
+    "rel_len": {"mode": "p25_x_rel_len"},
+    "rel_len_cap": {"mode": "p25_x_rel_len_cap"},
+    "sqrt_rel_len": {"mode": "p25_x_sqrt_rel_len"},
+    "found_guard": {"min_found": 0.3},
+    "motion+crosswalk_k6": {"min_motion": 3.0, "seg": "xw_k6_n4"},
+    "motion+crosswalk_k6+sqrt_rel_len": {"min_motion": 3.0, "seg": "xw_k6_n4", "mode": "p25_x_sqrt_rel_len"},
+    "all (motion+crosswalk_k6+sqrt_rel_len+found_guard)": {"min_motion": 3.0, "seg": "xw_k6_n4",
+                                                           "mode": "p25_x_sqrt_rel_len", "min_found": 0.3},
+}
+VARIANT_THRESHOLDS = (0.4, 0.5, 0.6, 0.8, 1.0)
+
+
+def variant_rows(recs: list[dict], clusters, labels: dict[int, str]) -> list[dict]:
+    """개선 후보별 · 기준별 확정 수와 눈 분류 (주기 3 프레임, 5 중 3). 새 확정이 든 칸은 'unlabeled'."""
+    rows = []
+    for name, v in VARIANTS.items():
+        for thr in VARIANT_THRESHOLDS:
+            ts = confirmed_times(replay(recs, thr, CONFIRM_K, CONFIRM_N, v))
+            c = {lab: 0 for lab in (*LABELS, "unlabeled")}
+            for t in ts:
+                c[label_of(t, clusters, labels) or "unlabeled"] += 1
+            done = sum(c[x] for x in LABELS)
+            rows.append({"variant": name, "threshold": thr, "confirmed": len(ts), **c,
+                         "fp_rate": round(c["fp"] / done, 3) if done else None,
+                         "real_135_140": sum(135 <= t <= 140 and label_of(t, clusters, labels) == "real" for t in ts)})
+    return rows
+
+
 def parse_stopped(specs: list[str]) -> dict[str, list[tuple[float, float]]]:
     """["clip:30-96,152-172"] → {"clip": [(30, 96), (152, 172)]}"""
     out: dict[str, list[tuple[float, float]]] = {}
@@ -274,6 +342,7 @@ def main(argv: list[str] | None = None) -> None:
     m = sub.add_parser("measure")
     m.add_argument("--clips", nargs="+", type=Path, required=True)
     m.add_argument("--every", type=int, default=3, help="블랙박스 --lane-every 와 같은 프레임 주기")
+    m.add_argument("--variants", action="store_true", help="§17-6 개선 후보용 값도 남긴다 (횡단보도 거름·노면 움직임)")
     s = sub.add_parser("sheets")
     s.add_argument("--near", type=int, default=12)
     u = sub.add_parser("summarize")
@@ -288,7 +357,7 @@ def main(argv: list[str] | None = None) -> None:
         for v in a.clips:
             d = a.out_dir / _clip_id(v)
             d.mkdir(parents=True, exist_ok=True)
-            recs = measure_clip(v, a.every)
+            recs = measure_clip(v, a.every, a.variants)
             (d / "frames.json").write_text(json.dumps({"video": str(v), "every": a.every, "frames": recs}))
             print(v.name, len(recs), "frames", clip_stats(recs, replay(recs)))
         return
@@ -324,6 +393,8 @@ def main(argv: list[str] | None = None) -> None:
             "bin_labels": {lab: sum(v == lab for v in labels.values()) for lab in LABELS} | {"bins": len(cl)},
             "sweep": sweep(recs, cl, labels, dur, every_mult=EVERY_MULT, every=c["every"]),
         }
+        if "xw" in next((r for r in recs if r["q_ok"]), {}):
+            out["clips"][d.name]["variants_17_6"] = variant_rows(recs, cl, labels)
         stops = parse_stopped(a.stopped).get(d.name)
         if stops:
             moving = [r for r in recs if not any(x <= r["t"] <= y for x, y in stops)]

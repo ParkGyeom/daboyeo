@@ -138,6 +138,11 @@ class LaneWearMeter:
 
     def measure_debug(self, frame_bgr: np.ndarray) -> tuple[LaneWearResult, list[tuple[int, int, int, int]]]:
         """measure + 채택된 선분 (원본 프레임 픽셀 좌표 x1,y1,x2,y2). 보정 도구의 오버레이용."""
+        return self._finish(self._segments(frame_bgr))
+
+    def _segments(self, frame_bgr: np.ndarray) -> dict:
+        """1~3단계: 후보 마스크와 기하 조건·소실점 투표를 통과한 선분 (작업 해상도·ROI 좌표) 과 선분별 표본.
+        `_finish` 가 4~6단계(길이 조건·대비·페인트 양)를 한다. 평가 도구가 선분을 더 거른 뒤 `_finish` 를 부를 수 있게 나눴다."""
         _check_frame(frame_bgr)
         h, w = frame_bgr.shape[:2]
         scale = min(1.0, self.work_width / w)
@@ -232,6 +237,13 @@ class LaneWearMeter:
         lane_vals = [lane_vals[i] for i in keep]
         road_vals = [road_vals[i] for i in keep]
         row_vals = [row_vals[i] for i in keep]
+        return {"segs": segs, "lane_vals": lane_vals, "road_vals": road_vals, "row_vals": row_vals, "cand": cand,
+                "d_row": d_row, "scale": scale, "origin": (x0, y0), "size": (sw, sh), "ch": ch, "n_roi": n_roi, "u": u}
+
+    def _finish(self, p: dict) -> tuple[LaneWearResult, list[tuple[int, int, int, int]]]:
+        segs, lane_vals, road_vals, row_vals = p["segs"], p["lane_vals"], p["road_vals"], p["row_vals"]
+        cand, d_row, scale, u, ch, n_roi = p["cand"], p["d_row"], p["scale"], p["u"], p["ch"], p["n_roi"]
+        (x0, y0), (sw, _) = p["origin"], p["size"]
         total_len = float(sum(np.hypot(xb - xa, yb - ya) for xa, ya, xb, yb in segs))
 
         if not segs:

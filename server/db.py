@@ -21,6 +21,8 @@ EXTRA_SQL = sorted(p for p in SCHEMA_SQL.parent.glob("0*.sql") if p != SCHEMA_SQ
 
 # 시연용 시민과 차량. 차량 이름(label)은 가상 블랙박스의 --device-id 와 같다
 DEMO = [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
+# 기기 초기 설정 때 등록했다고 가정하는 가짜 연락처 (모의 문자의 받는 번호)
+DEMO_PHONE = {"bb-01": "010-0000-0001", "bb-02": "010-0000-0002", "bb-03": "010-0000-0003"}
 _NS = uuid.UUID("6f1d3c52-6b8e-4a35-9d1e-2b8f6c0a9d41")
 
 
@@ -65,7 +67,11 @@ def _has_schema(conn: psycopg.Connection) -> bool:
 def seed_demo(conn: psycopg.Connection) -> None:
     for name, label in DEMO:
         uid, vid = demo_user_id(label), demo_vehicle_id(label)
-        conn.execute("INSERT INTO users (id, name) VALUES (%s, %s) ON CONFLICT (id) DO NOTHING", (uid, name))
+        conn.execute(
+            "INSERT INTO users (id, name, phone) VALUES (%s, %s, %s)"
+            " ON CONFLICT (id) DO UPDATE SET phone = EXCLUDED.phone",
+            (uid, name, DEMO_PHONE[label]),
+        )
         conn.execute(
             "INSERT INTO vehicles (id, owner_user_id, label) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
             (vid, uid, label),
@@ -86,7 +92,7 @@ def init_db() -> None:
 def reset_db() -> None:
     """모든 데이터를 지우고 처음 상태로 (시민·차량은 다시 넣는다)."""
     with connect() as conn:
-        conn.execute("TRUNCATE reports, findings, observations, defects, trips, vehicles, users CASCADE")
+        conn.execute("TRUNCATE notifications, reports, findings, observations, defects, trips, vehicles, users CASCADE")
         seed_demo(conn)
 
 

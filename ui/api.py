@@ -125,3 +125,27 @@ def snapshot_bytes(name: str | None) -> bytes | None:
         return _fetch_snapshot(name)
     except httpx.HTTPError:
         return None
+
+
+# ---------- 문자 링크 (가입·로그인 없이 토큰으로) ----------
+
+def link_findings(token: str) -> dict:
+    """{'user_name', 'expires_at', 'findings': [...]}. 없는 링크는 ApiError(404), 만료는 ApiError(410)."""
+    return _call("GET", f"/m/{token}/findings")
+
+
+def link_report(token: str, defect_id: str) -> dict:
+    return _call("POST", f"/m/{token}/defects/{defect_id}/report")
+
+
+def link_skip(token: str, defect_id: str) -> dict:
+    return _call("POST", f"/m/{token}/defects/{defect_id}/skip")
+
+
+def link_get_report(token: str, report_id: str) -> dict:
+    return _call("GET", f"/m/{token}/reports/{report_id}")
+
+
+def inbox() -> list[dict]:
+    """모의 문자 목록 (시연용 메시지함). 최근 것부터."""
+    return _call("GET", "/notifications")

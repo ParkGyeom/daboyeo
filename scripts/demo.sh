@@ -65,7 +65,7 @@ cmd_up() {
         say "  서버는 이미 떠 있다"
     else
         port_busy "$SERVER_PORT" && die "포트 $SERVER_PORT 을(를) 다른 프로그램이 쓰고 있다"
-        start_bg server "$PY" -m uvicorn server.main:app --port "$SERVER_PORT"
+        PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-http://localhost:$WEB_PORT}" start_bg server "$PY" -m uvicorn server.main:app --port "$SERVER_PORT"
         wait_http "http://localhost:$SERVER_PORT/health" server
         say "  서버 준비됨 http://localhost:$SERVER_PORT"
     fi
@@ -109,8 +109,8 @@ cmd_status() {
     n=$({ pgrep -f "edge.blackbox.run" 2>/dev/null || true; } | wc -l | tr -d ' ')
     say "블랙박스 ${n}대 실행 중"
     if curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null 2>&1; then
-        curl -fs "http://localhost:$SERVER_PORT/api/defects" | "$PY" -c \
-            'import json,sys; d=json.load(sys.stdin); n=sum(x["status"]=="미신고" for x in d); print(f"결함 {len(d)}건 (미신고 {n})")'
+        curl -fs "http://localhost:$SERVER_PORT/api/v1/defects" | "$PY" -c \
+            'import json,sys; d=json.load(sys.stdin); n=sum(x["status"]=="unreported" for x in d); print(f"결함 {len(d)}건 (미신고 {n})")'
     fi
 }
 

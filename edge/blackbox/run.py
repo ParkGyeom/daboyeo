@@ -12,9 +12,11 @@
 
 품질 판별(B6): 매 프레임 탐지 전에 재고, 나쁘면 탐지를 건너뛴다 (--no-quality 로 끈다).
 탐지 신뢰도: 기본은 클래스별 기준(--conf-json, 박겸 초안). --conf 를 주면 숫자 하나로 모든 클래스에 쓴다.
-차선 마모: --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고 LaneWearTracker 로 판정한다.
-같은 주행의 평소 차선과 비교해 연속 판정 5장 중 3장이 마모일 때 그 프레임 위치로 1건 보내고,
-마모 구간이 끝날 때까지 다시 보내지 않는다 (docs/ai-handoff.md 8장. 기준값은 박겸이 11/22까지 확정).
+차선 마모: 기본은 끈다 (--lane-every 0). 시연 클립 gn_b 에서 확정 58건 중 54건이 헛것(25건은 신호 대기 중
+횡단보도), gn_a 는 젖은 노면이라 차선을 2.8% 프레임에서만 찾았다 (docs/ai-handoff.md 17장). 박겸이 11/20까지
+개선해 보고 통과하면 --lane-every 3 으로 켠다. 켜면 --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고
+LaneWearTracker 로 판정한다. 같은 주행의 평소 차선과 비교해 연속 판정 5장 중 3장이 마모일 때 그 프레임 위치로
+1건 보내고, 마모 구간이 끝날 때까지 다시 보내지 않는다 (docs/ai-handoff.md 8장).
 """
 
 from __future__ import annotations
@@ -100,7 +102,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                     help="클래스별 탐지 신뢰도 기준 파일 (class_conf 키)")
     ap.add_argument("--threads", type=int, default=1, help="ONNX Runtime 스레드 수 (PRD: CPU 1~2코어)")
     ap.add_argument("--detect-every", type=int, default=1, help="결함 탐지 주기(프레임)")
-    ap.add_argument("--lane-every", type=int, default=3, help="차선 마모 주기(프레임). 0이면 재지 않는다")
+    ap.add_argument("--lane-every", type=int, default=0,
+                    help="차선 마모 주기(프레임). 기본 0 = 재지 않음 (시연 기본, handoff 17장). 켜려면 3")
     ap.add_argument("--speed", type=float, default=1.0, help="재생 배속. 0이면 기다리지 않는다")
     ap.add_argument("--gps-noise", type=float, default=0.0, help="GPS 에 더할 오차의 표준편차(m)")
     ap.add_argument("--brightness", type=float, default=1.0, help="밝기 배율")

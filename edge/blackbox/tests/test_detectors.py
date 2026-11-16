@@ -51,18 +51,18 @@ class Captured:
 
     log: ClassVar[list] = []
 
-    def __init__(self, server, dry_run=False):
+    def __init__(self, server, dry_run=False, **kw):
         from edge.blackbox.sender import Sender
 
-        self._s = Sender(server, dry_run=True)
+        self._s = Sender(server, dry_run=True, **kw)
         Captured.log = []
 
     def __getattr__(self, name):
         return getattr(self._s, name)
 
-    def send(self, obs, snapshot):
+    def send(self, obs, snapshot, clip=None):
         Captured.log.append((obs.defect_type.value, obs.confidence, obs.bbox, obs.t_s))
-        return self._s.send(obs, snapshot)
+        return self._s.send(obs, snapshot, clip)
 
 
 def drive(video, tmp_path, *extra):

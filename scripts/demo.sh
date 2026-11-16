@@ -118,8 +118,9 @@ cmd_reset() {
     docker info >/dev/null 2>&1 || die "Docker 가 꺼져 있다"
     pgrep -f "edge.blackbox.run" >/dev/null 2>&1 && die "가상 블랙박스가 돌고 있다. 끝난 뒤에 되돌린다"
     "$PY" -c "from server import db; db.init_db(); db.reset_db()"
-    rm -f server_data/snapshots/*.jpg
-    say "처음 상태로 되돌렸다 (결함·신고·사진 삭제, 시민 3명 다시 넣음)"
+    rm -f server_data/snapshots/*.jpg server_data/clips/*.mp4
+    rm -rf server_data/blackbox
+    say "처음 상태로 되돌렸다 (결함·신고·사진·클립, 블랙박스가 남긴 결함 구간 삭제, 시민 3명 다시 넣음)"
 }
 
 cmd_drive() {

@@ -6,9 +6,10 @@
 ## 1. 한눈에
 
 ```python
-from daboyeo_ai.inference import OnnxDetector
+from daboyeo_ai.inference import OnnxDetector, load_class_conf
 
-det = OnnxDetector("ai/models/detector_v2.onnx", threads=1)
+det = OnnxDetector("ai/models/detector_v3.onnx", threads=1,
+                  conf=load_class_conf("ai/models/detector_v3.json"))   # 시연 모델 v3 (11/16 확정, 16장)
 detections = det.detect(frame_bgr)        # OpenCV 로 읽은 BGR 프레임 그대로
 for d in detections:
     d.class_name   # "pothole" | "crack" | "guardrail" | "sign"
@@ -32,15 +33,16 @@ uv 를 안 쓰면: `pip install -e contracts -e ai`
 
 | 파일 | 위치 | 비고 |
 |---|---|---|
-| `detector_v2.onnx` | 박겸 Google Drive `daboyeo_data/models/` → 받아서 **`ai/models/`** 에 둔다 | git 에 안 올림 (`.gitignore`) |
-| `detector_v2.json` | 레포 `ai/models/` (Drive 에도 있음) | 클래스 순서, 입력 크기, 성능, 학습 데이터 정보 |
+| `detector_v3.onnx` | 박겸 Google Drive `daboyeo_data/models/` → 받아서 **`ai/models/`** 에 둔다 | git 에 안 올림 (`.gitignore`) |
+| `detector_v3.json` | 레포 `ai/models/` | 클래스 순서, 입력 크기, 성능, **클래스별 기준 `class_conf_draft`** (crack 0.42) |
 
 | 버전 | 클래스 | 상태 |
 |---|---|---|
-| **v2 (사용)** | 4클래스 전부 — RDD2022 + AI Hub 도로장애물(179) + 전국 도로시설물(KRID) | 11/15 완료 |
+| **v3 (사용, 11/16 확정)** | v2 에서 이어 학습 — 179 크랙 데이터를 고친 `road_v3` (15장) | 시연 클립에서 v2 가 못 잡는 균열을 잡음 (16장) |
+| v2 | 4클래스 전부 — RDD2022 + AI Hub 도로장애물(179) + 전국 도로시설물(KRID) | v3 로 대체 |
 | v1 | 출력은 4클래스지만 **학습된 건 pothole·crack 만** (RDD2022) | v2 로 대체 |
 
-**v1 → v2 는 파일만 바꾸면 된다.** 출력 클래스 수·순서·입력 형식이 같아서 코드 변경이 없다.
+**v2 → v3 도 파일(과 기준)만 바꾸면 된다.** 출력 클래스 수·순서·입력 형식이 같아서 코드 변경이 없다.
 
 v2 test mAP50 (자세한 값은 `detector_v2.json`):
 
@@ -80,6 +82,8 @@ det = OnnxDetector("ai/models/detector_v2.onnx", threads=1,
                    conf={"pothole": 0.27, "crack": 0.29, "guardrail": 0.26, "sign": 0.24})
 # 또는 파일에서: experiments/conf_thresholds.json 의 "class_conf", 모델 카드의 "class_conf_draft"
 det = OnnxDetector("ai/models/detector_v2.onnx", threads=1, conf=load_class_conf("experiments/conf_thresholds.json"))
+# 시연 모델 v3 (16장): 카드의 class_conf_draft = {"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21}
+det = OnnxDetector("ai/models/detector_v3.onnx", threads=1, conf=load_class_conf("ai/models/detector_v3.json"))
 det.class_conf   # [0.27, 0.29, 0.26, 0.24] — class_id 순서
 det.conf         # 0.24 — 그중 최솟값 (예전 코드 호환)
 ```
@@ -600,7 +604,7 @@ v2 끼리 돌려 확인함: 14장 값과 같다 (base 포트홀 0.26, 조각 0.4
 **0.02 넘게 안 떨어짐** (v2: crack 0.584, pothole 0.418), (3) 300장 표본에서 v2 에 없던 pothole+crack 새 탐지 **≤ 0.10/프레임**
 (v2 base 는 0), (4) guardrail+sign 잃은 것 ≤ 0.03/프레임. (1) 만 안 되고 나머지가 되면 179 test crack 이 오른 것만으로 v3 를 쓸지 따로 정한다.
 
-### 15-6. v3 평가 결과 (11/16, 결과: **제안 = v2 유지 (no-go) — 11/18 박겸 확정**)
+### 15-6. v3 평가 결과 (11/16, 결과: 제안 = v2 유지 (no-go) → **시연 클립 결과로 v3 채택, 16장**)
 
 `detector_v3.onnx` (v2 에서 15 epoch, `krid`+`rdd2022`+`road_v3`, Colab T4). ONNX 일치: 10장에서 Ultralytics 박스 65개 중 65개 맞음.
 속도는 v2 와 같다 (M4 Pro, 1280×720 150장, 탐지 중앙값 1스레드 v2 20.4·20.6 / v3 20.5·20.7 ms, 2스레드 16.6 / 16.5~16.7 ms).
@@ -656,7 +660,7 @@ v3 는 다른 표지판을 잡는 '교체'가 많고, 진짜만 세면 순손실
   `load_class_conf("ai/models/detector_v3.json")` 으로 읽는다 (입출력·클래스 순서 같음).
 - 다음 후보 (AI 쪽, 필요하면): 시공 줄눈·차선·그림자 프레임을 배경(라벨 없음)으로 넣어 다시 미세조정, 또는 crack 만 서버 노출 기준을 0.42 이상으로.
 
-## 16. 시연 클립 gn_a·gn_b 로 v2 vs v3 (11/16, 결과: **제안 = v3 + 균열 기준 0.42 — 박겸 확정 필요**)
+## 16. 시연 클립 gn_a·gn_b 로 v2 vs v3 (11/16, 결과: **v3 + 균열 기준 0.42 — 11/16 박겸 확정**)
 
 15-6 에서 "최종 선택은 시연 클립에서" 로 미룬 것. 정현우가 Drive `daboyeo_data/` 에 올린 클립
 `gn_a_2050-2510.mp4` (강남대로 북행, 흐림·이슬비, 1920×1080 59.94fps, 262초) 와 `gn_b_3320-3620.mp4` (같은 구간, 맑음, 60fps, 182초) 를
@@ -706,7 +710,8 @@ uv run python -m daboyeo_ai.eval.demo_clip summarize                          # 
 | 균열 real 증가 ≥ clear FP 증가 | +26 vs +9 (장소: +5 vs +4). 0.42 이면 +19 vs 0 | ✓ |
 | 포트홀·가드레일·표지판 real 순손실 ≤ 0.03/프레임 | v2 에만 있는 real 10개 = 0.011/프레임 (v3 에만 있는 real 을 빼면 −0.035) | ✓ |
 
-**제안: v3 로 바꾸고, 균열만 기준을 0.42 로 올린다** (`{"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21}`).
+**확정 (11/16 박겸): v3 로 바꾸고, 균열만 기준을 0.42 로 올린다** (`{"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21}`
+= `ai/models/detector_v3.json` 의 `class_conf_draft`).
 - v2 는 이 두 클립에서 진짜 균열을 하나도 못 잡는다 → 시연에서 균열을 보여 주려면 v3 가 필요하다.
 - 15-6 의 걱정(이음매·차선을 균열로)은 여기서도 보인다 (블록 포장 이음매). 서버가 여러 차량 관측을 묶으므로 같은 헛것이 여러 대에서 반복되면 결함으로 확정된다 → 균열 0.42 로 막는다. 0.42 에서 남는 real 은 긴 세로 균열 포함 4곳.
 - 포트홀은 두 클립 모두 두 모델 0. must-keep 포트홀(15-6)은 0.31 에서 v3 가 잡으므로 포트홀은 0.31 그대로.
@@ -722,6 +727,7 @@ uv run python -m daboyeo_ai.eval.demo_clip summarize                          # 
 
 ### 16-5. 정현우에게 전할 것 (제안)
 
-- 박겸이 v3 를 확정하면: 모델 경로 `ai/models/detector_v2.onnx` → `detector_v3.onnx`, 클래스별 기준은 위 dict (v3 카드 `class_conf_draft` 에서 crack 만 0.42). 입출력·클래스 순서·속도 같음 (15-6).
+- **[ ] 정현우**: Drive `daboyeo_data/models/detector_v3.onnx` 를 받아 `ai/models/` 에 두고, 블랙박스 모델 경로를 `detector_v3.onnx` 로,
+  클래스별 기준은 `load_class_conf("ai/models/detector_v3.json")` (= 위 dict). 입출력·클래스 순서·속도 같음 (15-6).
 - 자막 마스킹은 하지 않아도 된다 (아래 띠 탐지 0). 위 교차로 자막은 v3 에서 안 잡힘.
 - 품질 게이트는 두 클립 모두 건너뛰는 프레임이 없다.

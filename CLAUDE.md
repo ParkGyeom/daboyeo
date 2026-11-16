@@ -18,9 +18,9 @@ docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 scripts/demo.sh up                                  # DB → 서버(8000) → 화면(8501)
 uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 관측 보내기 (주행을 닫으면 시민 확인 목록이 생긴다)
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
-uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --detect-every 10 --speed 4
-uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3
-scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --detect-every 10 --speed 4
+uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --devices 3
+scripts/demo.sh drive ai/models/detector_v3.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
 # GPS 없는 유튜브 영상의 경로 재구성 (tools/gps/README.md): routes/<id>.gpx + anchors/<id>.csv → data/videos/<id>.gps.csv
 uv run python -m tools.gps.reconstruct gn_a                 # 클립이면 --clip-start <clip_start_in_source_s> --out data/videos/<클립>.gps.csv
 uv run python -m tools.gps.preview_map gn_a --fetch-roads   # 경로·기준점 HTML (오프라인 도로선). --fetch-roads 는 처음 한 번 (인터넷)

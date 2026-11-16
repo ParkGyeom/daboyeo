@@ -1,0 +1,513 @@
+{
+ "every_s": 0.5,
+ "v2_conf": {
+  "pothole": 0.27,
+  "crack": 0.29,
+  "guardrail": 0.26,
+  "sign": 0.24
+ },
+ "v3_conf": {
+  "pothole": 0.31,
+  "crack": 0.3,
+  "guardrail": 0.21,
+  "sign": 0.21
+ },
+ "clips": {
+  "gn_a": {
+   "frames": 525,
+   "minutes": 4.38,
+   "quality": {
+    "ok_ratio": 1.0,
+    "skip_reasons": {}
+   },
+   "v2": {
+    "per_min": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 2.51,
+     "sign": 98.97
+    },
+    "per_min_quality_ok": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 2.51,
+     "sign": 98.97
+    },
+    "conf": {
+     "pothole": {
+      "n": 0
+     },
+     "crack": {
+      "n": 0
+     },
+     "guardrail": {
+      "n": 11,
+      "p10": 0.261,
+      "p50": 0.35,
+      "p90": 0.479,
+      "ge_0.5": 0.091
+     },
+     "sign": {
+      "n": 433,
+      "p10": 0.264,
+      "p50": 0.487,
+      "p90": 0.731,
+      "ge_0.5": 0.476
+     }
+    },
+    "bottom_band": {
+     "6%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "8%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "10%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "12%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "15%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 1,
+      "sign": 0
+     }
+    },
+    "top_center": {
+     "pothole": 0,
+     "crack": 0,
+     "guardrail": 0,
+     "sign": 6
+    }
+   },
+   "v3": {
+    "per_min": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 17.6,
+     "sign": 209.37
+    },
+    "per_min_quality_ok": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 17.6,
+     "sign": 209.37
+    },
+    "conf": {
+     "pothole": {
+      "n": 0
+     },
+     "crack": {
+      "n": 0
+     },
+     "guardrail": {
+      "n": 77,
+      "p10": 0.22,
+      "p50": 0.282,
+      "p90": 0.442,
+      "ge_0.5": 0.052
+     },
+     "sign": {
+      "n": 916,
+      "p10": 0.223,
+      "p50": 0.387,
+      "p90": 0.719,
+      "ge_0.5": 0.341
+     }
+    },
+    "bottom_band": {
+     "6%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "8%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "10%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "12%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "15%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 6,
+      "sign": 0
+     }
+    },
+    "top_center": {
+     "pothole": 0,
+     "crack": 0,
+     "guardrail": 0,
+     "sign": 42
+    }
+   },
+   "v3_p08": {
+    "conf": {
+     "pothole": 0.4,
+     "crack": 0.42,
+     "guardrail": 0.31,
+     "sign": 0.34
+    },
+    "per_min": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 7.09,
+     "sign": 124.34
+    },
+    "v3_only_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 0.046,
+     "sign": 0.411
+    }
+   },
+   "v3_only_per_frame": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.126,
+    "sign": 0.99
+   },
+   "v2_only_per_frame": {
+    "pothole": 0.0,
+    "crack": 0.0,
+    "guardrail": 0.002,
+    "sign": 0.072
+   },
+   "v2_t2": {
+    "per_min": {
+     "pothole": 0.0,
+     "crack": 0.0,
+     "guardrail": 4.57,
+     "sign": 152.69
+    },
+    "pothole_gain_per_frame": 0.0
+   },
+   "review": {
+    "v3_only": {
+     "sign": {
+      "fp": 29,
+      "amb": 7,
+      "unreviewed": 484
+     },
+     "guardrail": {
+      "real": 34,
+      "fp": 1,
+      "amb": 1,
+      "unreviewed": 30
+     }
+    },
+    "v2_only": {
+     "sign": {
+      "fp": 33,
+      "amb": 2,
+      "real": 3
+     },
+     "guardrail": {
+      "fp": 1
+     }
+    }
+   }
+  },
+  "gn_b": {
+   "frames": 364,
+   "minutes": 3.03,
+   "quality": {
+    "ok_ratio": 1.0,
+    "skip_reasons": {}
+   },
+   "v2": {
+    "per_min": {
+     "pothole": 0.0,
+     "crack": 0.33,
+     "guardrail": 1.32,
+     "sign": 34.29
+    },
+    "per_min_quality_ok": {
+     "pothole": 0.0,
+     "crack": 0.33,
+     "guardrail": 1.32,
+     "sign": 34.29
+    },
+    "conf": {
+     "pothole": {
+      "n": 0
+     },
+     "crack": {
+      "n": 1,
+      "p10": 0.327,
+      "p50": 0.327,
+      "p90": 0.327,
+      "ge_0.5": 0.0
+     },
+     "guardrail": {
+      "n": 4,
+      "p10": 0.379,
+      "p50": 0.446,
+      "p90": 0.517,
+      "ge_0.5": 0.25
+     },
+     "sign": {
+      "n": 104,
+      "p10": 0.275,
+      "p50": 0.434,
+      "p90": 0.661,
+      "ge_0.5": 0.394
+     }
+    },
+    "bottom_band": {
+     "6%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "8%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "10%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "12%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "15%": {
+      "pothole": 0,
+      "crack": 0,
+      "guardrail": 0,
+      "sign": 0
+     }
+    },
+    "top_center": {
+     "pothole": 0,
+     "crack": 0,
+     "guardrail": 0,
+     "sign": 0
+    }
+   },
+   "v3": {
+    "per_min": {
+     "pothole": 0.0,
+     "crack": 14.51,
+     "guardrail": 9.23,
+     "sign": 86.37
+    },
+    "per_min_quality_ok": {
+     "pothole": 0.0,
+     "crack": 14.51,
+     "guardrail": 9.23,
+     "sign": 86.37
+    },
+    "conf": {
+     "pothole": {
+      "n": 0
+     },
+     "crack": {
+      "n": 44,
+      "p10": 0.312,
+      "p50": 0.412,
+      "p90": 0.604,
+      "ge_0.5": 0.341
+     },
+     "guardrail": {
+      "n": 28,
+      "p10": 0.222,
+      "p50": 0.331,
+      "p90": 0.544,
+      "ge_0.5": 0.143
+     },
+     "sign": {
+      "n": 262,
+      "p10": 0.232,
+      "p50": 0.418,
+      "p90": 0.759,
+      "ge_0.5": 0.42
+     }
+    },
+    "bottom_band": {
+     "6%": {
+      "pothole": 0,
+      "crack": 1,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "8%": {
+      "pothole": 0,
+      "crack": 6,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "10%": {
+      "pothole": 0,
+      "crack": 7,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "12%": {
+      "pothole": 0,
+      "crack": 12,
+      "guardrail": 0,
+      "sign": 0
+     },
+     "15%": {
+      "pothole": 0,
+      "crack": 19,
+      "guardrail": 0,
+      "sign": 0
+     }
+    },
+    "top_center": {
+     "pothole": 0,
+     "crack": 0,
+     "guardrail": 0,
+     "sign": 4
+    }
+   },
+   "v3_p08": {
+    "conf": {
+     "pothole": 0.4,
+     "crack": 0.42,
+     "guardrail": 0.31,
+     "sign": 0.34
+    },
+    "per_min": {
+     "pothole": 0.0,
+     "crack": 7.25,
+     "guardrail": 4.95,
+     "sign": 53.41
+    },
+    "v3_only_per_frame": {
+     "pothole": 0.0,
+     "crack": 0.06,
+     "guardrail": 0.033,
+     "sign": 0.212
+    }
+   },
+   "v3_only_per_frame": {
+    "pothole": 0.0,
+    "crack": 0.121,
+    "guardrail": 0.069,
+    "sign": 0.462
+   },
+   "v2_only_per_frame": {
+    "pothole": 0.0,
+    "crack": 0.003,
+    "guardrail": 0.003,
+    "sign": 0.03
+   },
+   "v2_t2": {
+    "per_min": {
+     "pothole": 1.98,
+     "crack": 0.33,
+     "guardrail": 1.32,
+     "sign": 34.62
+    },
+    "pothole_gain_per_frame": 0.016
+   },
+   "review": {
+    "v3_only": {
+     "sign": {
+      "fp": 19,
+      "amb": 10,
+      "real": 7,
+      "unreviewed": 132
+     },
+     "guardrail": {
+      "unreviewed": 25
+     },
+     "crack": {
+      "amb": 8,
+      "real": 26,
+      "fp": 10
+     }
+    },
+    "v2_only": {
+     "guardrail": {
+      "real": 1
+     },
+     "sign": {
+      "real": 6,
+      "amb": 5
+     },
+     "crack": {
+      "fp": 1
+     }
+    },
+    "t2_gain": {
+     "pothole": {
+      "amb": 4,
+      "real": 1,
+      "fp": 1
+     }
+    }
+   }
+  }
+ },
+ "v3_only_crack_review_at": {
+  "0.30": {
+   "amb": 8,
+   "real": 26,
+   "fp": 10
+  },
+  "0.42": {
+   "amb": 2,
+   "real": 19,
+   "fp": 1
+  }
+ },
+ "unreviewed": 671,
+ "decision": {
+  "checks": {
+   "crack_real_gain_ge_fp_gain": {
+    "real_gain": 26,
+    "fp_gain": 9,
+    "ok": true
+   },
+   "crack_real_gain_positive": {
+    "value": 26,
+    "ok": true
+   },
+   "other_real_net_loss_per_frame": {
+    "value": -0.035,
+    "need": "<= 0.03",
+    "ok": true
+   }
+  },
+  "adopt_v3": true
+ }
+}

@@ -30,3 +30,5 @@ def get(name: str, default: str) -> str:
 DATABASE_URL = get("DATABASE_URL", "postgresql://daboyeo:daboyeo@localhost:5432/daboyeo")
 SNAPSHOT_DIR = ROOT / get("SNAPSHOT_DIR", "server_data/snapshots")
 MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024
+CLIP_DIR = ROOT / get("CLIP_DIR", "server_data/clips")
+MAX_CLIP_BYTES = 20 * 1024 * 1024  # 결함 구간 클립 (전후 2초, 480p H.264 면 보통 1MB 아래)

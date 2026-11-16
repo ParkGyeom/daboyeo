@@ -1,0 +1,1540 @@
+{
+  "measured_at": "2026-11-16T18:14:48",
+  "video": "gn_a_2050-2510.mp4",
+  "video_duration_s": 262.4,
+  "video_fps": 59.94,
+  "gps": "gn_a_2050-2510.gps.csv",
+  "fake": {
+    "every": 60.0,
+    "visible": 2.0,
+    "first": 5.0
+  },
+  "detector": "fake: 5초부터 60초마다 결함 1개, 2초 보임",
+  "run_args": [
+    "--detect-every",
+    "10",
+    "--server",
+    "http://localhost:8010",
+    "--keep-dir",
+    "<임시 폴더>/keep3",
+    "--no-quality",
+    "--lane-every",
+    "0",
+    "--model",
+    "fake"
+  ],
+  "note": "gn_a 시연 구간 20:50~25:10(원본 스트림 복사). 가짜 GPS(강남역→신논현역 직선, 약 2.9 m/s). 가짜 탐지. 기기 3대 = VARIANTS(bb-02·03 관측마다 독립 GPS 오차 7m)",
+  "devices": [
+    {
+      "frames": 15726,
+      "trip_id": "c2ef367d-f610-48c2-a284-5108176f53fb",
+      "detected_frames": 1573,
+      "sent": 60,
+      "bytes_sent": 2868919,
+      "bytes_meta": 23530,
+      "bytes_snapshot": 1719974,
+      "bytes_clip": 1125415,
+      "clips": 5,
+      "clip_codec": "h264",
+      "clips_skipped_overlap": 55,
+      "failed": 0,
+      "skipped_no_gps": 0,
+      "skipped_quality": 0,
+      "detect_ms_avg": 0.00377490898050742,
+      "device_id": "bb-01"
+    },
+    {
+      "frames": 15726,
+      "trip_id": "c16ce105-954c-4851-b49c-cee432ca3ad4",
+      "detected_frames": 1573,
+      "sent": 60,
+      "bytes_sent": 2735951,
+      "bytes_meta": 23533,
+      "bytes_snapshot": 1587003,
+      "bytes_clip": 1125415,
+      "clips": 5,
+      "clip_codec": "h264",
+      "clips_skipped_overlap": 55,
+      "failed": 0,
+      "skipped_no_gps": 0,
+      "skipped_quality": 0,
+      "detect_ms_avg": 0.0035000984759460153,
+      "device_id": "bb-02"
+    },
+    {
+      "frames": 15724,
+      "trip_id": "79e924e5-b1e2-4cc3-8a81-d8cf8f13b751",
+      "detected_frames": 1573,
+      "sent": 60,
+      "bytes_sent": 2882790,
+      "bytes_meta": 23534,
+      "bytes_snapshot": 1724676,
+      "bytes_clip": 1134580,
+      "clips": 5,
+      "clip_codec": "h264",
+      "clips_skipped_overlap": 55,
+      "failed": 0,
+      "skipped_no_gps": 0,
+      "skipped_quality": 0,
+      "detect_ms_avg": 0.0032778200893251383,
+      "device_id": "bb-03"
+    }
+  ],
+  "clip_codec": "h264",
+  "bytes_sent_per_device": 2829220,
+  "baseline_a_file_bytes": 97672426,
+  "baseline_b_bytes": 327953281,
+  "bitrate_mbps_b": 10.0,
+  "reduction_a": 0.971033585261822,
+  "reduction_b": 0.9913731004940205,
+  "server": {
+    "observations": 180,
+    "defects": 9,
+    "stored_bytes": 8417063,
+    "clips": 15,
+    "defects_seen_by_2plus_vehicles": 7,
+    "observations_list": [
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980256,
+        "lon": 127.0275505,
+        "t_s": 5.005
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4981726,
+        "lon": 127.027498,
+        "t_s": 5.005
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980324,
+        "lon": 127.0276493,
+        "t_s": 5.005
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980298,
+        "lon": 127.0275489,
+        "t_s": 5.172
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980546,
+        "lon": 127.0275605,
+        "t_s": 5.172
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4979721,
+        "lon": 127.0276272,
+        "t_s": 5.172
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.498034,
+        "lon": 127.0275472,
+        "t_s": 5.339
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980865,
+        "lon": 127.0274361,
+        "t_s": 5.339
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980185,
+        "lon": 127.0275262,
+        "t_s": 5.339
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980382,
+        "lon": 127.0275456,
+        "t_s": 5.506
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980121,
+        "lon": 127.027486,
+        "t_s": 5.506
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4981585,
+        "lon": 127.0275577,
+        "t_s": 5.506
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980423,
+        "lon": 127.0275439,
+        "t_s": 5.672
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4979748,
+        "lon": 127.027477,
+        "t_s": 5.672
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980405,
+        "lon": 127.0276014,
+        "t_s": 5.672
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980465,
+        "lon": 127.0275423,
+        "t_s": 5.839
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980143,
+        "lon": 127.0275195,
+        "t_s": 5.839
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4981182,
+        "lon": 127.0275395,
+        "t_s": 5.839
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980507,
+        "lon": 127.0275406,
+        "t_s": 6.006
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4979937,
+        "lon": 127.0275741,
+        "t_s": 6.006
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980885,
+        "lon": 127.0274631,
+        "t_s": 6.006
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980549,
+        "lon": 127.027539,
+        "t_s": 6.173
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980205,
+        "lon": 127.0272855,
+        "t_s": 6.173
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980327,
+        "lon": 127.0275039,
+        "t_s": 6.173
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980591,
+        "lon": 127.0275373,
+        "t_s": 6.34
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.498134,
+        "lon": 127.0275063,
+        "t_s": 6.34
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4979762,
+        "lon": 127.0274174,
+        "t_s": 6.34
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980633,
+        "lon": 127.0275357,
+        "t_s": 6.507
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980165,
+        "lon": 127.0275569,
+        "t_s": 6.507
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4979618,
+        "lon": 127.0275164,
+        "t_s": 6.507
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980675,
+        "lon": 127.027534,
+        "t_s": 6.673
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980819,
+        "lon": 127.0275382,
+        "t_s": 6.673
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980575,
+        "lon": 127.0275083,
+        "t_s": 6.673
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980717,
+        "lon": 127.0275324,
+        "t_s": 6.84
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980179,
+        "lon": 127.0275476,
+        "t_s": 6.84
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.4980768,
+        "lon": 127.0274262,
+        "t_s": 6.84
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995328,
+        "lon": 127.0269568,
+        "t_s": 65.065
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4994361,
+        "lon": 127.0270712,
+        "t_s": 65.065
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995287,
+        "lon": 127.0269753,
+        "t_s": 65.065
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.499537,
+        "lon": 127.0269551,
+        "t_s": 65.232
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4994574,
+        "lon": 127.0269387,
+        "t_s": 65.232
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995851,
+        "lon": 127.0268877,
+        "t_s": 65.232
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995412,
+        "lon": 127.0269535,
+        "t_s": 65.399
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995424,
+        "lon": 127.0269708,
+        "t_s": 65.399
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995169,
+        "lon": 127.0267934,
+        "t_s": 65.399
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995454,
+        "lon": 127.0269518,
+        "t_s": 65.566
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995299,
+        "lon": 127.0269901,
+        "t_s": 65.566
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995145,
+        "lon": 127.0267774,
+        "t_s": 65.566
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995496,
+        "lon": 127.0269502,
+        "t_s": 65.732
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.499321,
+        "lon": 127.0269316,
+        "t_s": 65.732
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4994611,
+        "lon": 127.0270371,
+        "t_s": 65.732
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995537,
+        "lon": 127.0269485,
+        "t_s": 65.899
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995355,
+        "lon": 127.0269039,
+        "t_s": 65.899
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4994161,
+        "lon": 127.0270115,
+        "t_s": 65.899
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995579,
+        "lon": 127.0269469,
+        "t_s": 66.066
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.499646,
+        "lon": 127.0268592,
+        "t_s": 66.066
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995794,
+        "lon": 127.0269218,
+        "t_s": 66.066
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995621,
+        "lon": 127.0269452,
+        "t_s": 66.233
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995487,
+        "lon": 127.0267735,
+        "t_s": 66.233
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995918,
+        "lon": 127.0269867,
+        "t_s": 66.233
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995663,
+        "lon": 127.0269436,
+        "t_s": 66.4
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995753,
+        "lon": 127.0268041,
+        "t_s": 66.4
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4996329,
+        "lon": 127.026925,
+        "t_s": 66.4
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995705,
+        "lon": 127.0269419,
+        "t_s": 66.567
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4994631,
+        "lon": 127.0271193,
+        "t_s": 66.567
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995341,
+        "lon": 127.0268937,
+        "t_s": 66.567
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995747,
+        "lon": 127.0269403,
+        "t_s": 66.733
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4996109,
+        "lon": 127.0269291,
+        "t_s": 66.733
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995135,
+        "lon": 127.0269364,
+        "t_s": 66.733
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995789,
+        "lon": 127.0269386,
+        "t_s": 66.9
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995814,
+        "lon": 127.0268131,
+        "t_s": 66.9
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.4995303,
+        "lon": 127.027023,
+        "t_s": 66.9
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.50104,
+        "lon": 127.026363,
+        "t_s": 125.125
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.500965,
+        "lon": 127.0263864,
+        "t_s": 125.125
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5009233,
+        "lon": 127.026276,
+        "t_s": 125.125
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010442,
+        "lon": 127.0263614,
+        "t_s": 125.292
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5009014,
+        "lon": 127.0263727,
+        "t_s": 125.292
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5009851,
+        "lon": 127.0261952,
+        "t_s": 125.292
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010484,
+        "lon": 127.0263597,
+        "t_s": 125.459
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5009297,
+        "lon": 127.0263589,
+        "t_s": 125.459
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011689,
+        "lon": 127.0261685,
+        "t_s": 125.459
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010526,
+        "lon": 127.0263581,
+        "t_s": 125.626
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5009735,
+        "lon": 127.0264884,
+        "t_s": 125.626
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010356,
+        "lon": 127.0263161,
+        "t_s": 125.626
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010568,
+        "lon": 127.0263564,
+        "t_s": 125.793
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011133,
+        "lon": 127.0263045,
+        "t_s": 125.793
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011617,
+        "lon": 127.0261987,
+        "t_s": 125.793
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.501061,
+        "lon": 127.0263548,
+        "t_s": 125.959
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5009321,
+        "lon": 127.0262812,
+        "t_s": 125.959
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011292,
+        "lon": 127.0262965,
+        "t_s": 125.959
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010651,
+        "lon": 127.0263531,
+        "t_s": 126.126
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010532,
+        "lon": 127.0262628,
+        "t_s": 126.126
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010562,
+        "lon": 127.0262996,
+        "t_s": 126.126
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010693,
+        "lon": 127.0263515,
+        "t_s": 126.293
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010791,
+        "lon": 127.0264206,
+        "t_s": 126.293
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011104,
+        "lon": 127.026261,
+        "t_s": 126.293
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010735,
+        "lon": 127.0263498,
+        "t_s": 126.46
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010617,
+        "lon": 127.0263044,
+        "t_s": 126.46
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010694,
+        "lon": 127.0263775,
+        "t_s": 126.46
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010777,
+        "lon": 127.0263482,
+        "t_s": 126.627
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011193,
+        "lon": 127.0263139,
+        "t_s": 126.627
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011943,
+        "lon": 127.0261572,
+        "t_s": 126.627
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010819,
+        "lon": 127.0263465,
+        "t_s": 126.794
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011278,
+        "lon": 127.0263105,
+        "t_s": 126.794
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5011786,
+        "lon": 127.0264213,
+        "t_s": 126.794
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010861,
+        "lon": 127.0263449,
+        "t_s": 126.96
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.501181,
+        "lon": 127.026312,
+        "t_s": 126.96
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5010565,
+        "lon": 127.0263687,
+        "t_s": 126.96
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025431,
+        "lon": 127.0257709,
+        "t_s": 185.019
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5024671,
+        "lon": 127.0257684,
+        "t_s": 185.019
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025146,
+        "lon": 127.0259011,
+        "t_s": 185.019
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025472,
+        "lon": 127.0257693,
+        "t_s": 185.185
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5024986,
+        "lon": 127.0256833,
+        "t_s": 185.185
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025613,
+        "lon": 127.0257519,
+        "t_s": 185.185
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025514,
+        "lon": 127.0257676,
+        "t_s": 185.352
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025352,
+        "lon": 127.0258177,
+        "t_s": 185.352
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025379,
+        "lon": 127.0257514,
+        "t_s": 185.352
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025556,
+        "lon": 127.025766,
+        "t_s": 185.519
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5024093,
+        "lon": 127.0257522,
+        "t_s": 185.519
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025453,
+        "lon": 127.025696,
+        "t_s": 185.519
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025598,
+        "lon": 127.0257643,
+        "t_s": 185.686
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.502542,
+        "lon": 127.0257424,
+        "t_s": 185.686
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5026901,
+        "lon": 127.0256125,
+        "t_s": 185.686
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.502564,
+        "lon": 127.0257627,
+        "t_s": 185.853
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5026073,
+        "lon": 127.0256474,
+        "t_s": 185.853
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5023381,
+        "lon": 127.0257526,
+        "t_s": 185.853
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025682,
+        "lon": 127.025761,
+        "t_s": 186.02
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5026025,
+        "lon": 127.0257327,
+        "t_s": 186.02
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025598,
+        "lon": 127.0257902,
+        "t_s": 186.02
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025724,
+        "lon": 127.0257594,
+        "t_s": 186.186
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025716,
+        "lon": 127.0257318,
+        "t_s": 186.186
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025603,
+        "lon": 127.0257473,
+        "t_s": 186.186
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025765,
+        "lon": 127.0257577,
+        "t_s": 186.353
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025478,
+        "lon": 127.0257058,
+        "t_s": 186.353
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025983,
+        "lon": 127.0258342,
+        "t_s": 186.353
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025807,
+        "lon": 127.0257561,
+        "t_s": 186.52
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025995,
+        "lon": 127.0259161,
+        "t_s": 186.52
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025534,
+        "lon": 127.0257262,
+        "t_s": 186.52
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025849,
+        "lon": 127.0257544,
+        "t_s": 186.687
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5026449,
+        "lon": 127.0258141,
+        "t_s": 186.687
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5027078,
+        "lon": 127.0257961,
+        "t_s": 186.687
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5025891,
+        "lon": 127.0257528,
+        "t_s": 186.854
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.5026177,
+        "lon": 127.0257056,
+        "t_s": 186.854
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "crack",
+        "confidence": 0.8,
+        "lat": 37.502528,
+        "lon": 127.0259367,
+        "t_s": 186.854
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040503,
+        "lon": 127.0251772,
+        "t_s": 245.079
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040821,
+        "lon": 127.0253356,
+        "t_s": 245.079
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040999,
+        "lon": 127.0251302,
+        "t_s": 245.079
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040544,
+        "lon": 127.0251755,
+        "t_s": 245.245
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.503966,
+        "lon": 127.0252342,
+        "t_s": 245.245
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5039814,
+        "lon": 127.0251988,
+        "t_s": 245.245
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040586,
+        "lon": 127.0251739,
+        "t_s": 245.412
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041171,
+        "lon": 127.0251888,
+        "t_s": 245.412
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040071,
+        "lon": 127.0250897,
+        "t_s": 245.412
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040628,
+        "lon": 127.0251722,
+        "t_s": 245.579
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041071,
+        "lon": 127.0252767,
+        "t_s": 245.579
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5039822,
+        "lon": 127.0251318,
+        "t_s": 245.579
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.504067,
+        "lon": 127.0251706,
+        "t_s": 245.746
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5042026,
+        "lon": 127.0252687,
+        "t_s": 245.746
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041375,
+        "lon": 127.0251359,
+        "t_s": 245.746
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040712,
+        "lon": 127.0251689,
+        "t_s": 245.913
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041716,
+        "lon": 127.0251892,
+        "t_s": 245.913
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5039809,
+        "lon": 127.0252216,
+        "t_s": 245.913
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040754,
+        "lon": 127.0251673,
+        "t_s": 246.08
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041233,
+        "lon": 127.0251753,
+        "t_s": 246.08
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040804,
+        "lon": 127.0252338,
+        "t_s": 246.08
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040796,
+        "lon": 127.0251656,
+        "t_s": 246.246
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040938,
+        "lon": 127.0251229,
+        "t_s": 246.246
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.504156,
+        "lon": 127.0251519,
+        "t_s": 246.246
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040838,
+        "lon": 127.025164,
+        "t_s": 246.413
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041228,
+        "lon": 127.0252752,
+        "t_s": 246.413
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040755,
+        "lon": 127.02516,
+        "t_s": 246.413
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040879,
+        "lon": 127.0251623,
+        "t_s": 246.58
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040739,
+        "lon": 127.0251778,
+        "t_s": 246.58
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040174,
+        "lon": 127.025215,
+        "t_s": 246.58
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040921,
+        "lon": 127.0251607,
+        "t_s": 246.747
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041281,
+        "lon": 127.0251578,
+        "t_s": 246.747
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041793,
+        "lon": 127.0251741,
+        "t_s": 246.747
+      },
+      {
+        "vehicle": "bb-01",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040963,
+        "lon": 127.025159,
+        "t_s": 246.914
+      },
+      {
+        "vehicle": "bb-02",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5041526,
+        "lon": 127.0251755,
+        "t_s": 246.914
+      },
+      {
+        "vehicle": "bb-03",
+        "type": "pothole",
+        "confidence": 0.8,
+        "lat": 37.5040822,
+        "lon": 127.0251381,
+        "t_s": 246.914
+      }
+    ]
+  },
+  "dedup_ratio": 0.95
+}

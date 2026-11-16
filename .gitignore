@@ -21,3 +21,6 @@ runs/
 .omc/
 .env
 .DS_Store
+
+# 서버가 받은 사진·로그 (server/config.py SNAPSHOT_DIR, scripts/demo.sh)
+/server_data/

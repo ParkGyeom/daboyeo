@@ -1,0 +1,2 @@
+video_id,n_anchors,n_holdout,mean_m,median_m,max_m,max_at,route_m,n_moving,mean_moving_m
+gn_a,12,10,30.3,22.5,82.0,22:33.5 출발,570,5,25.7

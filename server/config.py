@@ -27,8 +27,6 @@ def get(name: str, default: str) -> str:
     return os.environ.get(name, _DOTENV.get(name, default))
 
 
-# server/sql/001_init.sql 이 만드는 daboyeo DB 와 테이블 이름(users, defects 등)이 겹쳐서,
-# 이 서버는 contracts 형식으로 옮기기 전까지 같은 DB 서버의 daboyeo_legacy DB 를 따로 쓴다 (없으면 만든다)
-DATABASE_URL = get("DATABASE_URL", "postgresql://daboyeo:daboyeo@localhost:5432/daboyeo_legacy")
+DATABASE_URL = get("DATABASE_URL", "postgresql://daboyeo:daboyeo@localhost:5432/daboyeo")
 SNAPSHOT_DIR = ROOT / get("SNAPSHOT_DIR", "server_data/snapshots")
 MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024

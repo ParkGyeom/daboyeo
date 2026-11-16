@@ -1,0 +1,5 @@
+# 프로젝트 폴더에서 streamlit run ui/app.py 할 때 읽힌다.
+[server]
+# ui/static/ 을 /app/static/ 으로 내준다. 네이버 지도 페이지(ui/static/naver_map.html)를
+# localhost:8501 주소로 띄워야 네이버가 등록한 Web 서비스 URL 로 인식한다.
+enableStaticServing = true

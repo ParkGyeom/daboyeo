@@ -1,4 +1,7 @@
-"""화면이 쓰는 서버 API 호출. 화면은 DB에 직접 접근하지 않는다 (docs/DESIGN.md 1장)."""
+"""화면이 쓰는 서버 API(/api/v1) 호출. 화면은 DB에 직접 접근하지 않는다.
+
+서버가 주는 값은 001_init.sql 의 영어 이름(unreported, urgent, …)이고, 한국어 표시는 여기서 붙인다.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +12,12 @@ import httpx
 import streamlit as st
 
 SERVER = os.environ.get("SERVER_URL", "http://localhost:8000")
-TYPE_KO = {"pothole": "포트홀", "crack": "균열", "lane_wear": "차선 마모"}
-USERS = {1: "시민 A (bb-01)", 2: "시민 B (bb-02)", 3: "시민 C (bb-03)"}
+API = SERVER + "/api/v1"
+
+TYPE_KO = {"pothole": "포트홀", "crack": "균열", "lane_wear": "차선 마모",
+           "guardrail_damage": "가드레일", "sign_damage": "표지판"}
+RISK_KO = {"urgent": "빠른 보수", "routine": "정기 보수"}
+STATUS_KO = {"unreported": "미신고", "reported": "신고됨", "under_repair": "보수 중"}
 
 
 class ApiError(Exception):
@@ -21,7 +28,7 @@ class ApiError(Exception):
 
 def _call(method: str, path: str, **kw):
     try:
-        r = httpx.request(method, SERVER + path, timeout=10, **kw)
+        r = httpx.request(method, API + path, timeout=10, **kw)
     except httpx.HTTPError as e:
         raise ApiError(0, f"서버에 연결할 수 없다 ({SERVER}): {e}") from e
     if r.status_code >= 400:
@@ -33,8 +40,20 @@ def _call(method: str, path: str, **kw):
     return r.json()
 
 
-def pending(user_id: int) -> list[dict]:
-    return _call("GET", f"/api/users/{user_id}/pending")
+@st.cache_data(ttl=30, show_spinner=False)
+def users() -> dict[str, str]:
+    """시민 id → '시민 A (bb-01)'."""
+    return {u["id"]: f"{u['name']} ({u['vehicle_label']})" for u in _call("GET", "/users")}
+
+
+def pick_user(key: str = "user_id") -> str:
+    """시민 선택 상자. 서버에 닿지 않으면 화면을 멈춘다."""
+    try:
+        us = users()
+    except ApiError as e:
+        st.error(e.detail)
+        st.stop()
+    return st.selectbox("시민", list(us), format_func=us.get, key=key)
 
 
 def clock(iso: str) -> str:
@@ -43,34 +62,47 @@ def clock(iso: str) -> str:
     return f"{'오전' if t.hour < 12 else '오후'} {(t.hour % 12) or 12}:{t.minute:02d}"
 
 
-def notices(user_id: int) -> list[dict]:
-    """아직 확인하지 않은 주행 종료 알림. 최근 것부터."""
-    return _call("GET", f"/api/users/{user_id}/notices")
+def findings(user_id: str) -> list[dict]:
+    return _call("GET", f"/users/{user_id}/findings")
 
 
-def notices_seen(user_id: int) -> dict:
-    return _call("POST", f"/api/users/{user_id}/notices/seen")
+def notices(user_id: str) -> list[dict]:
+    """끝난 주행 중 아직 답하지 않은 항목이 남은 것. 최근 것부터."""
+    return _call("GET", f"/users/{user_id}/notices")
 
 
-def report(defect_id: int, user_id: int) -> dict:
-    return _call("POST", f"/api/defects/{defect_id}/report", json={"user_id": user_id})
+def report(defect_id: str, user_id: str) -> dict:
+    return _call("POST", f"/defects/{defect_id}/report", json={"user_id": user_id})
 
 
-def skip(defect_id: int, user_id: int) -> dict:
-    return _call("POST", f"/api/defects/{defect_id}/skip", json={"user_id": user_id})
+def skip(defect_id: str, user_id: str) -> dict:
+    return _call("POST", f"/defects/{defect_id}/skip", json={"user_id": user_id})
 
 
-def get_report(report_id: int) -> dict:
-    return _call("GET", f"/api/reports/{report_id}")
+def get_report(report_id: str) -> dict:
+    return _call("GET", f"/reports/{report_id}")
+
+
+def user_reports(user_id: str) -> list[dict]:
+    return _call("GET", f"/users/{user_id}/reports")
 
 
 def defects(type: str | None = None, status: str | None = None) -> list[dict]:
     params = {k: v for k, v in {"type": type, "status": status}.items() if v}
-    return _call("GET", "/api/defects", params=params)
+    return _call("GET", "/defects", params=params)
 
 
-def set_status(defect_id: int, status: str) -> dict:
-    return _call("PATCH", f"/api/defects/{defect_id}/status", json={"status": status})
+def set_status(defect_id: str, status: str) -> dict:
+    return _call("PATCH", f"/defects/{defect_id}/status", json={"status": status})
+
+
+def reward(user_id: str) -> dict:
+    return _call("GET", f"/users/{user_id}/reward")
+
+
+def short(uuid_str: str) -> str:
+    """화면에 보일 짧은 번호 (UUID 앞 8자리)."""
+    return str(uuid_str)[:8]
 
 
 def snapshot_url(name: str | None) -> str | None:
@@ -93,7 +125,3 @@ def snapshot_bytes(name: str | None) -> bytes | None:
         return _fetch_snapshot(name)
     except httpx.HTTPError:
         return None
-
-
-def reward(user_id: int) -> dict:
-    return _call("GET", f"/api/users/{user_id}/reward")

@@ -1,0 +1,112 @@
+<!doctype html>
+<!--
+  관리자 지도(네이버 지도). ui/naver_map.py 가 iframe 으로 띄운다.
+  Streamlit 정적 파일(/app/static/)로 localhost:8501 주소에서 열려야 네이버 인증(Web 서비스 URL)이 통과한다.
+    ?key=<NAVER_MAP_KEY_ID>   네이버 클라우드 플랫폼 Maps Client ID
+    #<base64(JSON)>           결함 목록. 바뀌면 지도를 다시 만들지 않고 점만 다시 찍는다(확대·위치 유지)
+-->
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  #map { width: 100%; height: 100%; }  /* 네이버 지도가 position 을 relative 로 바꾸므로 inset 이 아니라 크기로 준다 */
+  #err { display: none; position: absolute; inset: 0; z-index: 10; padding: 16px; background: #fff;
+         color: #b00020; font-size: 14px; }
+  .pin { width: 16px; height: 16px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); box-sizing: border-box; }
+  .pin.c { border-radius: 50%; }
+  .tri { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent;
+         border-bottom-width: 16px; border-bottom-style: solid; filter: drop-shadow(0 0 1px rgba(0,0,0,.7)); }
+  .iw { padding: 10px 12px; font-size: 13px; line-height: 1.5; width: 220px; }
+  .iw img { width: 100%; border-radius: 4px; margin-bottom: 6px; display: block; }
+  .iw b { font-size: 14px; }
+  .legend { position: absolute; left: 10px; bottom: 26px; z-index: 5; background: rgba(255,255,255,.92);
+            padding: 6px 10px; border-radius: 6px; font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 8px; vertical-align: -1px; }
+</style></head>
+<body>
+<div id="err"></div>
+<div id="map"></div>
+<div class="legend"><span style="background:#d62728;margin-left:0"></span>빠른 보수<span style="background:#f2a900"></span>정기 보수
+  &nbsp;·&nbsp; ● 미신고 ■ 신고됨 ▲ 보수 중</div>
+<script>
+  function fail(msg) {
+    var e = document.getElementById('err');
+    e.style.display = 'block';
+    e.textContent = msg;
+  }
+  window.navermap_authFailure = function () {
+    fail('네이버 지도 인증 실패: .env 의 NAVER_MAP_KEY_ID(Client ID)와 콘솔의 Web 서비스 URL(http://localhost:8501), Dynamic Map 선택을 확인하세요.');
+  };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+    });
+  }
+  function readData() {
+    var h = location.hash.slice(1);
+    if (!h) return [];
+    var bin = atob(h.replace(/-/g, '+').replace(/_/g, '/'));
+    var bytes = Uint8Array.from(bin, function (c) { return c.charCodeAt(0); });
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+  function pinHtml(d) {
+    if (d.status === '보수 중') return '<div class="tri" style="border-bottom-color:' + esc(d.color) + '"></div>';
+    return '<div class="pin' + (d.status === '미신고' ? ' c' : '') + '" style="background:' + esc(d.color) + '"></div>';
+  }
+  function infoHtml(d) {
+    return '<div class="iw">' + (d.photo ? '<img src="' + esc(d.photo) + '">' : '') +
+      '<b>#' + d.id + ' ' + esc(d.type) + '</b><br>' +
+      esc(d.severity) + ' · <b>' + esc(d.status) + '</b><br>' +
+      esc(d.jurisdiction) + '<br>' +
+      '관측 ' + d.obs + '건 · 차량 ' + d.vehicles + '대 · 신뢰도 ' + Number(d.conf).toFixed(2) + '</div>';
+  }
+
+  var map = null, markers = [], openId = null, iw = null, fitted = false;
+
+  function draw() {
+    var data = readData();
+    markers.forEach(function (m) { m.setMap(null); });
+    markers = [];
+    if (!data.length) { if (iw) iw.close(); return; }
+    var pts = data.map(function (d) { return new naver.maps.LatLng(d.lat, d.lon); });
+    if (!map) {
+      map = new naver.maps.Map('map', { center: pts[0], zoom: 16, scaleControl: true });
+      iw = new naver.maps.InfoWindow({ content: '', borderWidth: 1, borderColor: '#ccc' });
+    }
+    var reopen = null;
+    data.forEach(function (d, i) {
+      var marker = new naver.maps.Marker({
+        position: pts[i], map: map, title: '#' + d.id,
+        icon: { content: pinHtml(d), anchor: new naver.maps.Point(8, 8) }
+      });
+      naver.maps.Event.addListener(marker, 'click', function () {
+        if (iw.getMap() && openId === d.id) { iw.close(); openId = null; return; }
+        iw.setContent(infoHtml(d));
+        iw.open(map, marker);
+        openId = d.id;
+      });
+      if (d.id === openId) reopen = { d: d, marker: marker };
+      markers.push(marker);
+    });
+    // 열려 있던 말풍선은 새 내용(바뀐 상태 등)으로 다시 연다
+    if (reopen) { iw.setContent(infoHtml(reopen.d)); iw.open(map, reopen.marker); }
+    else if (iw.getMap()) { iw.close(); openId = null; }
+    // 처음 한 번만 결함 전체가 보이게 맞춘다. 그 뒤로는 보고 있던 확대·위치를 유지한다
+    if (!fitted) {
+      if (pts.length > 1) map.fitBounds(pts, { top: 40, right: 40, bottom: 60, left: 40, maxZoom: 17 });
+      else map.setCenter(pts[0]);
+      fitted = true;
+    }
+  }
+
+  var key = new URLSearchParams(location.search).get('key');
+  if (!key) {
+    fail('NAVER_MAP_KEY_ID 가 없습니다.');
+  } else {
+    var s = document.createElement('script');
+    s.src = 'https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=' + encodeURIComponent(key);
+    s.onload = function () { if (window.naver && naver.maps) { draw(); window.addEventListener('hashchange', draw); } };
+    s.onerror = function () { fail('네이버 지도 스크립트를 불러오지 못했습니다(인터넷 연결 확인).'); };
+    document.head.appendChild(s);
+  }
+</script>
+</body></html>

@@ -9,7 +9,7 @@ import api
 st.markdown("<style>.block-container{max-width:430px;padding-top:2rem}</style>", unsafe_allow_html=True)
 st.title("포상 현황")
 
-user_id = st.selectbox("시민", list(api.USERS), format_func=api.USERS.get, key="user_id")
+user_id = api.pick_user()
 try:
     r = api.reward(user_id)
 except api.ApiError as e:

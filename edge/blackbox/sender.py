@@ -1,12 +1,18 @@
-"""탐지 결과를 서버로 보내고 전송 용량을 센다 (docs/DESIGN.md 3장, 5장)."""
+"""관측을 서버로 보내고 전송 용량을 센다 (계획 1.2·1.3).
+
+주행 하나 = 서버의 trip 하나. start_trip → send(ObservationIn, 사진) … → end_trip 순서로 부른다.
+dry_run 이면 보내지 않고 용량만 센다 (주행·차량 id 는 임의로 만든다).
+"""
 
 from __future__ import annotations
 
-import json
+import uuid
+from datetime import datetime
 
 import cv2
 import httpx
 import numpy as np
+from daboyeo_contracts import ObservationIn
 
 SNAPSHOT_MAX_SIDE = 640
 SNAPSHOT_QUALITY = 80
@@ -29,26 +35,41 @@ def crop_snapshot(image: np.ndarray, bbox: tuple[int, int, int, int], margin: fl
 
 
 class Sender:
-    """dry_run 이면 보내지 않고 용량만 센다."""
-
     def __init__(self, server: str, dry_run: bool = False, timeout: float = 10.0):
         self.dry_run = dry_run
         self.client = None if dry_run else httpx.Client(base_url=server, timeout=timeout)
+        self.trip_id: uuid.UUID | None = None
+        self.vehicle_id: uuid.UUID | None = None
         self.sent = 0
         self.failed = 0
         self.bytes_sent = 0
 
-    def send(self, event: dict, snapshot: bytes) -> dict | None:
-        body = json.dumps(event, ensure_ascii=False)
-        size = len(body.encode("utf-8")) + len(snapshot)
+    def start_trip(self, vehicle_label: str, started_at: datetime) -> bool:
+        """주행을 연다. 서버에 닿지 않거나 없는 차량이면 False (그러면 관측을 보내지 않는다)."""
+        if self.dry_run:
+            self.trip_id, self.vehicle_id = uuid.uuid4(), uuid.uuid4()
+            return True
+        try:
+            r = self.client.post("/api/v1/trips",
+                                 json={"vehicle_label": vehicle_label, "started_at": started_at.isoformat()})
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            print(f"  주행 시작 실패: {e}")
+            return False
+        data = r.json()
+        self.trip_id, self.vehicle_id = uuid.UUID(data["trip_id"]), uuid.UUID(data["vehicle_id"])
+        return True
+
+    def send(self, obs: ObservationIn, snapshot: bytes | None) -> dict | None:
+        meta = obs.model_dump_json()
+        size = len(meta.encode("utf-8")) + (len(snapshot) if snapshot else 0)
         if self.dry_run:
             self.sent += 1
             self.bytes_sent += size
             return None
+        files = {"snapshot": ("snapshot.jpg", snapshot, "image/jpeg")} if snapshot else None
         try:
-            r = self.client.post(
-                "/api/detections", data={"event": body}, files={"snapshot": ("snapshot.jpg", snapshot, "image/jpeg")}
-            )
+            r = self.client.post("/api/v1/observations", data={"meta": meta}, files=files)
             r.raise_for_status()
         except httpx.HTTPError as e:
             # 서버가 잠깐 멈춰도 주행(재생)은 계속한다
@@ -59,12 +80,12 @@ class Sender:
         self.bytes_sent += size
         return r.json()
 
-    def end_drive(self, device_id: str, started_at) -> dict | None:
-        """주행이 끝났다고 서버에 알린다. 시민 화면에 "주행이 끝났어요" 알림이 뜬다. 실패해도 주행 결과는 그대로 둔다."""
-        if self.dry_run:
+    def end_trip(self) -> dict | None:
+        """주행을 닫는다. 시민 화면에 '주행이 끝났어요' 알림과 확인 목록이 생긴다. 실패해도 주행 결과는 그대로 둔다."""
+        if self.dry_run or self.trip_id is None:
             return None
         try:
-            r = self.client.post("/api/drives", json={"device_id": device_id, "started_at": started_at.isoformat()})
+            r = self.client.post(f"/api/v1/trips/{self.trip_id}/end")
             r.raise_for_status()
         except httpx.HTTPError as e:
             print(f"  주행 종료 알림 실패: {e}")

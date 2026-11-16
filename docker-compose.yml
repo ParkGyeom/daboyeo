@@ -1,4 +1,6 @@
 # 로컬 개발·시연용. 서버·UI 서비스는 구현되면 여기에 추가한다.
+# 프로젝트 이름을 고정해 어느 폴더(작업 폴더 포함)에서 띄워도 같은 DB 컨테이너·볼륨(daboyeo_pgdata)을 쓴다.
+name: daboyeo
 services:
   db:
     image: postgis/postgis:16-3.4

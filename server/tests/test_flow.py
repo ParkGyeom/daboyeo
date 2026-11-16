@@ -1,87 +1,137 @@
-"""노출 조건, 신고, 중복 신고 거절, 상태 전환, 포상 현황 (B3 완료 기준). DB가 필요하다."""
+"""주행 후 확인 목록, 노출 기준, 신고·중복 신고 거절, 넘기기, 상태 전환, 포상 (PRD F5~F8). DB가 필요하다."""
 
-from server.tests.conftest import event, needs_db, north, post
+from concurrent.futures import ThreadPoolExecutor
+
+from server.tests.conftest import USER, end, needs_db, north, observe, start
 
 pytestmark = needs_db
+A, B, C = USER["bb-01"], USER["bb-02"], USER["bb-03"]
+LAT = 37.4979
 
-A, B, C = 1, 2, 3  # 시연용 시민 (bb-01, bb-02, bb-03)
 
-
-def _pending(client, uid):
-    r = client.get(f"/api/users/{uid}/pending")
-    assert r.status_code == 200
+def _findings(client, uid):
+    r = client.get(f"/api/v1/users/{uid}/findings")
+    assert r.status_code == 200, r.text
     return [d["id"] for d in r.json()]
 
 
-def test_low_confidence_single_device_hidden(client):
-    low = post(client, event(confidence=0.4)).json()["defect_id"]
-    high = post(client, event(lat=north(37.55, 100), confidence=0.8)).json()["defect_id"]
-    assert _pending(client, A) == [high]
-    # 다른 기기가 같은 결함을 보면 신뢰도가 낮아도 보인다
-    post(client, event(confidence=0.4, device="bb-02"))
-    assert set(_pending(client, A)) == {low, high}
-    assert _pending(client, B) == [low]      # B의 기기는 low 만 봤다
-    assert _pending(client, C) == []         # C의 기기는 아무것도 못 봤다
+def _notices(client, uid):
+    return client.get(f"/api/v1/users/{uid}/notices").json()
+
+
+def test_nothing_until_trip_ends(client):
+    t = start(client)
+    observe(client, t)
+    assert _findings(client, A) == [] and _notices(client, A) == []
+    assert end(client, t)["finding_count"] == 1
+    assert len(_findings(client, A)) == 1
+    (n,) = _notices(client, A)
+    assert n["trip_id"] == t["trip_id"] and n["pending_count"] == 1 and n["vehicle_label"] == "bb-01"
+    assert _findings(client, B) == []  # 다른 시민에게는 없다
+
+
+def test_low_confidence_single_vehicle_hidden_until_second_vehicle(client):
+    ta, tb = start(client, "bb-01"), start(client, "bb-02")
+    low = observe(client, ta, confidence=0.4)["defect_id"]
+    high = observe(client, ta, lat=north(LAT, 100), confidence=0.8)["defect_id"]
+    end(client, ta)
+    assert _findings(client, A) == [high]
+    # 다른 차량이 같은 결함을 보면 신뢰도가 낮아도 보인다 (A 의 끝난 주행도 다시 훑는다)
+    observe(client, tb, confidence=0.4)
+    end(client, tb)
+    assert set(_findings(client, A)) == {low, high}
+    assert _findings(client, B) == [low]
+    assert _findings(client, C) == []
 
 
 def test_report_then_second_report_rejected(client):
-    did = post(client, event()).json()["defect_id"]
-    post(client, event(device="bb-02"))
-    r = client.post(f"/api/defects/{did}/report", json={"user_id": A})
-    assert r.status_code == 200
+    ta, tb = start(client, "bb-01"), start(client, "bb-02")
+    did = observe(client, ta)["defect_id"]
+    observe(client, tb)
+    end(client, ta), end(client, tb)
+    r = client.post(f"/api/v1/defects/{did}/report", json={"user_id": A})
+    assert r.status_code == 200, r.text
     rep = r.json()
-    assert rep["status"] == "신고됨" and rep["body"]["submission"] == "제출됨(모의)"
-    assert rep["body"]["reporter"] == "시민 A" and rep["body"]["device_count"] == 2
+    assert rep["status"] == "reported"
+    assert rep["payload"]["reporter"] == "시민 A" and rep["payload"]["vehicle_count"] == 2
+    assert rep["payload"]["location"]["jurisdiction"] == "서울특별시"
 
-    r2 = client.post(f"/api/defects/{did}/report", json={"user_id": B})
+    r2 = client.post(f"/api/v1/defects/{did}/report", json={"user_id": B})
     assert r2.status_code == 409 and r2.json()["detail"] == "이미 신고됨"
-    # 신고된 결함은 다른 시민의 목록에서 사라진다
-    assert did not in _pending(client, B)
-    # 신고서 조회
-    got = client.get(f"/api/reports/{rep['report_id']}").json()
-    assert got["defect_id"] == did and got["body"]["defect_type"] == "pothole"
-    # 지도 대시보드에서 신고됨으로 보인다
-    assert client.get("/api/defects", params={"status": "신고됨"}).json()[0]["id"] == did
+    # 신고된 결함은 다른 시민의 목록과 알림에서도 사라진다
+    assert did not in _findings(client, B) and _notices(client, B) == []
+    got = client.get(f"/api/v1/reports/{rep['report_id']}").json()
+    assert got["defect_id"] == did and got["submission_status"] == "mock_submitted" and got["quarter"].startswith("20")
+    assert client.get("/api/v1/defects", params={"status": "reported"}).json()[0]["id"] == did
+    assert [x["id"] for x in client.get(f"/api/v1/users/{A}/reports").json()] == [rep["report_id"]]
+
+
+def test_concurrent_reports_make_one(client):
+    trips = [start(client, label) for label in ("bb-01", "bb-02", "bb-03")]
+    did = [observe(client, t) for t in trips][0]["defect_id"]
+    for t in trips:
+        end(client, t)
+    users = [A, B, C] * 7
+    with ThreadPoolExecutor(8) as ex:
+        codes = list(ex.map(lambda u: client.post(f"/api/v1/defects/{did}/report", json={"user_id": u}).status_code,
+                            users[:20]))
+    assert codes.count(200) == 1 and codes.count(409) == 19
 
 
 def test_cannot_report_defect_not_observed(client):
-    did = post(client, event(device="bb-01")).json()["defect_id"]
-    assert client.post(f"/api/defects/{did}/report", json={"user_id": C}).status_code == 403
-    assert client.post("/api/defects/9999/report", json={"user_id": A}).status_code == 404
+    t = start(client, "bb-01")
+    did = observe(client, t)["defect_id"]
+    assert client.post(f"/api/v1/defects/{did}/report", json={"user_id": C}).status_code == 403
+    missing = "00000000-0000-0000-0000-000000000000"
+    assert client.post(f"/api/v1/defects/{missing}/report", json={"user_id": A}).status_code == 404
 
 
-def test_skip_hides_only_for_that_user(client):
-    did = post(client, event()).json()["defect_id"]
-    post(client, event(device="bb-02"))
-    assert client.post(f"/api/defects/{did}/skip", json={"user_id": A}).status_code == 200
-    assert did not in _pending(client, A)
-    assert did in _pending(client, B)
+def test_skip_hides_only_for_that_user_and_is_not_asked_again(client):
+    ta, tb = start(client, "bb-01"), start(client, "bb-02")
+    did = observe(client, ta)["defect_id"]
+    observe(client, tb)
+    end(client, ta), end(client, tb)
+    assert client.post(f"/api/v1/defects/{did}/skip", json={"user_id": A}).status_code == 200
+    assert did not in _findings(client, A)
+    assert did in _findings(client, B)
+    # 새 주행에서 또 봐도 다시 묻지 않는다
+    t2 = start(client, "bb-01")
+    observe(client, t2)
+    end(client, t2)
+    assert did not in _findings(client, A)
+    # 목록에 없는 결함은 넘길 수 없다
+    assert client.post(f"/api/v1/defects/{did}/skip", json={"user_id": C}).status_code == 404
 
 
 def test_status_transitions(client):
-    did = post(client, event()).json()["defect_id"]
-    url = f"/api/defects/{did}/status"
-    assert client.patch(url, json={"status": "보수 중"}).status_code == 409   # 미신고 -> 보수 중 불가
-    client.post(f"/api/defects/{did}/report", json={"user_id": A})
-    assert client.patch(url, json={"status": "보수 중"}).status_code == 200
-    assert client.patch(url, json={"status": "미신고"}).status_code == 409
-    assert client.patch(url, json={"status": "엉뚱함"}).status_code == 422
+    t = start(client)
+    did = observe(client, t)["defect_id"]
+    end(client, t)
+    patch = lambda s: client.patch(f"/api/v1/defects/{did}/status", json={"status": s}).status_code  # noqa: E731
+    assert patch("under_repair") == 409            # 미신고 → 보수 중 은 안 된다
+    assert patch("nonsense") == 422
+    client.post(f"/api/v1/defects/{did}/report", json={"user_id": A})
+    assert patch("under_repair") == 200
+    assert patch("reported") == 409
 
 
 def test_reward_counts_only_eligible_reports(client):
-    seoul = post(client, event(lat=37.5154, lon=126.9521)).json()["defect_id"]
-    outside = post(client, event(lat=36.7850, lon=127.1736)).json()["defect_id"]
-    client.post(f"/api/defects/{seoul}/report", json={"user_id": A})
-    client.post(f"/api/defects/{outside}/report", json={"user_id": A})
-    r = client.get(f"/api/users/{A}/reward").json()
-    assert (r["count"], r["target"], r["remaining"]) == (1, 5, 4)
+    t = start(client)
+    seoul = observe(client, t)["defect_id"]
+    outside = observe(client, t, type="crack", lat=36.78, lon=127.17)["defect_id"]
+    end(client, t)
+    for did in (seoul, outside):
+        assert client.post(f"/api/v1/defects/{did}/report", json={"user_id": A}).status_code == 200
+    r = client.get(f"/api/v1/users/{A}/reward").json()
+    assert (r["count"], r["remaining"]) == (1, 4)
 
 
-def test_stats(client):
-    post(client, event(device="bb-01"))
-    post(client, event(device="bb-02"))
-    post(client, event(device="bb-02", lat=north(37.55, 200)))
-    s = client.get("/api/stats").json()
-    assert s["total_observations"] == 3
-    assert [(d["device_id"], d["observations"]) for d in s["devices"]] == [("bb-01", 1), ("bb-02", 2)]
-    assert s["total_bytes"] > 0
+def test_list_filters_and_jurisdiction(client):
+    t = start(client)
+    observe(client, t)
+    observe(client, t, type="crack", lat=36.78, lon=127.17)
+    rows = client.get("/api/v1/defects").json()
+    assert {d["jurisdiction"] for d in rows} == {"서울특별시", "서울 밖 (관할 미확정)"}
+    assert all(d["snapshot_path"] for d in rows)
+    assert [d["defect_type"] for d in client.get("/api/v1/defects", params={"type": "crack"}).json()] == ["crack"]
+    assert client.get("/api/v1/defects", params={"type": "x"}).status_code == 422

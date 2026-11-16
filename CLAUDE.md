@@ -22,6 +22,13 @@ uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive  
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --detect-every 10 --speed 4
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --devices 3
 scripts/demo.sh drive ai/models/detector_v3.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+# 탐지기 고르기 --detector onnx|fake|replay (edge/blackbox/detectors.py). fake: 정답 라벨 CSV(docs/ai-handoff.md 12장)를
+# 탐지처럼 낸다. 라벨 1개 = 관측 1건, 시설물 라벨은 화면에만 (SENT_TYPES). --labels 를 빼면 experiments/gt_events/<영상 이름>.csv
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --detector fake --labels experiments/gt_events/v1.csv --detect-every 5 --speed 0
+# replay: onnx 로 한 번 --record 를 붙여 돌려 두면, 모델 파일·추론 없이 같은 탐지로 운전한다 (영상 이름·--detect-every 가 기록과 같아야 함)
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --model ai/models/detector_v3.onnx --detect-every 5 --speed 0 --dry-run --record data/replay/v1.jsonl
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --detector replay --record data/replay/v1.jsonl --detect-every 5 --speed 0
+scripts/demo.sh replay data/replay/v1.jsonl data/videos/v1.mp4 3 0   # 기록대로 3대 (주기는 기록에서 읽음, 마지막은 배속)
 # GPS 없는 유튜브 영상의 경로 재구성 (tools/gps/README.md): routes/<id>.gpx + anchors/<id>.csv → data/videos/<id>.gps.csv
 uv run python -m tools.gps.reconstruct gn_a                 # 클립이면 --clip-start <clip_start_in_source_s> --out data/videos/<클립>.gps.csv
 uv run python -m tools.gps.preview_map gn_a --fetch-roads   # 경로·기준점 HTML (오프라인 도로선). --fetch-roads 는 처음 한 번 (인터넷)

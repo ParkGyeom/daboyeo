@@ -9,6 +9,10 @@
   # 로드마크 구간 (프레임마다 실제 GPS)
   uv run python -m edge.blackbox.run --segment 0401_light_rainy_smooth:03000071-03000182 \\
       --model ai/models/detector_v2.onnx --speed 4
+  # 탐지기 고르기 (edge/blackbox/detectors.py): 기본 onnx. fake 는 정답 라벨 CSV, replay 는 onnx 로 남긴 기록
+  ... --detector fake --labels experiments/gt_events/v1.csv      # 1.1 걷는 골격 (라벨 1개 = 관측 1건)
+  ... --model ai/models/detector_v2.onnx --record data/replay/v1.jsonl   # onnx 로 돌리며 기록
+  ... --detector replay --record data/replay/v1.jsonl            # 추론 없이 기록대로 (모델 파일 필요 없음)
 
 품질 판별(B6): 매 프레임 탐지 전에 재고, 나쁘면 탐지를 건너뛴다 (--no-quality 로 끈다).
 탐지 신뢰도: 기본은 클래스별 기준(--conf-json, 박겸 초안). --conf 를 주면 숫자 하나로 모든 클래스에 쓴다.
@@ -33,12 +37,12 @@ from pathlib import Path
 
 import numpy as np
 
-from daboyeo_ai.inference import load_class_conf
 from daboyeo_contracts import DefectType, ObservationIn
 
 from edge.blackbox.clipper import ClipCutter
 from edge.blackbox.quality import measure
-from edge.blackbox.detect import SENT_TYPES, Detection, Detector, LaneWear
+from edge.blackbox.detect import SENT_TYPES, Detection, LaneWear
+from edge.blackbox.detectors import DETECTORS, make_detector
 from edge.blackbox.live import LIVE_DIR, LiveView
 from edge.blackbox.sender import Sender, crop_snapshot
 from edge.blackbox.source import open_source
@@ -99,7 +103,13 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--frames", default="data/roadmark/VS4", help="로드마크 프레임 폴더 (IMAGE/, GPS/ 가 들어 있다)")
     ap.add_argument("--device-id", default="bb-01")
     ap.add_argument("--server", default="http://localhost:8000")
-    ap.add_argument("--model", required=True, help="ONNX 파일")
+    ap.add_argument("--detector", choices=DETECTORS, default="onnx",
+                    help="onnx: 모델 추론, fake: 정답 라벨 CSV 를 탐지처럼, replay: --record 기록을 추론 없이")
+    ap.add_argument("--model", default=None, help="ONNX 파일 (--detector onnx 일 때)")
+    ap.add_argument("--labels", default=None,
+                    help="fake 의 정답 라벨 CSV. 없으면 experiments/gt_events/<영상 이름>.csv")
+    ap.add_argument("--record", default=None,
+                    help="탐지 기록 JSONL. onnx·fake 는 여기에 쓰고, replay 는 여기서 읽는다")
     ap.add_argument("--conf", type=float, default=None, help="탐지 신뢰도 기준 하나 (주면 --conf-json 대신 쓴다)")
     ap.add_argument("--conf-json", default="experiments/conf_thresholds.json",
                     help="클래스별 탐지 신뢰도 기준 파일 (class_conf 키)")
@@ -139,8 +149,14 @@ def drive(args: argparse.Namespace) -> dict:
         print(f"프레임이 없다: {args.video or f'{args.segment} ({args.frames})'}", file=sys.stderr)
         return {"frames": 0}
 
-    conf = args.conf if args.conf is not None else load_class_conf(args.conf_json)
-    detector = Detector(args.model, conf=conf, threads=args.threads)
+    try:
+        detector = make_detector(args)
+    except (OSError, ValueError, KeyError) as e:
+        print(e, file=sys.stderr)
+        return {"frames": 0}
+    if args.detector == "fake" and args.lane_every > 0:
+        args.lane_every = 0  # 차선 마모도 라벨에서 나온다
+    print(f"[{args.device_id}] 탐지기 {detector.name}" + (f", 기록 {args.record}" if args.record else ""))
     sender = Sender(args.server, dry_run=args.dry_run,
                     keep_dir=Path(args.keep_dir) / args.device_id if args.keep_dir else None)
     rng = random.Random(args.seed)
@@ -220,7 +236,7 @@ def drive(args: argparse.Namespace) -> dict:
                           f"[밝기 {q.brightness:.0f}, 선명도 {q.sharpness:.0f}, 대비 {q.contrast:.0f}]")
             if run_detect:
                 t0 = time.perf_counter()
-                dets = detector.detect(image)
+                dets = detector.detect(image, frame=frame.name, t=ft)
                 detect_s += time.perf_counter() - t0
                 detected_frames += 1
                 if live:

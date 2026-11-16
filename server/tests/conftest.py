@@ -57,6 +57,7 @@ def client(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     monkeypatch.setattr(config, "SNAPSHOT_DIR", tmp_path)
+    monkeypatch.setattr(config, "CLIP_DIR", tmp_path)
     from server import geocode
 
     monkeypatch.setattr(geocode, "keys", lambda: None)  # 테스트는 네이버를 부르지 않는다 (.env 에 키가 있어도)
@@ -88,12 +89,14 @@ def meta(trip, lat=37.4979, lon=127.0276, type="pothole", confidence=0.8, t_s=1.
     return m
 
 
-def post(client, m: dict, photo: bytes | None = b"default"):
+def post(client, m: dict, photo: bytes | None = b"default", clip: bytes | None = None):
     import json
 
     if photo == b"default":
         photo = snapshot_jpeg(m["defect_type"], m["confidence"])
-    files = {"snapshot": ("s.jpg", photo, "image/jpeg")} if photo is not None else None
+    files = {"snapshot": ("s.jpg", photo, "image/jpeg")} if photo is not None else {}
+    if clip is not None:
+        files["clip"] = ("c.mp4", clip, "video/mp4")
     return client.post("/api/v1/observations", data={"meta": json.dumps(m)}, files=files)
 
 

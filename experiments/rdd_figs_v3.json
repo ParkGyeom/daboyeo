@@ -1,0 +1,115 @@
+{
+ "model": "detector_v3.onnx",
+ "date": "2026-11-16",
+ "source": "RDD2022 test split (rdd2022.zip, 3526 images, 학습에 안 씀)",
+ "iou": 0.5,
+ "class_conf": {
+  "pothole": 0.31,
+  "crack": 0.42
+ },
+ "pr_at_class_conf": {
+  "pothole": {
+   "conf": 0.31,
+   "tp": 196,
+   "fp": 87,
+   "n_gt": 638,
+   "P": 0.693,
+   "R": 0.307
+  },
+  "crack": {
+   "conf": 0.42,
+   "tp": 1603,
+   "fp": 390,
+   "n_gt": 4239,
+   "P": 0.804,
+   "R": 0.378
+  }
+ },
+ "pothole_by_country": {
+  "China_MotorBike": {
+   "conf": 0.31,
+   "tp": 13,
+   "fp": 1,
+   "n_gt": 14,
+   "P": 0.929,
+   "R": 0.929
+  },
+  "Czech": {
+   "conf": 0.31,
+   "tp": 4,
+   "fp": 3,
+   "n_gt": 24,
+   "P": 0.571,
+   "R": 0.167
+  },
+  "India": {
+   "conf": 0.31,
+   "tp": 85,
+   "fp": 47,
+   "n_gt": 306,
+   "P": 0.644,
+   "R": 0.278
+  },
+  "Japan": {
+   "conf": 0.31,
+   "tp": 92,
+   "fp": 34,
+   "n_gt": 248,
+   "P": 0.73,
+   "R": 0.371
+  },
+  "Norway": {
+   "conf": 0.31,
+   "tp": 1,
+   "fp": 1,
+   "n_gt": 32,
+   "P": 0.5,
+   "R": 0.031
+  },
+  "United_States": {
+   "conf": 0.31,
+   "tp": 1,
+   "fp": 1,
+   "n_gt": 14,
+   "P": 0.5,
+   "R": 0.071
+  }
+ },
+ "pothole_image_outcomes": {
+  "hit": 86,
+  "false": 53,
+  "miss": 158,
+  "partial": 71
+ },
+ "mAP50_rdd_test (card eval_by_source)": {
+  "pothole": 0.425,
+  "crack": 0.582
+ },
+ "slides": [
+  {
+   "file": "s1_hit_Czech_001437",
+   "kind": "hit"
+  },
+  {
+   "file": "s2_hit_Japan_007378",
+   "kind": "hit"
+  },
+  {
+   "file": "s3_hit_Japan_006427",
+   "kind": "hit (pothole+crack)"
+  },
+  {
+   "file": "s4_hit_India_000781",
+   "kind": "hit"
+  },
+  {
+   "file": "s5_miss_Czech_000270",
+   "kind": "miss"
+  },
+  {
+   "file": "s6_false_India_009182",
+   "kind": "false"
+  }
+ ],
+ "license": "figshare 기록 CC BY 4.0, GitHub README CC BY-SA 4.0 (불일치 → 더 엄격한 CC BY-SA 4.0 조건으로 표기). United_States 는 Google 스트리트뷰 워터마크 → 발표에 쓰지 않음"
+}

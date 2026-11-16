@@ -28,6 +28,7 @@ from server import config, db, dedup, findings, geocode, notify, report, rules
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config.SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    config.CLIP_DIR.mkdir(parents=True, exist_ok=True)
     db.init_db()
     yield
 
@@ -35,6 +36,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="다보여 서버", lifespan=lifespan)
 config.SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/snapshots", StaticFiles(directory=config.SNAPSHOT_DIR), name="snapshots")
+config.CLIP_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/clips", StaticFiles(directory=config.CLIP_DIR), name="clips")
 
 API = "/api/v1"
 
@@ -134,8 +137,9 @@ def trip_findings(trip_id: UUID):
 
 
 @app.post(f"{API}/observations", status_code=201)
-def post_observation(bg: BackgroundTasks, meta: str = Form(...), snapshot: UploadFile | None = File(None)):
-    """관측 한 건 (multipart: meta = ObservationIn JSON, snapshot = 결함 주변 JPEG).
+def post_observation(bg: BackgroundTasks, meta: str = Form(...), snapshot: UploadFile | None = File(None),
+                     clip: UploadFile | None = File(None)):
+    """관측 한 건 (multipart: meta = ObservationIn JSON, snapshot = 결함 주변 JPEG, clip = 결함 구간 mp4 (선택)).
     같은 client_observation_id 를 다시 보내면 저장하지 않고 처음 결과를 duplicate=true 로 돌려준다."""
     try:
         obs = ObservationIn.model_validate_json(meta)
@@ -150,6 +154,12 @@ def post_observation(bg: BackgroundTasks, meta: str = Form(...), snapshot: Uploa
             raise HTTPException(413, "사진이 너무 크다")
         if not photo.startswith(b"\xff\xd8"):
             raise HTTPException(422, "snapshot 은 JPEG 파일이어야 한다")
+    video = clip.file.read() if clip is not None else None
+    if video is not None:
+        if len(video) > config.MAX_CLIP_BYTES:
+            raise HTTPException(413, "클립이 너무 크다")
+        if video[4:8] != b"ftyp":
+            raise HTTPException(422, "clip 은 mp4 파일이어야 한다")
 
     with db.connect() as conn:
         trip = conn.execute("SELECT vehicle_id FROM trips WHERE id = %s", (obs.trip_id,)).fetchone()
@@ -157,19 +167,26 @@ def post_observation(bg: BackgroundTasks, meta: str = Form(...), snapshot: Uploa
             raise HTTPException(404, "없는 주행 (먼저 POST /api/v1/trips)")
         if trip["vehicle_id"] != obs.vehicle_id:
             raise HTTPException(422, "vehicle_id 가 그 주행의 차량이 아니다")
-        name = path = None
+        name = path = clip_name = clip_path = None
         if photo is not None:
             name = f"{uuid.uuid4().hex}.jpg"
             path = config.SNAPSHOT_DIR / name
             path.write_bytes(photo)
+        if video is not None:
+            clip_name = f"{uuid.uuid4().hex}.mp4"
+            clip_path = config.CLIP_DIR / clip_name
+            clip_path.write_bytes(video)
+        files = [f for f in (path, clip_path) if f]
         try:
-            r = dedup.ingest(conn, obs, name, len(photo) if photo is not None else None)
+            r = dedup.ingest(conn, obs, name, len(photo) if photo is not None else None,
+                             clip_name, len(video) if video is not None else None)
         except Exception:
-            if path:
-                path.unlink(missing_ok=True)  # 저장에 실패하면 사진도 남기지 않는다
+            for f in files:
+                f.unlink(missing_ok=True)  # 저장에 실패하면 사진·클립도 남기지 않는다
             raise
-        if r.duplicate and path:
-            path.unlink(missing_ok=True)
+        if r.duplicate:
+            for f in files:
+                f.unlink(missing_ok=True)
     if r.is_new_defect:
         bg.add_task(geocode.fill_missing)  # 새 결함의 주소는 응답 뒤에 받는다. 블랙박스를 기다리게 하지 않는다
     return {"observation_id": r.observation_id, "defect_id": r.defect_id,

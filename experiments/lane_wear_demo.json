@@ -1,0 +1,3376 @@
+{
+ "setup": {
+  "lane_every_frames": 3,
+  "thresholds": [
+   0.8,
+   0.9,
+   1.0,
+   1.1,
+   1.2,
+   1.3
+  ],
+  "votes": [
+   "2/5",
+   "3/5",
+   "4/5",
+   "5/5"
+  ],
+  "bin_s": 2.0,
+  "review": "Claude 눈 분류 (확정이 든 2초 칸 단위, 칸에서 점수가 가장 낮은 프레임, real/amb/fp)"
+ },
+ "clips": {
+  "gn_a_2050-2510": {
+   "duration_s": 262.3,
+   "stats": {
+    "frames": 5242,
+    "quality_pass": 1.0,
+    "lane_found_of_pass": 0.028,
+    "judged": 128,
+    "score": {
+     "p5": -0.09,
+     "p10": -0.024,
+     "p25": 0.135,
+     "p50": 0.565,
+     "p75": 0.94,
+     "p90": 1.428,
+     "p95": 1.702
+    },
+    "contrast_p25": {
+     "p5": -0.017,
+     "p10": -0.005,
+     "p25": 0.021,
+     "p50": 0.057,
+     "p75": 0.11,
+     "p90": 0.162,
+     "p95": 0.213
+    },
+    "paint_len": {
+     "p5": 0.256,
+     "p10": 0.265,
+     "p25": 0.333,
+     "p50": 0.405,
+     "p75": 0.624,
+     "p90": 0.88,
+     "p95": 0.941
+    },
+    "frame_worn_rate": 0.805,
+    "near_threshold_rate": 0.094
+   },
+   "confirmed_base": [
+    {
+     "t": 130.48,
+     "bin": 1,
+     "label": "fp"
+    }
+   ],
+   "worn_runs_base": [
+    [
+     130.48,
+     140.04
+    ],
+    [
+     140.24,
+     142.24
+    ],
+    [
+     142.54,
+     143.39
+    ],
+    [
+     143.54,
+     144.65
+    ],
+    [
+     144.84,
+     144.84
+    ],
+    [
+     145.04,
+     145.55
+    ],
+    [
+     149.55,
+     150.05
+    ]
+   ],
+   "bin_labels": {
+    "real": 0,
+    "amb": 0,
+    "fp": 5,
+    "bins": 5
+   },
+   "sweep": [
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.23,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 0,
+     "per_min": 0.0,
+     "real": 0,
+     "amb": 0,
+     "fp": 0,
+     "unlabeled": 0,
+     "fp_rate": null
+    }
+   ]
+  },
+  "gn_b_3320-3620": {
+   "duration_s": 181.9,
+   "stats": {
+    "frames": 3640,
+    "quality_pass": 1.0,
+    "lane_found_of_pass": 0.967,
+    "judged": 3500,
+    "score": {
+     "p5": 0.276,
+     "p10": 0.468,
+     "p25": 0.867,
+     "p50": 1.503,
+     "p75": 2.231,
+     "p90": 3.029,
+     "p95": 3.706
+    },
+    "contrast_p25": {
+     "p5": 0.112,
+     "p10": 0.154,
+     "p25": 0.199,
+     "p50": 0.281,
+     "p75": 0.4,
+     "p90": 0.516,
+     "p95": 0.579
+    },
+    "paint_len": {
+     "p5": 0.472,
+     "p10": 0.639,
+     "p25": 1.039,
+     "p50": 1.528,
+     "p75": 2.122,
+     "p90": 2.687,
+     "p95": 3.056
+    },
+    "frame_worn_rate": 0.301,
+    "near_threshold_rate": 0.075
+   },
+   "confirmed_base": [
+    {
+     "t": 3.15,
+     "bin": 0,
+     "label": "fp"
+    },
+    {
+     "t": 7.3,
+     "bin": 2,
+     "label": "fp"
+    },
+    {
+     "t": 9.55,
+     "bin": 3,
+     "label": "fp"
+    },
+    {
+     "t": 13.1,
+     "bin": 5,
+     "label": "fp"
+    },
+    {
+     "t": 14.05,
+     "bin": 6,
+     "label": "fp"
+    },
+    {
+     "t": 15.6,
+     "bin": 6,
+     "label": "fp"
+    },
+    {
+     "t": 16.45,
+     "bin": 7,
+     "label": "fp"
+    },
+    {
+     "t": 17.65,
+     "bin": 7,
+     "label": "fp"
+    },
+    {
+     "t": 20.7,
+     "bin": 9,
+     "label": "fp"
+    },
+    {
+     "t": 21.35,
+     "bin": 9,
+     "label": "fp"
+    },
+    {
+     "t": 23.1,
+     "bin": 10,
+     "label": "fp"
+    },
+    {
+     "t": 24.45,
+     "bin": 11,
+     "label": "fp"
+    },
+    {
+     "t": 25.75,
+     "bin": 11,
+     "label": "fp"
+    },
+    {
+     "t": 28.4,
+     "bin": 13,
+     "label": "fp"
+    },
+    {
+     "t": 31.35,
+     "bin": 14,
+     "label": "fp"
+    },
+    {
+     "t": 36.45,
+     "bin": 17,
+     "label": "fp"
+    },
+    {
+     "t": 42.45,
+     "bin": 20,
+     "label": "fp"
+    },
+    {
+     "t": 43.15,
+     "bin": 20,
+     "label": "fp"
+    },
+    {
+     "t": 43.6,
+     "bin": 20,
+     "label": "fp"
+    },
+    {
+     "t": 45.35,
+     "bin": 21,
+     "label": "fp"
+    },
+    {
+     "t": 47.95,
+     "bin": 22,
+     "label": "fp"
+    },
+    {
+     "t": 52.9,
+     "bin": 25,
+     "label": "fp"
+    },
+    {
+     "t": 55.0,
+     "bin": 26,
+     "label": "fp"
+    },
+    {
+     "t": 57.25,
+     "bin": 27,
+     "label": "fp"
+    },
+    {
+     "t": 62.15,
+     "bin": 30,
+     "label": "fp"
+    },
+    {
+     "t": 63.15,
+     "bin": 30,
+     "label": "fp"
+    },
+    {
+     "t": 63.95,
+     "bin": 30,
+     "label": "fp"
+    },
+    {
+     "t": 65.25,
+     "bin": 31,
+     "label": "fp"
+    },
+    {
+     "t": 66.7,
+     "bin": 32,
+     "label": "fp"
+    },
+    {
+     "t": 69.8,
+     "bin": 33,
+     "label": "fp"
+    },
+    {
+     "t": 73.85,
+     "bin": 35,
+     "label": "fp"
+    },
+    {
+     "t": 77.7,
+     "bin": 37,
+     "label": "fp"
+    },
+    {
+     "t": 79.25,
+     "bin": 38,
+     "label": "fp"
+    },
+    {
+     "t": 81.15,
+     "bin": 39,
+     "label": "fp"
+    },
+    {
+     "t": 82.95,
+     "bin": 40,
+     "label": "fp"
+    },
+    {
+     "t": 84.3,
+     "bin": 41,
+     "label": "fp"
+    },
+    {
+     "t": 86.2,
+     "bin": 42,
+     "label": "fp"
+    },
+    {
+     "t": 88.9,
+     "bin": 43,
+     "label": "fp"
+    },
+    {
+     "t": 90.7,
+     "bin": 44,
+     "label": "fp"
+    },
+    {
+     "t": 91.55,
+     "bin": 44,
+     "label": "fp"
+    },
+    {
+     "t": 97.5,
+     "bin": 47,
+     "label": "fp"
+    },
+    {
+     "t": 108.9,
+     "bin": 50,
+     "label": "fp"
+    },
+    {
+     "t": 110.85,
+     "bin": 51,
+     "label": "fp"
+    },
+    {
+     "t": 112.1,
+     "bin": 52,
+     "label": "fp"
+    },
+    {
+     "t": 113.7,
+     "bin": 52,
+     "label": "fp"
+    },
+    {
+     "t": 114.3,
+     "bin": 53,
+     "label": "fp"
+    },
+    {
+     "t": 115.55,
+     "bin": 53,
+     "label": "fp"
+    },
+    {
+     "t": 117.3,
+     "bin": 54,
+     "label": "fp"
+    },
+    {
+     "t": 121.55,
+     "bin": 56,
+     "label": "fp"
+    },
+    {
+     "t": 124.6,
+     "bin": 58,
+     "label": "fp"
+    },
+    {
+     "t": 126.85,
+     "bin": 59,
+     "label": "fp"
+    },
+    {
+     "t": 132.9,
+     "bin": 61,
+     "label": "fp"
+    },
+    {
+     "t": 135.8,
+     "bin": 62,
+     "label": "amb"
+    },
+    {
+     "t": 137.05,
+     "bin": 63,
+     "label": "real"
+    },
+    {
+     "t": 139.05,
+     "bin": 64,
+     "label": "real"
+    },
+    {
+     "t": 144.45,
+     "bin": 67,
+     "label": "fp"
+    },
+    {
+     "t": 145.6,
+     "bin": 67,
+     "label": "fp"
+    },
+    {
+     "t": 176.7,
+     "bin": 74,
+     "label": "amb"
+    }
+   ],
+   "worn_runs_base": [
+    [
+     3.15,
+     5.2
+    ],
+    [
+     7.3,
+     7.65
+    ],
+    [
+     7.8,
+     8.3
+    ],
+    [
+     9.55,
+     10.7
+    ],
+    [
+     10.95,
+     11.3
+    ],
+    [
+     13.1,
+     13.3
+    ],
+    [
+     14.05,
+     14.2
+    ],
+    [
+     14.5,
+     14.65
+    ],
+    [
+     15.1,
+     15.2
+    ],
+    [
+     15.6,
+     15.85
+    ],
+    [
+     16.45,
+     17.0
+    ],
+    [
+     17.65,
+     19.45
+    ],
+    [
+     20.7,
+     20.85
+    ],
+    [
+     21.35,
+     22.65
+    ],
+    [
+     23.1,
+     23.25
+    ],
+    [
+     24.45,
+     25.25
+    ],
+    [
+     25.75,
+     26.8
+    ],
+    [
+     28.4,
+     28.9
+    ],
+    [
+     31.35,
+     32.6
+    ],
+    [
+     32.85,
+     33.0
+    ],
+    [
+     33.25,
+     33.5
+    ],
+    [
+     33.65,
+     33.65
+    ],
+    [
+     33.8,
+     34.65
+    ],
+    [
+     34.8,
+     34.8
+    ],
+    [
+     34.95,
+     35.0
+    ],
+    [
+     36.45,
+     36.5
+    ],
+    [
+     36.8,
+     37.15
+    ],
+    [
+     37.3,
+     37.8
+    ],
+    [
+     37.9,
+     37.9
+    ],
+    [
+     38.05,
+     38.1
+    ],
+    [
+     38.2,
+     38.5
+    ],
+    [
+     38.85,
+     39.05
+    ],
+    [
+     39.6,
+     41.9
+    ],
+    [
+     42.45,
+     42.5
+    ],
+    [
+     43.15,
+     43.2
+    ],
+    [
+     43.6,
+     43.75
+    ],
+    [
+     45.35,
+     45.8
+    ],
+    [
+     47.95,
+     48.05
+    ],
+    [
+     48.4,
+     48.4
+    ],
+    [
+     49.05,
+     49.35
+    ],
+    [
+     49.5,
+     49.7
+    ],
+    [
+     52.9,
+     53.05
+    ],
+    [
+     53.35,
+     53.4
+    ],
+    [
+     55.0,
+     55.35
+    ],
+    [
+     55.45,
+     55.65
+    ],
+    [
+     57.25,
+     57.55
+    ],
+    [
+     57.85,
+     58.1
+    ],
+    [
+     58.35,
+     58.7
+    ],
+    [
+     59.35,
+     59.4
+    ],
+    [
+     62.15,
+     62.2
+    ],
+    [
+     63.15,
+     63.2
+    ],
+    [
+     63.95,
+     63.95
+    ],
+    [
+     64.35,
+     64.85
+    ],
+    [
+     65.25,
+     65.25
+    ],
+    [
+     65.65,
+     65.7
+    ],
+    [
+     66.0,
+     66.25
+    ],
+    [
+     66.7,
+     66.85
+    ],
+    [
+     67.1,
+     67.6
+    ],
+    [
+     69.8,
+     70.0
+    ],
+    [
+     70.1,
+     71.55
+    ],
+    [
+     71.8,
+     72.8
+    ],
+    [
+     72.9,
+     72.9
+    ],
+    [
+     73.85,
+     73.9
+    ],
+    [
+     77.7,
+     77.7
+    ],
+    [
+     79.25,
+     79.25
+    ],
+    [
+     79.45,
+     79.45
+    ],
+    [
+     81.15,
+     81.55
+    ],
+    [
+     82.95,
+     83.1
+    ],
+    [
+     84.3,
+     84.3
+    ],
+    [
+     86.2,
+     86.2
+    ],
+    [
+     88.9,
+     88.9
+    ],
+    [
+     90.7,
+     90.7
+    ],
+    [
+     91.55,
+     91.55
+    ],
+    [
+     92.15,
+     92.15
+    ],
+    [
+     97.5,
+     98.45
+    ],
+    [
+     98.6,
+     98.65
+    ],
+    [
+     99.05,
+     100.55
+    ],
+    [
+     100.85,
+     102.2
+    ],
+    [
+     108.9,
+     109.1
+    ],
+    [
+     110.85,
+     111.5
+    ],
+    [
+     112.1,
+     112.45
+    ],
+    [
+     112.55,
+     112.55
+    ],
+    [
+     113.7,
+     113.8
+    ],
+    [
+     114.3,
+     114.8
+    ],
+    [
+     115.55,
+     115.6
+    ],
+    [
+     115.7,
+     115.75
+    ],
+    [
+     115.9,
+     116.1
+    ],
+    [
+     117.3,
+     117.45
+    ],
+    [
+     117.75,
+     119.7
+    ],
+    [
+     121.55,
+     122.45
+    ],
+    [
+     124.6,
+     125.6
+    ],
+    [
+     126.85,
+     127.75
+    ],
+    [
+     132.9,
+     133.1
+    ],
+    [
+     135.8,
+     135.85
+    ],
+    [
+     137.05,
+     137.2
+    ],
+    [
+     139.05,
+     139.9
+    ],
+    [
+     140.05,
+     140.7
+    ],
+    [
+     141.0,
+     141.65
+    ],
+    [
+     141.95,
+     142.6
+    ],
+    [
+     142.7,
+     142.7
+    ],
+    [
+     143.05,
+     143.4
+    ],
+    [
+     143.75,
+     143.85
+    ],
+    [
+     144.45,
+     145.05
+    ],
+    [
+     145.6,
+     146.2
+    ],
+    [
+     176.7,
+     181.65
+    ]
+   ],
+   "bin_labels": {
+    "real": 2,
+    "amb": 2,
+    "fp": 72,
+    "bins": 76
+   },
+   "sweep": [
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 81,
+     "per_min": 26.71,
+     "real": 3,
+     "amb": 2,
+     "fp": 76,
+     "unlabeled": 0,
+     "fp_rate": 0.938
+    },
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 53,
+     "per_min": 17.48,
+     "real": 1,
+     "amb": 2,
+     "fp": 50,
+     "unlabeled": 0,
+     "fp_rate": 0.943
+    },
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 39,
+     "per_min": 12.86,
+     "real": 1,
+     "amb": 2,
+     "fp": 36,
+     "unlabeled": 0,
+     "fp_rate": 0.923
+    },
+    {
+     "every": 3,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 29,
+     "per_min": 9.56,
+     "real": 1,
+     "amb": 1,
+     "fp": 27,
+     "unlabeled": 0,
+     "fp_rate": 0.931
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 75,
+     "per_min": 24.73,
+     "real": 3,
+     "amb": 1,
+     "fp": 71,
+     "unlabeled": 0,
+     "fp_rate": 0.947
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 52,
+     "per_min": 17.15,
+     "real": 1,
+     "amb": 1,
+     "fp": 50,
+     "unlabeled": 0,
+     "fp_rate": 0.962
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 38,
+     "per_min": 12.53,
+     "real": 1,
+     "amb": 1,
+     "fp": 36,
+     "unlabeled": 0,
+     "fp_rate": 0.947
+    },
+    {
+     "every": 3,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 31,
+     "per_min": 10.22,
+     "real": 1,
+     "amb": 1,
+     "fp": 29,
+     "unlabeled": 0,
+     "fp_rate": 0.935
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 79,
+     "per_min": 26.05,
+     "real": 3,
+     "amb": 3,
+     "fp": 73,
+     "unlabeled": 0,
+     "fp_rate": 0.924
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 58,
+     "per_min": 19.13,
+     "real": 2,
+     "amb": 2,
+     "fp": 54,
+     "unlabeled": 0,
+     "fp_rate": 0.931
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 43,
+     "per_min": 14.18,
+     "real": 2,
+     "amb": 1,
+     "fp": 40,
+     "unlabeled": 0,
+     "fp_rate": 0.93
+    },
+    {
+     "every": 3,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 31,
+     "per_min": 10.22,
+     "real": 1,
+     "amb": 1,
+     "fp": 29,
+     "unlabeled": 0,
+     "fp_rate": 0.935
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 76,
+     "per_min": 25.06,
+     "real": 3,
+     "amb": 4,
+     "fp": 69,
+     "unlabeled": 0,
+     "fp_rate": 0.908
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 59,
+     "per_min": 19.46,
+     "real": 2,
+     "amb": 2,
+     "fp": 55,
+     "unlabeled": 0,
+     "fp_rate": 0.932
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 46,
+     "per_min": 15.17,
+     "real": 2,
+     "amb": 2,
+     "fp": 42,
+     "unlabeled": 0,
+     "fp_rate": 0.913
+    },
+    {
+     "every": 3,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 32,
+     "per_min": 10.55,
+     "real": 1,
+     "amb": 1,
+     "fp": 30,
+     "unlabeled": 0,
+     "fp_rate": 0.938
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 72,
+     "per_min": 23.74,
+     "real": 4,
+     "amb": 3,
+     "fp": 65,
+     "unlabeled": 0,
+     "fp_rate": 0.903
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 58,
+     "per_min": 19.13,
+     "real": 2,
+     "amb": 3,
+     "fp": 53,
+     "unlabeled": 0,
+     "fp_rate": 0.914
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 47,
+     "per_min": 15.5,
+     "real": 2,
+     "amb": 2,
+     "fp": 43,
+     "unlabeled": 0,
+     "fp_rate": 0.915
+    },
+    {
+     "every": 3,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 32,
+     "per_min": 10.55,
+     "real": 1,
+     "amb": 2,
+     "fp": 29,
+     "unlabeled": 0,
+     "fp_rate": 0.906
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 66,
+     "per_min": 21.76,
+     "real": 4,
+     "amb": 3,
+     "fp": 59,
+     "unlabeled": 0,
+     "fp_rate": 0.894
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 58,
+     "per_min": 19.13,
+     "real": 2,
+     "amb": 3,
+     "fp": 53,
+     "unlabeled": 0,
+     "fp_rate": 0.914
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 48,
+     "per_min": 15.83,
+     "real": 2,
+     "amb": 2,
+     "fp": 44,
+     "unlabeled": 0,
+     "fp_rate": 0.917
+    },
+    {
+     "every": 3,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 38,
+     "per_min": 12.53,
+     "real": 1,
+     "amb": 2,
+     "fp": 35,
+     "unlabeled": 0,
+     "fp_rate": 0.921
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 46,
+     "per_min": 15.17,
+     "real": 2,
+     "amb": 1,
+     "fp": 43,
+     "unlabeled": 0,
+     "fp_rate": 0.935
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 31,
+     "per_min": 10.22,
+     "real": 1,
+     "amb": 1,
+     "fp": 29,
+     "unlabeled": 0,
+     "fp_rate": 0.935
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 23,
+     "per_min": 7.58,
+     "real": 1,
+     "amb": 0,
+     "fp": 22,
+     "unlabeled": 0,
+     "fp_rate": 0.957
+    },
+    {
+     "every": 6,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 18,
+     "per_min": 5.94,
+     "real": 1,
+     "amb": 0,
+     "fp": 17,
+     "unlabeled": 0,
+     "fp_rate": 0.944
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 45,
+     "per_min": 14.84,
+     "real": 2,
+     "amb": 1,
+     "fp": 42,
+     "unlabeled": 0,
+     "fp_rate": 0.933
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 33,
+     "per_min": 10.88,
+     "real": 1,
+     "amb": 1,
+     "fp": 31,
+     "unlabeled": 0,
+     "fp_rate": 0.939
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 23,
+     "per_min": 7.58,
+     "real": 1,
+     "amb": 0,
+     "fp": 22,
+     "unlabeled": 0,
+     "fp_rate": 0.957
+    },
+    {
+     "every": 6,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 20,
+     "per_min": 6.6,
+     "real": 1,
+     "amb": 0,
+     "fp": 19,
+     "unlabeled": 0,
+     "fp_rate": 0.95
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 47,
+     "per_min": 15.5,
+     "real": 2,
+     "amb": 2,
+     "fp": 43,
+     "unlabeled": 0,
+     "fp_rate": 0.915
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 35,
+     "per_min": 11.54,
+     "real": 1,
+     "amb": 2,
+     "fp": 32,
+     "unlabeled": 0,
+     "fp_rate": 0.914
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 26,
+     "per_min": 8.57,
+     "real": 1,
+     "amb": 1,
+     "fp": 24,
+     "unlabeled": 0,
+     "fp_rate": 0.923
+    },
+    {
+     "every": 6,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 22,
+     "per_min": 7.25,
+     "real": 1,
+     "amb": 1,
+     "fp": 20,
+     "unlabeled": 0,
+     "fp_rate": 0.909
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 46,
+     "per_min": 15.17,
+     "real": 2,
+     "amb": 2,
+     "fp": 42,
+     "unlabeled": 0,
+     "fp_rate": 0.913
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 37,
+     "per_min": 12.2,
+     "real": 1,
+     "amb": 2,
+     "fp": 34,
+     "unlabeled": 0,
+     "fp_rate": 0.919
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 28,
+     "per_min": 9.23,
+     "real": 1,
+     "amb": 2,
+     "fp": 25,
+     "unlabeled": 0,
+     "fp_rate": 0.893
+    },
+    {
+     "every": 6,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 23,
+     "per_min": 7.58,
+     "real": 1,
+     "amb": 1,
+     "fp": 21,
+     "unlabeled": 0,
+     "fp_rate": 0.913
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 44,
+     "per_min": 14.51,
+     "real": 2,
+     "amb": 2,
+     "fp": 40,
+     "unlabeled": 0,
+     "fp_rate": 0.909
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 38,
+     "per_min": 12.53,
+     "real": 1,
+     "amb": 2,
+     "fp": 35,
+     "unlabeled": 0,
+     "fp_rate": 0.921
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 29,
+     "per_min": 9.56,
+     "real": 1,
+     "amb": 2,
+     "fp": 26,
+     "unlabeled": 0,
+     "fp_rate": 0.897
+    },
+    {
+     "every": 6,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 25,
+     "per_min": 8.24,
+     "real": 1,
+     "amb": 1,
+     "fp": 23,
+     "unlabeled": 0,
+     "fp_rate": 0.92
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 42,
+     "per_min": 13.85,
+     "real": 1,
+     "amb": 2,
+     "fp": 39,
+     "unlabeled": 0,
+     "fp_rate": 0.929
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 37,
+     "per_min": 12.2,
+     "real": 1,
+     "amb": 2,
+     "fp": 34,
+     "unlabeled": 0,
+     "fp_rate": 0.919
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 30,
+     "per_min": 9.89,
+     "real": 1,
+     "amb": 2,
+     "fp": 27,
+     "unlabeled": 0,
+     "fp_rate": 0.9
+    },
+    {
+     "every": 6,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 25,
+     "per_min": 8.24,
+     "real": 1,
+     "amb": 1,
+     "fp": 23,
+     "unlabeled": 0,
+     "fp_rate": 0.92
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 21,
+     "per_min": 6.92,
+     "real": 2,
+     "amb": 1,
+     "fp": 18,
+     "unlabeled": 0,
+     "fp_rate": 0.857
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 16,
+     "per_min": 5.28,
+     "real": 1,
+     "amb": 0,
+     "fp": 15,
+     "unlabeled": 0,
+     "fp_rate": 0.938
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 9,
+     "per_min": 2.97,
+     "real": 1,
+     "amb": 0,
+     "fp": 8,
+     "unlabeled": 0,
+     "fp_rate": 0.889
+    },
+    {
+     "every": 15,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 6,
+     "per_min": 1.98,
+     "real": 0,
+     "amb": 0,
+     "fp": 6,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 21,
+     "per_min": 6.92,
+     "real": 2,
+     "amb": 1,
+     "fp": 18,
+     "unlabeled": 0,
+     "fp_rate": 0.857
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 17,
+     "per_min": 5.61,
+     "real": 1,
+     "amb": 0,
+     "fp": 16,
+     "unlabeled": 0,
+     "fp_rate": 0.941
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 11,
+     "per_min": 3.63,
+     "real": 1,
+     "amb": 0,
+     "fp": 10,
+     "unlabeled": 0,
+     "fp_rate": 0.909
+    },
+    {
+     "every": 15,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 5,
+     "per_min": 1.65,
+     "real": 0,
+     "amb": 0,
+     "fp": 5,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 19,
+     "per_min": 6.27,
+     "real": 0,
+     "amb": 2,
+     "fp": 17,
+     "unlabeled": 0,
+     "fp_rate": 0.895
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 18,
+     "per_min": 5.94,
+     "real": 1,
+     "amb": 1,
+     "fp": 16,
+     "unlabeled": 0,
+     "fp_rate": 0.889
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 13,
+     "per_min": 4.29,
+     "real": 1,
+     "amb": 1,
+     "fp": 11,
+     "unlabeled": 0,
+     "fp_rate": 0.846
+    },
+    {
+     "every": 15,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 6,
+     "per_min": 1.98,
+     "real": 0,
+     "amb": 0,
+     "fp": 6,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 19,
+     "per_min": 6.27,
+     "real": 0,
+     "amb": 2,
+     "fp": 17,
+     "unlabeled": 0,
+     "fp_rate": 0.895
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 18,
+     "per_min": 5.94,
+     "real": 1,
+     "amb": 1,
+     "fp": 16,
+     "unlabeled": 0,
+     "fp_rate": 0.889
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 14,
+     "per_min": 4.62,
+     "real": 1,
+     "amb": 1,
+     "fp": 12,
+     "unlabeled": 0,
+     "fp_rate": 0.857
+    },
+    {
+     "every": 15,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 10,
+     "per_min": 3.3,
+     "real": 0,
+     "amb": 1,
+     "fp": 9,
+     "unlabeled": 0,
+     "fp_rate": 0.9
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 15,
+     "per_min": 4.95,
+     "real": 0,
+     "amb": 2,
+     "fp": 13,
+     "unlabeled": 0,
+     "fp_rate": 0.867
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 14,
+     "per_min": 4.62,
+     "real": 1,
+     "amb": 1,
+     "fp": 12,
+     "unlabeled": 0,
+     "fp_rate": 0.857
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 12,
+     "per_min": 3.96,
+     "real": 1,
+     "amb": 1,
+     "fp": 10,
+     "unlabeled": 0,
+     "fp_rate": 0.833
+    },
+    {
+     "every": 15,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 10,
+     "per_min": 3.3,
+     "real": 0,
+     "amb": 1,
+     "fp": 9,
+     "unlabeled": 0,
+     "fp_rate": 0.9
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 15,
+     "per_min": 4.95,
+     "real": 0,
+     "amb": 2,
+     "fp": 13,
+     "unlabeled": 0,
+     "fp_rate": 0.867
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 14,
+     "per_min": 4.62,
+     "real": 1,
+     "amb": 1,
+     "fp": 12,
+     "unlabeled": 0,
+     "fp_rate": 0.857
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 11,
+     "per_min": 3.63,
+     "real": 1,
+     "amb": 1,
+     "fp": 9,
+     "unlabeled": 0,
+     "fp_rate": 0.818
+    },
+    {
+     "every": 15,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 10,
+     "per_min": 3.3,
+     "real": 0,
+     "amb": 1,
+     "fp": 9,
+     "unlabeled": 0,
+     "fp_rate": 0.9
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "2/5",
+     "confirmed": 12,
+     "per_min": 3.96,
+     "real": 1,
+     "amb": 0,
+     "fp": 11,
+     "unlabeled": 0,
+     "fp_rate": 0.917
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "3/5",
+     "confirmed": 8,
+     "per_min": 2.64,
+     "real": 0,
+     "amb": 0,
+     "fp": 8,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "4/5",
+     "confirmed": 4,
+     "per_min": 1.32,
+     "real": 0,
+     "amb": 0,
+     "fp": 4,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 0.8,
+     "vote": "5/5",
+     "confirmed": 1,
+     "per_min": 0.33,
+     "real": 0,
+     "amb": 0,
+     "fp": 1,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "2/5",
+     "confirmed": 11,
+     "per_min": 3.63,
+     "real": 1,
+     "amb": 0,
+     "fp": 10,
+     "unlabeled": 0,
+     "fp_rate": 0.909
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "3/5",
+     "confirmed": 8,
+     "per_min": 2.64,
+     "real": 0,
+     "amb": 0,
+     "fp": 8,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "4/5",
+     "confirmed": 6,
+     "per_min": 1.98,
+     "real": 0,
+     "amb": 0,
+     "fp": 6,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 0.9,
+     "vote": "5/5",
+     "confirmed": 3,
+     "per_min": 0.99,
+     "real": 0,
+     "amb": 0,
+     "fp": 3,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "2/5",
+     "confirmed": 11,
+     "per_min": 3.63,
+     "real": 1,
+     "amb": 1,
+     "fp": 9,
+     "unlabeled": 0,
+     "fp_rate": 0.818
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "3/5",
+     "confirmed": 8,
+     "per_min": 2.64,
+     "real": 0,
+     "amb": 0,
+     "fp": 8,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "4/5",
+     "confirmed": 5,
+     "per_min": 1.65,
+     "real": 0,
+     "amb": 0,
+     "fp": 5,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.0,
+     "vote": "5/5",
+     "confirmed": 5,
+     "per_min": 1.65,
+     "real": 0,
+     "amb": 0,
+     "fp": 5,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "2/5",
+     "confirmed": 10,
+     "per_min": 3.3,
+     "real": 1,
+     "amb": 1,
+     "fp": 8,
+     "unlabeled": 0,
+     "fp_rate": 0.8
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "3/5",
+     "confirmed": 7,
+     "per_min": 2.31,
+     "real": 1,
+     "amb": 0,
+     "fp": 6,
+     "unlabeled": 0,
+     "fp_rate": 0.857
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "4/5",
+     "confirmed": 4,
+     "per_min": 1.32,
+     "real": 0,
+     "amb": 0,
+     "fp": 4,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.1,
+     "vote": "5/5",
+     "confirmed": 4,
+     "per_min": 1.32,
+     "real": 0,
+     "amb": 0,
+     "fp": 4,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "2/5",
+     "confirmed": 10,
+     "per_min": 3.3,
+     "real": 1,
+     "amb": 1,
+     "fp": 8,
+     "unlabeled": 0,
+     "fp_rate": 0.8
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "3/5",
+     "confirmed": 7,
+     "per_min": 2.31,
+     "real": 1,
+     "amb": 1,
+     "fp": 5,
+     "unlabeled": 0,
+     "fp_rate": 0.714
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "4/5",
+     "confirmed": 5,
+     "per_min": 1.65,
+     "real": 0,
+     "amb": 0,
+     "fp": 5,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.2,
+     "vote": "5/5",
+     "confirmed": 4,
+     "per_min": 1.32,
+     "real": 0,
+     "amb": 0,
+     "fp": 4,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "2/5",
+     "confirmed": 8,
+     "per_min": 2.64,
+     "real": 1,
+     "amb": 1,
+     "fp": 6,
+     "unlabeled": 0,
+     "fp_rate": 0.75
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "3/5",
+     "confirmed": 6,
+     "per_min": 1.98,
+     "real": 1,
+     "amb": 1,
+     "fp": 4,
+     "unlabeled": 0,
+     "fp_rate": 0.667
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "4/5",
+     "confirmed": 4,
+     "per_min": 1.32,
+     "real": 0,
+     "amb": 0,
+     "fp": 4,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    },
+    {
+     "every": 30,
+     "threshold": 1.3,
+     "vote": "5/5",
+     "confirmed": 4,
+     "per_min": 1.32,
+     "real": 0,
+     "amb": 0,
+     "fp": 4,
+     "unlabeled": 0,
+     "fp_rate": 1.0
+    }
+   ],
+   "moving_only": {
+    "stopped_s": [
+     [
+      30.0,
+      96.0
+     ],
+     [
+      152.0,
+      172.0
+     ]
+    ],
+    "sweep": [
+     {
+      "every": 3,
+      "threshold": 1.0,
+      "vote": "2/5",
+      "confirmed": 37,
+      "per_min": 23.14,
+      "real": 3,
+      "amb": 3,
+      "fp": 31,
+      "unlabeled": 0,
+      "fp_rate": 0.838
+     },
+     {
+      "every": 3,
+      "threshold": 1.0,
+      "vote": "3/5",
+      "confirmed": 33,
+      "per_min": 20.64,
+      "real": 2,
+      "amb": 2,
+      "fp": 29,
+      "unlabeled": 0,
+      "fp_rate": 0.879
+     },
+     {
+      "every": 3,
+      "threshold": 1.0,
+      "vote": "4/5",
+      "confirmed": 31,
+      "per_min": 19.39,
+      "real": 2,
+      "amb": 1,
+      "fp": 28,
+      "unlabeled": 0,
+      "fp_rate": 0.903
+     },
+     {
+      "every": 3,
+      "threshold": 1.0,
+      "vote": "5/5",
+      "confirmed": 22,
+      "per_min": 13.76,
+      "real": 1,
+      "amb": 1,
+      "fp": 20,
+      "unlabeled": 0,
+      "fp_rate": 0.909
+     },
+     {
+      "every": 6,
+      "threshold": 1.0,
+      "vote": "2/5",
+      "confirmed": 28,
+      "per_min": 17.51,
+      "real": 3,
+      "amb": 2,
+      "fp": 23,
+      "unlabeled": 0,
+      "fp_rate": 0.821
+     },
+     {
+      "every": 6,
+      "threshold": 1.0,
+      "vote": "3/5",
+      "confirmed": 23,
+      "per_min": 14.38,
+      "real": 2,
+      "amb": 2,
+      "fp": 19,
+      "unlabeled": 0,
+      "fp_rate": 0.826
+     },
+     {
+      "every": 6,
+      "threshold": 1.0,
+      "vote": "4/5",
+      "confirmed": 20,
+      "per_min": 12.51,
+      "real": 1,
+      "amb": 1,
+      "fp": 18,
+      "unlabeled": 0,
+      "fp_rate": 0.9
+     },
+     {
+      "every": 6,
+      "threshold": 1.0,
+      "vote": "5/5",
+      "confirmed": 17,
+      "per_min": 10.63,
+      "real": 1,
+      "amb": 1,
+      "fp": 15,
+      "unlabeled": 0,
+      "fp_rate": 0.882
+     },
+     {
+      "every": 15,
+      "threshold": 1.0,
+      "vote": "2/5",
+      "confirmed": 13,
+      "per_min": 8.13,
+      "real": 0,
+      "amb": 2,
+      "fp": 11,
+      "unlabeled": 0,
+      "fp_rate": 0.846
+     },
+     {
+      "every": 15,
+      "threshold": 1.0,
+      "vote": "3/5",
+      "confirmed": 12,
+      "per_min": 7.5,
+      "real": 1,
+      "amb": 1,
+      "fp": 10,
+      "unlabeled": 0,
+      "fp_rate": 0.833
+     },
+     {
+      "every": 15,
+      "threshold": 1.0,
+      "vote": "4/5",
+      "confirmed": 10,
+      "per_min": 6.25,
+      "real": 1,
+      "amb": 1,
+      "fp": 8,
+      "unlabeled": 0,
+      "fp_rate": 0.8
+     },
+     {
+      "every": 15,
+      "threshold": 1.0,
+      "vote": "5/5",
+      "confirmed": 7,
+      "per_min": 4.38,
+      "real": 0,
+      "amb": 0,
+      "fp": 7,
+      "unlabeled": 0,
+      "fp_rate": 1.0
+     },
+     {
+      "every": 30,
+      "threshold": 1.0,
+      "vote": "2/5",
+      "confirmed": 5,
+      "per_min": 3.13,
+      "real": 1,
+      "amb": 1,
+      "fp": 3,
+      "unlabeled": 0,
+      "fp_rate": 0.6
+     },
+     {
+      "every": 30,
+      "threshold": 1.0,
+      "vote": "3/5",
+      "confirmed": 5,
+      "per_min": 3.13,
+      "real": 1,
+      "amb": 0,
+      "fp": 4,
+      "unlabeled": 0,
+      "fp_rate": 0.8
+     },
+     {
+      "every": 30,
+      "threshold": 1.0,
+      "vote": "4/5",
+      "confirmed": 5,
+      "per_min": 3.13,
+      "real": 0,
+      "amb": 0,
+      "fp": 5,
+      "unlabeled": 0,
+      "fp_rate": 1.0
+     },
+     {
+      "every": 30,
+      "threshold": 1.0,
+      "vote": "5/5",
+      "confirmed": 1,
+      "per_min": 0.63,
+      "real": 0,
+      "amb": 0,
+      "fp": 1,
+      "unlabeled": 0,
+      "fp_rate": 1.0
+     }
+    ]
+   }
+  }
+ }
+}

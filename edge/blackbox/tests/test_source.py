@@ -91,3 +91,33 @@ def test_video_and_segment_are_exclusive():
         run.parse_args(["--video", "a.mp4", "--segment", "x:00000001-00000002", "--model", "m.onnx"])
     with pytest.raises(SystemExit):
         run.parse_args(["--model", "m.onnx"])
+
+
+def _drive(video, tmp_path, *extra):
+    args = run.parse_args(["--video", str(video), "--model", "m.onnx", "--conf", "0.25", "--speed", "0",
+                           "--dry-run", "--lane-every", "0", "--live-dir", str(tmp_path / "live"), *extra])
+    return run.drive(args)
+
+
+def test_drive_merges_same_pothole_into_one_observation(video, monkeypatch, tmp_path):
+    """같은 자리 포트홀이 매 프레임 보이면 합쳐서 1건, --no-merge 면 탐지마다 1건 (계획 2.3)."""
+    monkeypatch.setattr(run, "Detector", FakeDetector)
+    merged = _drive(video, tmp_path, "--detect-every", "2", "--no-quality")
+    assert merged["detected_frames"] == 11  # 0,2,…,20 (21~24 는 위치 없음)
+    assert merged["detections"] == 11 and merged["tracks"] == 1 and merged["sent"] == 1
+    plain = _drive(video, tmp_path, "--detect-every", "2", "--no-quality", "--no-merge")
+    assert plain["sent"] == 11 and plain["tracks"] is None
+    assert merged["bytes_sent"] < plain["bytes_sent"] / 5
+
+
+def test_drive_runs_quality_every_frame_and_logs_stage_ratio(video, monkeypatch, tmp_path, capsys):
+    """품질은 매 프레임, 탐지는 5프레임마다 (계획 2.2). 끝날 때 단계별 실행 비율을 출력한다."""
+    monkeypatch.setattr(run, "Detector", FakeDetector)
+    r = _drive(video, tmp_path, "--detect-every", "5")
+    st = r["stages"]
+    assert st["frames"] == 21  # 위치 있는 프레임
+    assert st["quality"]["runs"] == 21 and st["lane"]["runs"] == 0
+    # 탐지 차례는 0,5,10,15,20. 합성 프레임 일부는 밋밋해서 품질 나쁨(흐림)으로 건너뛴다
+    assert st["detect"]["runs"] + r["skipped_quality"] == 5 and st["detect"]["runs"] >= 1
+    assert r["quality_bad"] >= r["skipped_quality"]
+    assert "단계별 실행 품질 21/21 (100%" in capsys.readouterr().out

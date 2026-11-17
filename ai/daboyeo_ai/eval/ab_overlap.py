@@ -5,6 +5,8 @@
     # 2) 숫자 (정답 짝 거리 + v3 탐지를 서버처럼 20 m 로 묶었을 때 두 대가 같이 본 결함)
     uv run python -m daboyeo_ai.eval.ab_overlap run --json experiments/ab_overlap.json
 
+- GPS: 정현우 `tools/gps` 기준점(원본 영상 시각)을 `reconstruct` 로 읽기 전용 호출해, 클립 시작 초(`CLIP_START_S`)를 빼서
+  클립 시각 경로를 만든다 (`reconstruct --clip-start` 와 같은 결과). `--gps-csv` 면 `<클립>.gps.csv` 를 대신 읽는다.
 - 위치: 정답 결함은 구간 가운데 시각, 탐지는 그 프레임 시각의 GPS (블랙박스도 프레임 시각 GPS 를 그대로 보낸다).
   결함은 실제로 카메라 앞 몇~수십 m 에 있지만, 두 클립 모두 같은 규칙이라 대부분 상쇄된다. `--ahead-m` 으로 앞으로 민다.
 - GPS CSV 끝을 조금 넘는 시각은 마지막 구간 방향·속도로 늘인다 (`MAX_EXTRAP_S` 까지, `extrap` 표시).
@@ -26,9 +28,22 @@ from daboyeo_contracts import CLASS_NAMES
 
 ROOT = Path(__file__).resolve().parents[3]
 CLIPS = {"A": "gn_a_2050-2510", "B": "gn_b_3320-3620"}
+# 클립 t=0 의 원본 영상 시각 (초). 이름의 2050·3320 은 분:초(20:50·33:20)이고, 재인코딩 없이 잘라 앞 키프레임에서
+# 시작해 그보다 조금 앞이다 (data/videos/fetch_log.jsonl clip_start_in_source_s, docs/plan.md 0.8). 클립 → 원본 변환은 여기만 쓴다.
+CLIP_START_S = {"gn_a_2050-2510": 1247.646, "gn_b_3320-3620": 1998.0}
 ROAD_TYPES = ("pothole", "crack")  # 서버로 보내는 도로 결함 (시설물은 화면에만)
 RADII = (20.0, 30.0, 50.0)
 MAX_EXTRAP_S = 8.0  # gn_b B_C11 (클립 끝, GPS 끝 6초 뒤) 까지
+
+
+def source_video(clip: str) -> str:
+    """gn_a_2050-2510 → gn_a (tools/gps 의 video_id)."""
+    return "_".join(clip.split("_")[:2])
+
+
+def to_source_s(clip: str, t: float) -> float:
+    """클립 시각 → 원본 영상 시각."""
+    return round(CLIP_START_S[clip] + t, 3)
 
 
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -60,6 +75,17 @@ class Track:
     def from_csv(cls, path: Path) -> Track:
         with open(path) as f:
             return cls([(float(r["t_s"]), float(r["lat"]), float(r["lon"])) for r in csv.DictReader(f)])
+
+    @classmethod
+    def for_clip(cls, clip: str, videos: Path | None = None) -> Track:
+        """클립 시각 경로. videos 가 있으면 <videos>/<클립>.gps.csv, 없으면 기준점에서 CLIP_START_S 로 만든다."""
+        if videos is not None:
+            return cls.from_csv(videos / f"{clip}.gps.csv")
+        from tools.gps.reconstruct import default_paths, reconstruct  # 정현우 담당 코드, 읽기 전용으로 부른다
+
+        vid = source_video(clip)
+        gps, _, _ = reconstruct(*default_paths(vid), vid, clip_start_s=CLIP_START_S[clip])
+        return cls([(p.t_s, p.lat, p.lon) for p in gps.points])
 
     def _ll(self, i: int) -> tuple[float, float]:
         return float(self.lat[i]), float(self.lon[i])
@@ -210,13 +236,15 @@ def summarize_groups(defects: list[dict]) -> dict:
 
 
 def run(args) -> dict:
-    tracks = {k: Track.from_csv(args.videos / f"{v}.gps.csv") for k, v in CLIPS.items()}
+    tracks = {k: Track.for_clip(v, args.videos if args.gps_csv else None) for k, v in CLIPS.items()}
     gt = {k: locate(read_gt(args.gt / f"{v}.csv"), tracks[k], args.ahead_m) for k, v in CLIPS.items()}
     pairs = pair_events(gt["A"], gt["B"])
     res: dict = {
-        "clips": CLIPS, "ahead_m": args.ahead_m,
+        "clips": CLIPS, "clip_start_s": {v: CLIP_START_S[v] for v in CLIPS.values()},
+        "gps": "csv" if args.gps_csv else "anchors", "ahead_m": args.ahead_m,
         "gps_span_s": {k: [float(tr.t[0]), float(tr.t[-1])] for k, tr in tracks.items()},
-        "gt": {k: [{x: e[x] for x in ("id", "type", "t0", "t1", "amb", "lat", "lon", "extrap")} for e in v]
+        "gt": {k: [{x: e[x] for x in ("id", "type", "t0", "t1", "amb", "lat", "lon", "extrap")}
+                   | {"t0_src": to_source_s(CLIPS[k], e["t0"]), "t1_src": to_source_s(CLIPS[k], e["t1"])} for e in v]
                for k, v in gt.items()},
         "gt_nearest_a_to_b": nearest_counterpart(gt["A"], gt["B"]),
         "gt_pairs_within": {f"{r:g}m": [p for p in pairs if p["dist_m"] <= r] for r in RADII},
@@ -224,7 +252,7 @@ def run(args) -> dict:
     thr = _thr(args.model_json)
     obs = {}
     for k, v in CLIPS.items():
-        cache = json.loads((args.cache / "_".join(v.split("_")[:2]) / "raw.json").read_text())  # gn_a/raw.json
+        cache = json.loads((args.cache / source_video(v) / "raw.json").read_text())  # gn_a/raw.json
         obs[k] = observations(cache["raw"]["v3"], thr, tracks[k], k, merge=not args.no_merge)
     allobs = obs["B"] + obs["A"]  # 촬영 순서 (gn_b 2022-01 → gn_a 2022 여름, tools/video/sources.csv) = 도착 순서
     res["detections"] = {
@@ -242,7 +270,7 @@ def sheets(args) -> None:
     """짝 후보마다 A(위)·B(아래) 결함 구간 처음·가운데·끝 프레임을 나란히 → data/ab_overlap/pair_<a>_<b>.jpg."""
     import cv2
 
-    tracks = {k: Track.from_csv(args.videos / f"{v}.gps.csv") for k, v in CLIPS.items()}
+    tracks = {k: Track.for_clip(v, args.videos if args.gps_csv else None) for k, v in CLIPS.items()}
     gt = {k: {e["id"]: e for e in locate(read_gt(args.gt / f"{v}.csv"), tracks[k], args.ahead_m)}
           for k, v in CLIPS.items()}
     pairs = pair_events(list(gt["A"].values()), list(gt["B"].values()), args.max_m, same_type=False)
@@ -275,6 +303,8 @@ def main(argv=None) -> None:
     for name in ("run", "sheets"):
         p = sub.add_parser(name)
         p.add_argument("--videos", type=Path, default=ROOT / "data/videos", help="클립과 <클립>.gps.csv 가 있는 곳")
+        p.add_argument("--gps-csv", action="store_true",
+                       help="기준점 대신 <videos>/<클립>.gps.csv 를 읽는다 (기본: 기준점 + CLIP_START_S)")
         p.add_argument("--gt", type=Path, default=ROOT / "experiments/gt_events")
         p.add_argument("--ahead-m", type=float, default=0.0, help="결함 위치를 경로를 따라 앞으로 미는 거리")
     r, s = sub.choices["run"], sub.choices["sheets"]

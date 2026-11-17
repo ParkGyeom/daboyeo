@@ -1,5 +1,7 @@
 import pytest
 from daboyeo_ai.eval.ab_overlap import (
+    CLIP_START_S,
+    CLIPS,
     Track,
     haversine_m,
     locate,
@@ -7,6 +9,8 @@ from daboyeo_ai.eval.ab_overlap import (
     observations,
     pair_events,
     server_group,
+    source_video,
+    to_source_s,
 )
 
 M_LAT = 1 / 111_320  # 북쪽 1 m 의 위도
@@ -71,3 +75,27 @@ def test_observations_threshold_merge_and_gps_span():
     o = observations(raw, thr, tr, "A")
     assert len(o) == 1 and o[0]["t"] == 1.5 and o[0]["frames"] == 2 and o[0]["conf"] == 0.6
     assert len(observations(raw, thr, tr, "A", merge=False)) == 2
+
+
+def test_clip_start_is_keyframe_before_name():
+    """이름의 2050·3320 은 분:초. 실제 시작은 앞 키프레임이라 이름 시각보다 0~3초 앞 (docs/plan.md 0.8)."""
+    assert set(CLIP_START_S) == set(CLIPS.values())
+    for clip, start in CLIP_START_S.items():
+        mmss = clip.split("_")[2].split("-")[0]
+        named = int(mmss[:2]) * 60 + int(mmss[2:])
+        assert 0 <= named - start < 3
+    assert CLIP_START_S["gn_a_2050-2510"] == 1247.646 and CLIP_START_S["gn_b_3320-3620"] == 1998.0
+    assert to_source_s("gn_a_2050-2510", 71.5) == 1319.146
+    assert source_video("gn_b_3320-3620") == "gn_b"
+
+
+def test_clip_track_from_anchors_uses_clip_start():
+    """기준점 → 클립 경로: 원본 시각 T 의 위치 = 클립 시각 T - CLIP_START_S 의 위치."""
+    from tools.gps.reconstruct import default_paths, reconstruct
+
+    clip = CLIPS["A"]
+    tr = Track.for_clip(clip)
+    src, _, _ = reconstruct(*default_paths("gn_a"), "gn_a")
+    p = src.points[200]
+    f = tr.fix(p.t_s - CLIP_START_S[clip])
+    assert haversine_m(p.lat, p.lon, f.lat, f.lon) < 0.5

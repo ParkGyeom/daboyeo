@@ -46,3 +46,24 @@ def test_quarter_and_progress():
     assert r.quarter_label(datetime(2026, 9, 30, 16, 0, tzinfo=timezone.utc)) == "2026-Q4"
     assert r.reward_progress(3) == {"count": 3, "target": 5, "remaining": 2}
     assert r.reward_progress(7)["remaining"] == 0
+
+
+def test_theta_is_per_type_from_model_card():
+    """θ 는 블랙박스와 같은 유형별 기준 (v3 카드 class_conf_draft, 오픈 이슈 #3). 카드에 없는 차선 마모는 기본 θ."""
+    assert r.theta("pothole") == 0.31 and r.theta("crack") == 0.42
+    assert r.theta("lane_wear") == r.CONFIDENCE_VISIBLE
+    assert r.is_exposed(0.45, 1, defect_type="crack")       # 블랙박스가 보낸 균열(0.42 이상)은 1대로도 보인다
+    assert not r.is_exposed(0.40, 1, defect_type="crack")
+    assert r.is_exposed(0.40, r.MIN_VEHICLES_VISIBLE, defect_type="crack")  # k 조건은 그대로 (실서비스 설계)
+
+
+def test_load_type_conf_reads_card_and_maps_facilities(tmp_path):
+    card = tmp_path / "card.json"
+    card.write_text('{"class_conf_draft": {"pothole": 0.3, "crack": 0.4, "guardrail": 0.2, "sign": 0.25}}')
+    assert r.load_type_conf(str(card)) == {"pothole": 0.3, "crack": 0.4, "guardrail_damage": 0.2, "sign_damage": 0.25}
+    assert r.load_type_conf(str(tmp_path / "none.json")) == {}
+
+
+def test_dedup_radius_is_30m():
+    """오픈 이슈 #2 (11/17): 재구성 GPS 오차가 7 m 이상이라 30 m."""
+    assert r.DEDUP_DISTANCE_M["pothole"] == r.DEDUP_DISTANCE_M["crack"] == 30.0

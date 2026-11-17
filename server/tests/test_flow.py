@@ -32,12 +32,13 @@ def test_nothing_until_trip_ends(client):
 
 def test_low_confidence_single_vehicle_hidden_until_second_vehicle(client):
     ta, tb = start(client, "bb-01"), start(client, "bb-02")
-    low = observe(client, ta, confidence=0.4)["defect_id"]
+    # θ 는 유형별 (포트홀 0.31, 오픈 이슈 #3). 그보다 낮은 신뢰도
+    low = observe(client, ta, confidence=0.2)["defect_id"]
     high = observe(client, ta, lat=north(LAT, 100), confidence=0.8)["defect_id"]
     end(client, ta)
     assert _findings(client, A) == [high]
     # 다른 차량이 같은 결함을 보면 신뢰도가 낮아도 보인다 (A 의 끝난 주행도 다시 훑는다)
-    observe(client, tb, confidence=0.4)
+    observe(client, tb, confidence=0.2)
     end(client, tb)
     assert set(_findings(client, A)) == {low, high}
     assert _findings(client, B) == [low]

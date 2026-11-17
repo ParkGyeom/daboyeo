@@ -28,6 +28,15 @@ scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 
 scripts/demo.sh down
 ```
 
+공개 주행 영상 (`tools/video/sources.csv`). 원본(영상만)·1080p30 사본·`demo_segment` 클립을 `data/videos/` 에 만들고 길이·fps·해상도·크기를 `fetch_log.jsonl` 에 남긴다. 받기 전에 사용자에게 id·크기를 확인받는다:
+
+```bash
+uv run python tools/video/fetch.py gn_a gn_b --max-height 1080   # 1080p60 원본 ~2.9GB + 1080p30 사본 ~7.5GB
+uv run python tools/video/fetch.py gn_a gn_b --clips-only        # 받은 원본에서 클립만 다시
+# 클립은 재인코딩 없이 직전 키프레임부터 자른다: 클립 t=0 = 로그의 clip_start_in_source_s (gn_a 1247.646, gn_b 1998.0)
+# 큰 파일을 한 번에 받으면 YouTube 가 중간에 HTTP 403 을 준다 → fetch.py 는 10MB 씩 받고, 다시 실행하면 이어 받는다
+```
+
 ## 담당 영역 — 요청한 사람의 폴더만 고친다
 
 | 폴더 | 담당 |

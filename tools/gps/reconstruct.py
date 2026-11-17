@@ -13,7 +13,7 @@
   기준점이 경로 순서와 어긋나거나, 시간이 거꾸로이거나, 경로에서 멀면(--max-snap-m) 오류.
 
   uv run python -m tools.gps.reconstruct gn_a                       # → data/videos/gn_a.gps.csv
-  uv run python -m tools.gps.reconstruct gn_a --clip-start 1250.25 --out data/videos/gn_a_2050-2510.gps.csv
+  uv run python -m tools.gps.reconstruct gn_a --clip-start 1247.646 --out data/videos/gn_a_2050-2510.gps.csv  # fetch_log 값
   uv run python -m tools.gps.reconstruct --gpx a.gpx --anchors a.csv --out a.gps.csv
 
 --clip-start: 잘라 낸 클립의 t=0 이 원본의 몇 초인지 (tools/video/fetch.py 의 fetch_log.jsonl

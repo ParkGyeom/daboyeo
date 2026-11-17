@@ -32,6 +32,20 @@ def test_observation_saved_with_photo_and_stats(client, tmp_path):
     assert s["vehicles"] == [{"vehicle_label": "bb-01", "observations": 1, "bytes": row["snapshot_bytes"]}]
 
 
+def test_observation_with_clip_counts_bytes(client, tmp_path):
+    t = start(client)
+    clip = b"\x00\x00\x00\x18ftypisom" + b"x" * 100
+    r = post(client, meta(t), photo=b"\xff\xd8 jpeg-ish", clip=clip)
+    assert r.status_code == 201, r.text
+    with db.connect() as conn:
+        row = conn.execute("SELECT clip_path, clip_bytes, snapshot_bytes FROM observations WHERE id = %s",
+                           (r.json()["observation_id"],)).fetchone()
+    assert row["clip_path"].endswith(".mp4") and row["clip_bytes"] == len(clip)
+    assert (tmp_path / row["clip_path"]).read_bytes() == clip
+    assert client.get("/api/v1/stats").json()["total_bytes"] == len(clip) + row["snapshot_bytes"]
+    assert post(client, meta(t), clip=b"not an mp4 file").status_code == 422
+
+
 def test_lane_wear_without_bbox_or_photo(client):
     t = start(client)
     assert post(client, meta(t, type="lane_wear"), photo=None).status_code == 201

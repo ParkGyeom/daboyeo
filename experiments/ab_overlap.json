@@ -1,0 +1,469 @@
+{
+ "clips": {
+  "A": "gn_a_2050-2510",
+  "B": "gn_b_3320-3620"
+ },
+ "clip_start_s": {
+  "gn_a_2050-2510": 1247.646,
+  "gn_b_3320-3620": 1998.0
+ },
+ "gps": "anchors",
+ "ahead_m": 0.0,
+ "gps_span_s": {
+  "A": [
+   2.354,
+   259.354
+  ],
+  "B": [
+   0.3,
+   177.0
+  ]
+ },
+ "gt": {
+  "A": [
+   {
+    "id": "A_C01",
+    "type": "crack",
+    "t0": 61.0,
+    "t1": 63.5,
+    "amb": true,
+    "lat": 37.5011375,
+    "lon": 127.0262676,
+    "extrap": false,
+    "t0_src": 1308.646,
+    "t1_src": 1311.146
+   },
+   {
+    "id": "A_P01",
+    "type": "pothole",
+    "t0": 66.0,
+    "t1": 68.5,
+    "amb": true,
+    "lat": 37.5014201,
+    "lon": 127.0261415,
+    "extrap": false,
+    "t0_src": 1313.646,
+    "t1_src": 1316.146
+   },
+   {
+    "id": "A_C02",
+    "type": "crack",
+    "t0": 258.5,
+    "t1": 259.0,
+    "amb": false,
+    "lat": 37.5046624,
+    "lon": 127.0245147,
+    "extrap": false,
+    "t0_src": 1506.146,
+    "t1_src": 1506.646
+   },
+   {
+    "id": "A_P02",
+    "type": "pothole",
+    "t0": 259.0,
+    "t1": 259.8,
+    "amb": true,
+    "lat": 37.5046996,
+    "lon": 127.0244946,
+    "extrap": true,
+    "t0_src": 1506.646,
+    "t1_src": 1507.446
+   }
+  ],
+  "B": [
+   {
+    "id": "B_C01",
+    "type": "crack",
+    "t0": 5.0,
+    "t1": 8.0,
+    "amb": false,
+    "lat": 37.4992681,
+    "lon": 127.0271299,
+    "extrap": false,
+    "t0_src": 2003.0,
+    "t1_src": 2006.0
+   },
+   {
+    "id": "B_C02",
+    "type": "crack",
+    "t0": 9.0,
+    "t1": 14.5,
+    "amb": false,
+    "lat": 37.4996441,
+    "lon": 127.026948,
+    "extrap": false,
+    "t0_src": 2007.0,
+    "t1_src": 2012.5
+   },
+   {
+    "id": "B_C03",
+    "type": "crack",
+    "t0": 22.5,
+    "t1": 25.0,
+    "amb": false,
+    "lat": 37.5005054,
+    "lon": 127.0265396,
+    "extrap": false,
+    "t0_src": 2020.5,
+    "t1_src": 2023.0
+   },
+   {
+    "id": "B_C04",
+    "type": "crack",
+    "t0": 93.5,
+    "t1": 95.0,
+    "amb": false,
+    "lat": 37.5009977,
+    "lon": 127.0263231,
+    "extrap": false,
+    "t0_src": 2091.5,
+    "t1_src": 2093.0
+   },
+   {
+    "id": "B_C05",
+    "type": "crack",
+    "t0": 96.0,
+    "t1": 97.0,
+    "amb": false,
+    "lat": 37.50105,
+    "lon": 127.0263001,
+    "extrap": false,
+    "t0_src": 2094.0,
+    "t1_src": 2095.0
+   },
+   {
+    "id": "B_C06",
+    "type": "crack",
+    "t0": 98.0,
+    "t1": 101.0,
+    "amb": false,
+    "lat": 37.5011715,
+    "lon": 127.0262552,
+    "extrap": false,
+    "t0_src": 2096.0,
+    "t1_src": 2099.0
+   },
+   {
+    "id": "B_P01",
+    "type": "pothole",
+    "t0": 99.0,
+    "t1": 99.5,
+    "amb": false,
+    "lat": 37.5011609,
+    "lon": 127.026259,
+    "extrap": false,
+    "t0_src": 2097.0,
+    "t1_src": 2097.5
+   },
+   {
+    "id": "B_C07",
+    "type": "crack",
+    "t0": 104.5,
+    "t1": 105.5,
+    "amb": true,
+    "lat": 37.5013998,
+    "lon": 127.0261513,
+    "extrap": false,
+    "t0_src": 2102.5,
+    "t1_src": 2103.5
+   },
+   {
+    "id": "B_C08",
+    "type": "crack",
+    "t0": 114.0,
+    "t1": 115.0,
+    "amb": false,
+    "lat": 37.5017637,
+    "lon": 127.0259668,
+    "extrap": false,
+    "t0_src": 2112.0,
+    "t1_src": 2113.0
+   },
+   {
+    "id": "B_C09",
+    "type": "crack",
+    "t0": 116.5,
+    "t1": 119.5,
+    "amb": true,
+    "lat": 37.5018817,
+    "lon": 127.0259013,
+    "extrap": false,
+    "t0_src": 2114.5,
+    "t1_src": 2117.5
+   },
+   {
+    "id": "B_C10",
+    "type": "crack",
+    "t0": 120.0,
+    "t1": 131.0,
+    "amb": false,
+    "lat": 37.5021384,
+    "lon": 127.0257735,
+    "extrap": false,
+    "t0_src": 2118.0,
+    "t1_src": 2129.0
+   },
+   {
+    "id": "B_C11",
+    "type": "crack",
+    "t0": 180.0,
+    "t1": 181.9,
+    "amb": false,
+    "lat": 37.504438,
+    "lon": 127.0246617,
+    "extrap": true,
+    "t0_src": 2178.0,
+    "t1_src": 2179.9
+   }
+  ]
+ },
+ "gt_nearest_a_to_b": {
+  "A_C01": {
+   "id": "B_C06",
+   "dist_m": 3.9
+  },
+  "A_P01": {
+   "id": "B_P01",
+   "dist_m": 30.6
+  },
+  "A_C02": {
+   "id": "B_C11",
+   "dist_m": 28.1
+  },
+  "A_P02": {
+   "id": "B_P01",
+   "dist_m": 423.1
+  }
+ },
+ "gt_pairs_within": {
+  "20m": [
+   {
+    "a": "A_C01",
+    "b": "B_C06",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 3.9
+   },
+   {
+    "a": "A_C01",
+    "b": "B_C05",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 10.1
+   },
+   {
+    "a": "A_C01",
+    "b": "B_C04",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 16.3
+   }
+  ],
+  "30m": [
+   {
+    "a": "A_C01",
+    "b": "B_C06",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 3.9
+   },
+   {
+    "a": "A_C01",
+    "b": "B_C05",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 10.1
+   },
+   {
+    "a": "A_C01",
+    "b": "B_C04",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 16.3
+   },
+   {
+    "a": "A_C02",
+    "b": "B_C11",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 28.1
+   }
+  ],
+  "50m": [
+   {
+    "a": "A_C01",
+    "b": "B_C06",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 3.9
+   },
+   {
+    "a": "A_C01",
+    "b": "B_C05",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 10.1
+   },
+   {
+    "a": "A_C01",
+    "b": "B_C04",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 16.3
+   },
+   {
+    "a": "A_C02",
+    "b": "B_C11",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 28.1
+   },
+   {
+    "a": "A_P01",
+    "b": "B_P01",
+    "type_a": "pothole",
+    "type_b": "pothole",
+    "dist_m": 30.6
+   },
+   {
+    "a": "A_C01",
+    "b": "B_C07",
+    "type_a": "crack",
+    "type_b": "crack",
+    "dist_m": 30.9
+   }
+  ]
+ },
+ "detections": {
+  "model": "v3",
+  "thr": {
+   "pothole": 0.31,
+   "crack": 0.42,
+   "guardrail": 0.21,
+   "sign": 0.21
+  },
+  "merge": true,
+  "obs": {
+   "A": {
+    "n": 0,
+    "by_type": {
+     "pothole": 0,
+     "crack": 0
+    }
+   },
+   "B": {
+    "n": 9,
+    "by_type": {
+     "pothole": 0,
+     "crack": 9
+    }
+   }
+  },
+  "server": {
+   "20m": {
+    "defects": 6,
+    "by_type": {
+     "pothole": 0,
+     "crack": 6
+    },
+    "two_devices": 0,
+    "two_device_defects": []
+   },
+   "30m": {
+    "defects": 4,
+    "by_type": {
+     "pothole": 0,
+     "crack": 4
+    },
+    "two_devices": 0,
+    "two_device_defects": []
+   },
+   "50m": {
+    "defects": 3,
+    "by_type": {
+     "pothole": 0,
+     "crack": 3
+    },
+    "two_devices": 0,
+    "two_device_defects": []
+   }
+  },
+  "obs_list": {
+   "A": [],
+   "B": [
+    {
+     "type": "crack",
+     "t": 3.017,
+     "conf": 0.498,
+     "lat": 37.499017,
+     "lon": 127.027246,
+     "frames": 1
+    },
+    {
+     "type": "crack",
+     "t": 4.017,
+     "conf": 0.654,
+     "lat": 37.499089,
+     "lon": 127.027213,
+     "frames": 1
+    },
+    {
+     "type": "crack",
+     "t": 6.017,
+     "conf": 0.556,
+     "lat": 37.499234,
+     "lon": 127.027147,
+     "frames": 1
+    },
+    {
+     "type": "crack",
+     "t": 11.017,
+     "conf": 0.571,
+     "lat": 37.499591,
+     "lon": 127.026973,
+     "frames": 1
+    },
+    {
+     "type": "crack",
+     "t": 11.017,
+     "conf": 0.454,
+     "lat": 37.499591,
+     "lon": 127.026973,
+     "frames": 1
+    },
+    {
+     "type": "crack",
+     "t": 114.516,
+     "conf": 0.476,
+     "lat": 37.501764,
+     "lon": 127.025967,
+     "frames": 2
+    },
+    {
+     "type": "crack",
+     "t": 120.516,
+     "conf": 0.684,
+     "lat": 37.501966,
+     "lon": 127.025854,
+     "frames": 6
+    },
+    {
+     "type": "crack",
+     "t": 124.516,
+     "conf": 0.652,
+     "lat": 37.502104,
+     "lon": 127.025789,
+     "frames": 5
+    },
+    {
+     "type": "crack",
+     "t": 128.516,
+     "conf": 0.609,
+     "lat": 37.502243,
+     "lon": 127.025725,
+     "frames": 4
+    }
+   ]
+  }
+ }
+}

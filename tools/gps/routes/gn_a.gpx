@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- gn_a: 강남대로 북행 차로, 지하철2호선.강남역(중) 정류장 앞 ~ 교보타워사거리 지나 (약 570 m).
+     좌표: OpenStreetMap 강남대로 북행 way 521770119·521766180·521766186·521770121 (© OpenStreetMap contributors, ODbL) -->
+<gpx version="1.1" creator="daboyeo tools/gps" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>gn_a</name>
+    <trkseg>
+      <trkpt lat="37.500388" lon="127.026592"></trkpt>
+      <trkpt lat="37.500409" lon="127.026582"></trkpt>
+      <trkpt lat="37.501057" lon="127.026297"></trkpt>
+      <trkpt lat="37.501224" lon="127.026236"></trkpt>
+      <trkpt lat="37.501639" lon="127.026036"></trkpt>
+      <trkpt lat="37.501976" lon="127.025849"></trkpt>
+      <trkpt lat="37.502290" lon="127.025703"></trkpt>
+      <trkpt lat="37.502648" lon="127.025536"></trkpt>
+      <trkpt lat="37.503601" lon="127.025058"></trkpt>
+      <trkpt lat="37.503945" lon="127.024893"></trkpt>
+      <trkpt lat="37.504301" lon="127.024726"></trkpt>
+      <trkpt lat="37.504499" lon="127.024603"></trkpt>
+      <trkpt lat="37.504697" lon="127.024496"></trkpt>
+      <trkpt lat="37.505101" lon="127.024301"></trkpt>
+      <trkpt lat="37.505169" lon="127.024268"></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

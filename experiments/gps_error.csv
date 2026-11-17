@@ -1,0 +1,3 @@
+video_id,n_anchors,n_holdout,mean_m,median_m,max_m,max_at,route_m,n_moving,mean_moving_m
+gn_a,12,10,30.3,22.5,82.0,22:33.5 출발,570,5,25.7
+gn_b,12,10,38.7,13.6,165.7,35:31.5 편집 컷 직후·왼쪽 교보타워가 바로 옆이고 오른쪽 808타워(소용돌이 무늬)가 가까움,936,4,7.6

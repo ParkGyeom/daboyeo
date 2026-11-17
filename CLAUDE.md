@@ -17,16 +17,42 @@ docker compose up -d db    # PostGIS (스키마: server/sql/001_init.sql)
 ```bash
 scripts/demo.sh up                                  # DB → 서버(8000) → 화면(8501)
 uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 관측 보내기 (주행을 닫으면 시민 확인 목록이 생긴다)
+# 주행이 끝나면 모의 문자(링크 포함)가 생긴다. 화면 > 시연 > 메시지함 (모의)에서 보고, 링크(http://localhost:8501/?t=토큰)를 누르면 로그인 없이 확인·신고 화면이 열린다. 실제 문자는 보내지 않는다 (docs/notify-link-plan.md)
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
-uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --detect-every 10 --speed 4
-uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v2.onnx --devices 3
-scripts/demo.sh drive ai/models/detector_v2.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+# 차선 마모는 시연에서 끈다(확정, --lane-every 0, handoff 17-6). 실험용으로만 --lane-every 3
+# 탐지 기준 기본은 시연 모델 v3 카드(--conf-json ai/models/detector_v3.json: 포트홀 0.31·균열 0.42·가드레일 0.21·표지판 0.21)
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --detect-every 10 --speed 4
+uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --devices 3
+scripts/demo.sh drive ai/models/detector_v3.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)
+# 탐지기 고르기 --detector onnx|fake|replay (edge/blackbox/detectors.py). fake: 정답 라벨 CSV(docs/ai-handoff.md 12장)를
+# 탐지처럼 낸다. 라벨 1개 = 관측 1건, 시설물 라벨은 화면에만 (SENT_TYPES). --labels 를 빼면 experiments/gt_events/<영상 이름>.csv
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --detector fake --labels experiments/gt_events/v1.csv --detect-every 5 --speed 0
+# replay: onnx 로 한 번 --record 를 붙여 돌려 두면, 모델 파일·추론 없이 같은 탐지로 운전한다 (영상 이름·--detect-every 가 기록과 같아야 함)
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --model ai/models/detector_v3.onnx --detect-every 5 --speed 0 --dry-run --record data/replay/v1.jsonl
+uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --detector replay --record data/replay/v1.jsonl --detect-every 5 --speed 0
+scripts/demo.sh replay data/replay/v1.jsonl data/videos/v1.mp4 3 0   # 기록대로 3대 (주기는 기록에서 읽음, 마지막은 배속)
+# GPS 없는 유튜브 영상의 경로 재구성 (tools/gps/README.md): routes/<id>.gpx + anchors/<id>.csv → data/videos/<id>.gps.csv
+uv run python -m tools.gps.reconstruct gn_a                 # 클립이면 --clip-start <clip_start_in_source_s> --out data/videos/<클립>.gps.csv
+uv run python -m tools.gps.preview_map gn_a --fetch-roads   # 경로·기준점 HTML (오프라인 도로선). --fetch-roads 는 처음 한 번 (인터넷)
+uv run python -m tools.gps.holdout_error gn_a gn_b          # 기준점 hold-out 오차 → experiments/gps_error.csv (AC-13)
 # 블랙박스가 보는 프레임과 탐지 박스: 화면의 관리자 → 블랙박스 화면 (server_data/live/, --live-fps 0 이면 끔)
 # 관리자 지도를 네이버 지도로: .env 에 NAVER_MAP_KEY_ID=<Client ID>, 콘솔 Web 서비스 URL 에 http://localhost:8501 등록 (인터넷 필요). 없으면 도로선 지도
 # 네이버 지도: 관리자는 전국 지도(깜빡이는 신호·숫자 묶음·새 결함 강조), 시민 카드·신고서는 결함마다 작은 지도. 지도 페이지는 ui/static/*.html
 # 결함 주소: .env 에 NAVER_MAP_CLIENT_SECRET (콘솔 Application 에서 Reverse Geocoding 켜기). 결함이 처음 생길 때 한 번 받아 defects.address 에 저장 (server/geocode.py, server/sql/002_address.sql). 없거나 실패하면 주소 없이 진행하고 1분 뒤 다시 시도
 scripts/demo.sh down
 ```
+
+통신량·중복 정리 측정 (계획 4.5, 결과는 `docs/plan.md` 11장). 블랙박스는 결함마다 전후 2초 480p H.264 클립을 사진과 함께 보내고 `server_data/blackbox/` 에 남긴다 (`edge/blackbox/clipper.py`, `--no-clip`·`--keep-dir ""` 로 끔). 모델이 있으면 `--fake-every 60` 대신 `--model ai/models/detector_v2.onnx`:
+
+```bash
+uv run python experiments/bandwidth.py --video data/videos/gn_a.mp4 --gps <GPS CSV> --fake-every 60 --devices 1 --dry-run --detect-every 10 --keep-dir "" --json experiments/bandwidth_gn_a_full_fake.json
+uv run python experiments/bandwidth.py --video data/videos/gn_a_2050-2510.mp4 --gps <GPS CSV> --fake-every 60 --devices 3 --detect-every 10 --server http://localhost:8010 --json experiments/bandwidth_gn_a_demo_fake.json   # 서버를 띄운 뒤
+uv run python experiments/dedup_distance.py --yes --replay experiments/bandwidth_gn_a_demo_fake.json --distances 10,20,30   # DB 를 비운다
+uv run python experiments/dedup_distance.py --yes --distances 10,20,30
+```
+
+- 11/16 측정은 시연용 DB 를 건드리지 않으려고 따로 띄운 서버(`DATABASE_URL=postgresql://daboyeo:daboyeo@localhost:5432/daboyeo_bw uv run python -m uvicorn server.main:app --port 8010`)로 쟀고, 위 명령에도 같은 `DATABASE_URL` 을 붙였다. `scripts/demo.sh up` 서버로 재면 `--server http://localhost:8000`, 끝나고 `scripts/demo.sh reset`.
+- DB 컨테이너는 여러 작업이 함께 쓴다. 테스트가 서로의 `daboyeo_test` 를 비우며 깨지면 `TEST_DATABASE_URL=…/<다른 이름>_test uv run pytest -q`.
 
 ## 담당 영역 — 요청한 사람의 폴더만 고친다
 

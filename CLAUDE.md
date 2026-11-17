@@ -19,7 +19,8 @@ scripts/demo.sh up                                  # DB → 서버(8000) → �
 uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive   # 가짜 관측 보내기 (주행을 닫으면 시민 확인 목록이 생긴다)
 # 주행이 끝나면 모의 문자(링크 포함)가 생긴다. 화면 > 시연 > 메시지함 (모의)에서 보고, 링크(http://localhost:8501/?t=토큰)를 누르면 로그인 없이 확인·신고 화면이 열린다. 실제 문자는 보내지 않는다 (docs/notify-link-plan.md)
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
-# 차선 마모는 기본으로 끈다(--lane-every 0, handoff 17장). 켜려면 --lane-every 3
+# 차선 마모는 시연에서 끈다(확정, --lane-every 0, handoff 17-6). 실험용으로만 --lane-every 3
+# 탐지 기준 기본은 시연 모델 v3 카드(--conf-json ai/models/detector_v3.json: 포트홀 0.31·균열 0.42·가드레일 0.21·표지판 0.21)
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --detect-every 10 --speed 4
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --devices 3
 scripts/demo.sh drive ai/models/detector_v3.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)

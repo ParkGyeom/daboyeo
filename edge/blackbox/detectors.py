@@ -37,7 +37,7 @@ from edge.blackbox.detect import Detection, Detector
 
 DETECTORS = ("onnx", "fake", "replay")
 RECORD_KIND = "daboyeo-detections"
-RECORD_VERSION = 1
+RECORD_VERSION = 2  # 2: 머리 줄에 탐지 기준(conf)을 적는다
 
 # 라벨 유형(DefectType 값) → 블랙박스 탐지 유형(Detection.type, 탐지 클래스 이름 + lane_wear)
 LABEL_TO_DETECTION = {
@@ -67,6 +67,7 @@ class FrameDetector(Protocol):
 class OnnxMode:
     def __init__(self, model: str, conf, threads: int = 1):
         self.name = Path(model).name
+        self.conf = conf  # 기록 머리 줄에 남긴다 (replay 가 같은 기준인지 확인)
         self._det = Detector(model, conf=conf, threads=threads)
 
     def detect(self, image: np.ndarray, frame: str, t: float) -> list[Detection]:
@@ -79,9 +80,10 @@ def default_labels_path(video: str | Path) -> Path:
 
 
 class FakeDetector:
-    """정답 라벨을 탐지처럼 낸다. 라벨 하나당 1번, 라벨 구간이 시작된 뒤 처음 부른 프레임에서."""
+    """정답 라벨을 탐지처럼 낸다. 라벨 하나당 1번, 라벨 구간이 시작된 뒤 처음 부른 프레임에서.
+    memo 가 `amb` 로 시작하는 애매한 라벨은 기본으로 내지 않는다 (확실한 정답만 서버로, handoff 18-4)."""
 
-    def __init__(self, labels: str | Path, point_half_s: float = 1.0):
+    def __init__(self, labels: str | Path, point_half_s: float = 1.0, include_amb: bool = False):
         from daboyeo_ai.eval.video_events import load_gt
 
         path = Path(labels)
@@ -89,7 +91,11 @@ class FakeDetector:
             raise FileNotFoundError(f"라벨 CSV 가 없다: {path} (--labels 로 준다)")
         self.name = f"fake:{path.name}"
         # t_end_s 를 비운 라벨은 load_gt 가 t_start_s ± point_half_s 창으로 바꿔 준다
-        self.events = sorted(load_gt(path, point_half_s=point_half_s), key=lambda e: e.t_start)
+        events = load_gt(path, point_half_s=point_half_s)
+        self.skipped_amb = 0 if include_amb else sum(e.memo.lower().startswith("amb") for e in events)
+        if not include_amb:
+            events = [e for e in events if not e.memo.lower().startswith("amb")]
+        self.events = sorted(events, key=lambda e: e.t_start)
         self._fired: set[int] = set()
         self._started = False
 
@@ -131,7 +137,8 @@ class Recorder:
         self._fh = self.path.open("w", encoding="utf-8")
         self._write({
             "kind": RECORD_KIND, "version": RECORD_VERSION, "model": inner.name, "video": source,
-            "detect_every": detect_every, "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "detect_every": detect_every, "conf": getattr(inner, "conf", None),
+            "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         })
 
     def _write(self, obj: dict) -> None:
@@ -149,7 +156,8 @@ class Recorder:
 
 
 class ReplayDetector:
-    def __init__(self, path: str | Path, source: str, detect_every: int):
+    def __init__(self, path: str | Path, source: str, detect_every: int, conf=None):
+        """conf: 지금 쓰려는 탐지 기준. 주면 기록을 남길 때의 기준과 같아야 한다 (다르면 기록을 다시 뜬다)."""
         path = Path(path)
         if not path.exists():
             raise FileNotFoundError(f"탐지 기록이 없다: {path} (onnx 로 한 번 --record {path} 를 붙여 돌린다)")
@@ -161,12 +169,17 @@ class ReplayDetector:
         if not isinstance(head, dict) or head.get("kind") != RECORD_KIND:
             raise ValueError(f"{path}: 탐지 기록 파일이 아니다 (첫 줄에 kind={RECORD_KIND!r} 가 없다)")
         if head.get("version") != RECORD_VERSION:
-            raise ValueError(f"{path}: 기록 형식 버전 {head.get('version')} 은 읽지 못한다 (지원: {RECORD_VERSION})")
+            raise ValueError(f"{path}: 기록 형식 버전 {head.get('version')} 은 읽지 못한다 (지원: {RECORD_VERSION}). onnx 로 --record 를 붙여 다시 뜬다")
         if head.get("video") != source:
             raise ValueError(f"{path}: {head.get('video')!r} 의 기록이다. 지금 영상은 {source!r}")
         if head.get("detect_every") != detect_every:
             raise ValueError(f"{path}: 탐지 주기 {head.get('detect_every')} 로 남긴 기록이다. "
                              f"--detect-every {head.get('detect_every')} 로 돌린다 (지금 {detect_every})")
+        rec_conf = head.get("conf")
+        if conf is not None and rec_conf is not None and _norm_conf(rec_conf) != _norm_conf(conf):
+            raise ValueError(f"{path}: 탐지 기준 {rec_conf} 로 남긴 기록이다. 지금 기준은 {conf} — "
+                             f"onnx 로 --record 를 붙여 지금 기준으로 다시 뜬다")
+        self.conf = rec_conf
         self.model = str(head.get("model", "?"))
         self.name = f"replay:{self.model}"
         self.by_frame: dict[str, list[Detection]] = {}
@@ -200,6 +213,21 @@ class ReplayDetector:
         return [Detection(d.type, d.confidence, d.bbox) for d in dets or []]
 
 
+def _norm_conf(conf):
+    """숫자 하나 또는 {클래스: 기준} 을 비교할 수 있게 (소수 넷째 자리)."""
+    if isinstance(conf, dict):
+        return {str(k): round(float(v), 4) for k, v in conf.items()}
+    return round(float(conf), 4)
+
+
+def _conf_from_args(args):
+    if getattr(args, "conf", None) is not None:
+        return args.conf
+    from daboyeo_ai.inference import load_class_conf
+
+    return load_class_conf(args.conf_json)
+
+
 def make_detector(args) -> FrameDetector:
     """run.py 의 인자로 탐지기를 만든다. 파일이 없거나 기록이 맞지 않으면 FileNotFoundError·ValueError."""
     kind = getattr(args, "detector", "onnx")
@@ -207,20 +235,18 @@ def make_detector(args) -> FrameDetector:
     if kind == "replay":
         if not record:
             raise ValueError("--detector replay 는 --record <기록.jsonl> 이 필요하다")
-        return ReplayDetector(record, _source_name(args), args.detect_every)
+        return ReplayDetector(record, _source_name(args), args.detect_every, conf=_conf_from_args(args))
     if kind == "fake":
         if not args.video:
             raise ValueError("--detector fake 는 --video 와 함께 쓴다 (라벨 시각이 영상 시각이다)")
-        det: FrameDetector = FakeDetector(args.labels or default_labels_path(args.video))
+        det: FrameDetector = FakeDetector(args.labels or default_labels_path(args.video),
+                                          include_amb=getattr(args, "include_amb", False))
     elif kind == "onnx":
         if not args.model:
             raise ValueError("--detector onnx 는 --model <파일.onnx> 이 필요하다")
         if not Path(args.model).exists():
             raise FileNotFoundError(f"모델 파일이 없다: {args.model} (Drive daboyeo_data/models/ 에서 받는다)")
-        from daboyeo_ai.inference import load_class_conf
-
-        conf = args.conf if args.conf is not None else load_class_conf(args.conf_json)
-        det = OnnxMode(args.model, conf=conf, threads=args.threads)
+        det = OnnxMode(args.model, conf=_conf_from_args(args), threads=args.threads)
     else:
         raise ValueError(f"모르는 탐지기 {kind!r} (쓸 수 있는 값: {', '.join(DETECTORS)})")
     if record:

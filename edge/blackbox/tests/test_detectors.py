@@ -155,14 +155,19 @@ def test_record_then_replay_gives_same_observations(video, tmp_path, monkeypatch
     assert len(lines) == r1["detected_frames"]
 
     monkeypatch.setattr(detectors, "Detector", None)  # replay 는 모델을 부르지 않는다
+    assert head["version"] == 2 and head["conf"] == 0.25  # 기록에 탐지 기준이 남는다
     _, r2 = drive(video, tmp_path, "--detector", "replay", "--record", str(rec), "--detect-every", "4",
-                  "--lane-every", "0")
+                  "--lane-every", "0", "--conf", "0.25")
     assert Captured.log == sent_onnx
     assert r2["detected_frames"] == r1["detected_frames"]
 
 
+V3_CONF = {"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21}
+
+
 def _write_record(path, **head):
-    h = {"kind": "daboyeo-detections", "version": 1, "model": "m.onnx", "video": "v1.mp4", "detect_every": 5}
+    h = {"kind": "daboyeo-detections", "version": 2, "model": "m.onnx", "video": "v1.mp4", "detect_every": 5,
+         "conf": V3_CONF}
     h.update(head)
     lines = [h,
              {"frame": "v1@0.00s", "t": 0.0, "dets": [["pothole", 0.8, 1, 2, 30, 40]]},
@@ -187,7 +192,7 @@ def test_replay_matches_by_name_then_nearest_time(tmp_path):
     ({"video": "gn_b.mp4"}, "gn_b.mp4"),
     ({"detect_every": 10}, "탐지 주기"),
     ({"kind": "something"}, "탐지 기록 파일이 아니다"),
-    ({"version": 2}, "버전"),
+    ({"version": 1}, "다시 뜬다"),  # 기준이 적혀 있지 않은 예전 기록
 ])
 def test_replay_rejects_mismatched_record(tmp_path, head, msg):
     with pytest.raises(ValueError, match=msg):
@@ -220,3 +225,29 @@ def test_drive_stops_on_wrong_record(video, tmp_path):
 def test_sent_types_unchanged():
     # fake 의 관측 수 규칙은 SENT_TYPES 에 기대므로, 바뀌면 이 테스트와 handoff 12장을 같이 본다
     assert SENT_TYPES == {"pothole", "crack", "lane_wear"}
+
+
+def test_replay_rejects_record_made_with_other_conf(tmp_path):
+    """v2 기준(균열 0.29)으로 뜬 기록을 v3 기준(0.42)으로 재생하지 않는다 — 기록을 다시 뜬다."""
+    rec = _write_record(tmp_path / "r.jsonl", conf={**V3_CONF, "crack": 0.29})
+    with pytest.raises(ValueError, match="다시 뜬다"):
+        ReplayDetector(rec, "v1.mp4", 5, conf=V3_CONF)
+    assert ReplayDetector(_write_record(tmp_path / "ok.jsonl"), "v1.mp4", 5, conf=dict(V3_CONF)).conf == V3_CONF
+
+
+def test_default_conf_is_v3_model_card():
+    """블랙박스 기본 탐지 기준 = 시연 모델 v3 카드의 class_conf_draft (handoff 16장)."""
+    args = run.parse_args(["--video", "a.mp4", "--model", "m.onnx"])
+    assert args.conf_json == "ai/models/detector_v3.json"
+    assert detectors._conf_from_args(args) == V3_CONF
+
+
+def test_fake_skips_amb_labels_unless_asked(tmp_path):
+    p = tmp_path / "v1.csv"
+    p.write_text("defect_id,t_start_s,t_end_s,defect_type,memo\n"
+                 "C1,0.0,1.0,crack,확실\nC2,0.5,1.5,crack,amb 블록 포장 이음매\nP1,1.0,2.0,pothole,\n", encoding="utf-8")
+    img = np.zeros((10, 10, 3), np.uint8)
+    fake = FakeDetector(p)
+    assert fake.skipped_amb == 1 and len(fake.events) == 2
+    assert sorted(d.type for d in fake.detect(img, "a", 1.0)) == ["crack", "pothole"]  # amb 균열 C2 는 안 냄
+    assert len(FakeDetector(p, include_amb=True).events) == 3

@@ -11,7 +11,7 @@
       --model ai/models/detector_v2.onnx --speed 4
   # 탐지기 고르기 (edge/blackbox/detectors.py): 기본 onnx. fake 는 정답 라벨 CSV, replay 는 onnx 로 남긴 기록
   ... --detector fake --labels experiments/gt_events/v1.csv      # 1.1 걷는 골격 (라벨 1개 = 관측 1건)
-  ... --model ai/models/detector_v2.onnx --record data/replay/v1.jsonl   # onnx 로 돌리며 기록
+  ... --model ai/models/detector_v3.onnx --record data/replay/v1.jsonl   # onnx 로 돌리며 기록
   ... --detector replay --record data/replay/v1.jsonl            # 추론 없이 기록대로 (모델 파일 필요 없음)
 
 분석 주기(계획 2.2, scheduler.py): 품질 판별은 매 프레임(--quality-every), 탐지는 --detect-every,
@@ -20,10 +20,11 @@
 연속 프레임 합치기(계획 2.3, track_merge.py): 같은 결함이 여러 프레임에 보여도 트랙 하나로 묶고,
 트랙이 끝날 때(--merge-gap 초 동안 안 보이거나 주행이 끝날 때) 가장 신뢰도 높은 프레임으로 관측 1건만 보낸다.
 --no-merge 면 예전처럼 탐지마다 보낸다 (합치기 전후 비교용).
-탐지 신뢰도: 기본은 클래스별 기준(--conf-json, 박겸 초안). --conf 를 주면 숫자 하나로 모든 클래스에 쓴다.
+탐지 신뢰도: 기본은 시연 모델 v3 의 클래스별 기준(--conf-json ai/models/detector_v3.json: 포트홀 0.31 · 균열 0.42 ·
+가드레일 0.21 · 표지판 0.21, handoff 16장). --conf 를 주면 숫자 하나로 모든 클래스에 쓴다.
 차선 마모: 기본은 끈다 (--lane-every 0). 시연 클립 gn_b 에서 확정 58건 중 54건이 헛것(25건은 신호 대기 중
-횡단보도), gn_a 는 젖은 노면이라 차선을 2.8% 프레임에서만 찾았다 (docs/ai-handoff.md 17장). 박겸이 11/20까지
-개선해 보고 통과하면 --lane-every 3 으로 켠다. 켜면 --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고
+횡단보도), gn_a 는 젖은 노면이라 차선을 2.8% 프레임에서만 찾았다 (docs/ai-handoff.md 17장). 개선(정지 판정·횡단보도
+거르기)을 해도 헛것 84% 라 시연에서는 끈다 (확정, handoff 17-6). 실험용으로 켤 때는 --lane-every 3. 켜면 --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고
 LaneWearTracker 로 판정한다. 같은 주행의 평소 차선과 비교해 연속 판정 5장 중 3장이 마모일 때 그 프레임 위치로
 1건 보내고, 마모 구간이 끝날 때까지 다시 보내지 않는다 (docs/ai-handoff.md 8장).
 클립(계획 1.3): 영상 입력이면 결함마다 전후 2초를 480p H.264 로 잘라 사진과 함께 보낸다 (edge/blackbox/clipper.py,
@@ -115,15 +116,17 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--model", default=None, help="ONNX 파일 (--detector onnx 일 때)")
     ap.add_argument("--labels", default=None,
                     help="fake 의 정답 라벨 CSV. 없으면 experiments/gt_events/<영상 이름>.csv")
+    ap.add_argument("--include-amb", action="store_true",
+                    help="fake 가 memo 가 amb 로 시작하는 애매한 라벨도 낸다 (기본은 확실한 정답만, handoff 18-4)")
     ap.add_argument("--record", default=None,
                     help="탐지 기록 JSONL. onnx·fake 는 여기에 쓰고, replay 는 여기서 읽는다")
     ap.add_argument("--conf", type=float, default=None, help="탐지 신뢰도 기준 하나 (주면 --conf-json 대신 쓴다)")
-    ap.add_argument("--conf-json", default="experiments/conf_thresholds.json",
-                    help="클래스별 탐지 신뢰도 기준 파일 (class_conf 키)")
+    ap.add_argument("--conf-json", default="ai/models/detector_v3.json",
+                    help="클래스별 탐지 신뢰도 기준 파일 (class_conf 또는 class_conf_draft 키). 기본은 시연 모델 v3")
     ap.add_argument("--threads", type=int, default=1, help="ONNX Runtime 스레드 수 (PRD: CPU 1~2코어)")
     ap.add_argument("--detect-every", type=int, default=1, help="결함 탐지 주기(프레임)")
     ap.add_argument("--lane-every", type=int, default=0,
-                    help="차선 마모 주기(프레임). 기본 0 = 재지 않음 (시연 기본, handoff 17장). 켜려면 3")
+                    help="차선 마모 주기(프레임). 기본 0 = 재지 않음 (시연에서 끔 확정, handoff 17-6). 실험용 3")
     ap.add_argument("--quality-every", type=int, default=1,
                     help="품질 판별 주기(프레임). 탐지·차선 프레임에서는 주기와 상관없이 먼저 잰다")
     ap.add_argument("--merge-gap", type=float, default=GAP_S,

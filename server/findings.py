@@ -7,21 +7,25 @@
 
 from __future__ import annotations
 
+import json
 from uuid import UUID
 
 import psycopg
 
 from server import db, rules
 
-# rules.is_exposed 와 같은 조건 (SQL)
+# rules.is_exposed 와 같은 조건 (SQL). θ 는 유형별 (rules.CONFIDENCE_VISIBLE_BY_TYPE, JSON 으로 넘긴다)
 _EXPOSED = """
     ((d.is_suspected AND d.vehicle_count >= %(k)s)
-     OR (NOT d.is_suspected AND (d.confidence >= %(theta)s OR d.vehicle_count >= %(k)s)))
+     OR (NOT d.is_suspected AND (
+         d.confidence >= COALESCE((%(theta_by_type)s::jsonb ->> d.defect_type::text)::real, %(theta)s)
+         OR d.vehicle_count >= %(k)s)))
 """
 
 
 def _params(**kw) -> dict:
-    return {"k": rules.MIN_VEHICLES_VISIBLE, "theta": rules.CONFIDENCE_VISIBLE, **kw}
+    return {"k": rules.MIN_VEHICLES_VISIBLE, "theta": rules.CONFIDENCE_VISIBLE,
+            "theta_by_type": json.dumps(rules.CONFIDENCE_VISIBLE_BY_TYPE), **kw}
 
 
 def refresh_trip(conn: psycopg.Connection, trip_id: UUID) -> int:

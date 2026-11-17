@@ -9,12 +9,26 @@
   # 로드마크 구간 (프레임마다 실제 GPS)
   uv run python -m edge.blackbox.run --segment 0401_light_rainy_smooth:03000071-03000182 \\
       --model ai/models/detector_v2.onnx --speed 4
+  # 탐지기 고르기 (edge/blackbox/detectors.py): 기본 onnx. fake 는 정답 라벨 CSV, replay 는 onnx 로 남긴 기록
+  ... --detector fake --labels experiments/gt_events/v1.csv      # 1.1 걷는 골격 (라벨 1개 = 관측 1건)
+  ... --model ai/models/detector_v3.onnx --record data/replay/v1.jsonl   # onnx 로 돌리며 기록
+  ... --detector replay --record data/replay/v1.jsonl            # 추론 없이 기록대로 (모델 파일 필요 없음)
 
-품질 판별(B6): 매 프레임 탐지 전에 재고, 나쁘면 탐지를 건너뛴다 (--no-quality 로 끈다).
-탐지 신뢰도: 기본은 클래스별 기준(--conf-json, 박겸 초안). --conf 를 주면 숫자 하나로 모든 클래스에 쓴다.
-차선 마모: --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고 LaneWearTracker 로 판정한다.
-같은 주행의 평소 차선과 비교해 연속 판정 5장 중 3장이 마모일 때 그 프레임 위치로 1건 보내고,
-마모 구간이 끝날 때까지 다시 보내지 않는다 (docs/ai-handoff.md 8장. 기준값은 박겸이 11/22까지 확정).
+분석 주기(계획 2.2, scheduler.py): 품질 판별은 매 프레임(--quality-every), 탐지는 --detect-every,
+차선 마모는 --lane-every 프레임마다. 품질이 나쁜 프레임은 탐지·차선을 건너뛴다 (--no-quality 로 끈다).
+끝날 때 단계별 실행 비율과 평균 시간을 출력한다.
+연속 프레임 합치기(계획 2.3, track_merge.py): 같은 결함이 여러 프레임에 보여도 트랙 하나로 묶고,
+트랙이 끝날 때(--merge-gap 초 동안 안 보이거나 주행이 끝날 때) 가장 신뢰도 높은 프레임으로 관측 1건만 보낸다.
+--no-merge 면 예전처럼 탐지마다 보낸다 (합치기 전후 비교용).
+탐지 신뢰도: 기본은 시연 모델 v3 의 클래스별 기준(--conf-json ai/models/detector_v3.json: 포트홀 0.31 · 균열 0.42 ·
+가드레일 0.21 · 표지판 0.21, handoff 16장). --conf 를 주면 숫자 하나로 모든 클래스에 쓴다.
+차선 마모: 기본은 끈다 (--lane-every 0). 시연 클립 gn_b 에서 확정 58건 중 54건이 헛것(25건은 신호 대기 중
+횡단보도), gn_a 는 젖은 노면이라 차선을 2.8% 프레임에서만 찾았다 (docs/ai-handoff.md 17장). 개선(정지 판정·횡단보도
+거르기)을 해도 헛것 84% 라 시연에서는 끈다 (확정, handoff 17-6). 실험용으로 켤 때는 --lane-every 3. 켜면 --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고
+LaneWearTracker 로 판정한다. 같은 주행의 평소 차선과 비교해 연속 판정 5장 중 3장이 마모일 때 그 프레임 위치로
+1건 보내고, 마모 구간이 끝날 때까지 다시 보내지 않는다 (docs/ai-handoff.md 8장).
+클립(계획 1.3): 영상 입력이면 결함마다 전후 2초를 480p H.264 로 잘라 사진과 함께 보낸다 (edge/blackbox/clipper.py,
+앞 클립과 겹치면 다시 자르지 않는다). 보낸 사진·클립은 --keep-dir/<기기>/<주행>/ 에도 남는다. --no-clip 으로 끈다.
 """
 
 from __future__ import annotations
@@ -29,14 +43,17 @@ from pathlib import Path
 
 import numpy as np
 
-from daboyeo_ai.inference import load_class_conf
 from daboyeo_contracts import DefectType, ObservationIn
 
-from edge.blackbox.quality import measure
-from edge.blackbox.detect import SENT_TYPES, Detection, Detector, LaneWear
+from edge.blackbox.clipper import ClipCutter
+from edge.blackbox.detect import SENT_TYPES, Detection, LaneWear
+from edge.blackbox.detectors import DETECTORS, make_detector
 from edge.blackbox.live import LIVE_DIR, LiveView
+from edge.blackbox.quality import measure
+from edge.blackbox.scheduler import Scheduler
 from edge.blackbox.sender import Sender, crop_snapshot
 from edge.blackbox.source import open_source
+from edge.blackbox.track_merge import GAP_S, TrackMerger
 
 KST = timezone(timedelta(hours=9))
 DEFAULT_INTERVAL_S = 1.0  # 시각을 읽지 못한 프레임 사이 간격
@@ -94,25 +111,42 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--frames", default="data/roadmark/VS4", help="로드마크 프레임 폴더 (IMAGE/, GPS/ 가 들어 있다)")
     ap.add_argument("--device-id", default="bb-01")
     ap.add_argument("--server", default="http://localhost:8000")
-    ap.add_argument("--model", required=True, help="ONNX 파일")
+    ap.add_argument("--detector", choices=DETECTORS, default="onnx",
+                    help="onnx: 모델 추론, fake: 정답 라벨 CSV 를 탐지처럼, replay: --record 기록을 추론 없이")
+    ap.add_argument("--model", default=None, help="ONNX 파일 (--detector onnx 일 때)")
+    ap.add_argument("--labels", default=None,
+                    help="fake 의 정답 라벨 CSV. 없으면 experiments/gt_events/<영상 이름>.csv")
+    ap.add_argument("--include-amb", action="store_true",
+                    help="fake 가 memo 가 amb 로 시작하는 애매한 라벨도 낸다 (기본은 확실한 정답만, handoff 18-4)")
+    ap.add_argument("--record", default=None,
+                    help="탐지 기록 JSONL. onnx·fake 는 여기에 쓰고, replay 는 여기서 읽는다")
     ap.add_argument("--conf", type=float, default=None, help="탐지 신뢰도 기준 하나 (주면 --conf-json 대신 쓴다)")
-    ap.add_argument("--conf-json", default="experiments/conf_thresholds.json",
-                    help="클래스별 탐지 신뢰도 기준 파일 (class_conf 키)")
+    ap.add_argument("--conf-json", default="ai/models/detector_v3.json",
+                    help="클래스별 탐지 신뢰도 기준 파일 (class_conf 또는 class_conf_draft 키). 기본은 시연 모델 v3")
     ap.add_argument("--threads", type=int, default=1, help="ONNX Runtime 스레드 수 (PRD: CPU 1~2코어)")
     ap.add_argument("--detect-every", type=int, default=1, help="결함 탐지 주기(프레임)")
-    ap.add_argument("--lane-every", type=int, default=3, help="차선 마모 주기(프레임). 0이면 재지 않는다")
+    ap.add_argument("--lane-every", type=int, default=0,
+                    help="차선 마모 주기(프레임). 기본 0 = 재지 않음 (시연에서 끔 확정, handoff 17-6). 실험용 3")
+    ap.add_argument("--quality-every", type=int, default=1,
+                    help="품질 판별 주기(프레임). 탐지·차선 프레임에서는 주기와 상관없이 먼저 잰다")
+    ap.add_argument("--merge-gap", type=float, default=GAP_S,
+                    help="이만큼(초) 안 보이면 결함 트랙이 끝난 것으로 보고 관측 1건을 보낸다")
+    ap.add_argument("--no-merge", action="store_true", help="연속 프레임을 합치지 않고 탐지마다 보낸다 (비교용)")
     ap.add_argument("--speed", type=float, default=1.0, help="재생 배속. 0이면 기다리지 않는다")
     ap.add_argument("--gps-noise", type=float, default=0.0, help="GPS 에 더할 오차의 표준편차(m)")
     ap.add_argument("--brightness", type=float, default=1.0, help="밝기 배율")
     ap.add_argument("--start-offset", type=int, default=0, help="건너뛸 앞쪽 프레임 수")
     ap.add_argument("--seed", type=int, default=None, help="GPS 오차 난수 씨앗")
     ap.add_argument("--dry-run", action="store_true", help="서버로 보내지 않고 화면에만 출력")
+    ap.add_argument("--no-clip", action="store_true", help="결함 구간 클립을 만들지 않는다 (사진·메타만)")
+    ap.add_argument("--keep-dir", default="server_data/blackbox",
+                    help="보낸 사진·클립을 남길 폴더 (<폴더>/<기기>/<주행>/). 빈 문자열이면 남기지 않는다")
     ap.add_argument("--no-quality", action="store_true", help="품질 판별을 끈다 (실험용)")
     ap.add_argument("--live-fps", type=float, default=5.0,
                     help="블랙박스 화면에 초당 몇 장 내보낼지. 0이면 화면을 쓰지 않는다")
     ap.add_argument("--live-dir", default=str(LIVE_DIR), help="블랙박스 화면 파일을 둘 폴더 (화면 ui/ 가 읽는다)")
     args = ap.parse_args(argv)
-    if args.detect_every < 1 or args.lane_every < 0:
+    if args.detect_every < 1 or args.quality_every < 1 or args.lane_every < 0:
         ap.error("주기는 1 이상이어야 한다")
     if args.speed < 0:
         ap.error("--speed 는 0 이상이어야 한다")
@@ -130,25 +164,34 @@ def drive(args: argparse.Namespace) -> dict:
         print(f"프레임이 없다: {args.video or f'{args.segment} ({args.frames})'}", file=sys.stderr)
         return {"frames": 0}
 
-    conf = args.conf if args.conf is not None else load_class_conf(args.conf_json)
-    detector = Detector(args.model, conf=conf, threads=args.threads)
-    sender = Sender(args.server, dry_run=args.dry_run)
+    try:
+        detector = make_detector(args)
+    except (OSError, ValueError, KeyError) as e:
+        print(e, file=sys.stderr)
+        return {"frames": 0}
+    if args.detector == "fake" and args.lane_every > 0:
+        args.lane_every = 0  # 차선 마모도 라벨에서 나온다
+    print(f"[{args.device_id}] 탐지기 {detector.name}" + (f", 기록 {args.record}" if args.record else ""))
+    sender = Sender(args.server, dry_run=args.dry_run,
+                    keep_dir=Path(args.keep_dir) / args.device_id if args.keep_dir else None)
     rng = random.Random(args.seed)
     started = datetime.now(KST).replace(microsecond=0)
     if not sender.start_trip(args.device_id, started):
         print(f"[{args.device_id}] 서버에 주행을 열지 못했다 ({args.server}). --dry-run 이면 서버 없이 돈다", file=sys.stderr)
         sender.close()
         return {"frames": 0}
+    clipper = ClipCutter(args.video) if args.video and not args.no_clip else None
     first_t: float | None = None
     pacer = Pacer()
-    detect_s = 0.0
-    detected_frames = skipped_no_gps = skipped_quality = 0
+    sched = Scheduler(args.detect_every, args.lane_every, args.quality_every, quality=not args.no_quality)
+    merger = None if args.no_merge else TrackMerger(gap_s=args.merge_gap)
+    skipped_no_gps = skipped_quality = quality_bad = 0
 
     lane_meter = LaneWear() if args.lane_every > 0 else None
     live = (LiveView(args.device_id, Path(args.video).name if args.video else args.segment, SENT_TYPES,
                      out_dir=args.live_dir, fps=args.live_fps) if args.live_fps > 0 else None)
 
-    def send(d: Detection, image, fix, i: int, name: str) -> None:
+    def send(d: Detection, image, fix, i: int, name: str, note: str = "") -> None:
         x1, y1, x2, y2 = d.bbox
         if x2 <= x1 or y2 <= y1:
             return
@@ -166,12 +209,22 @@ def drive(args: argparse.Namespace) -> dict:
             confidence=round(d.confidence, 4), bbox=bbox, lat=round(lat, 7), lon=round(lon, 7),
             t_s=round(offset, 3), observed_at=started + timedelta(seconds=offset),
         )
-        res = sender.send(obs, crop_snapshot(image, d.bbox))
+        # 클립 시각은 영상 시각(fix.time_s). 차선 마모도 결함 구간이라 같이 자른다
+        clip = clipper.cut(fix.time_s) if clipper is not None and fix.time_s is not None else None
+        res = sender.send(obs, crop_snapshot(image, d.bbox), clip)
         tag = "" if res is None else f" → 결함 {str(res['defect_id'])[:8]}{' (새 결함)' if res['is_new_defect'] else ''}"
-        print(f"  {name}: {d.type} {d.confidence:.2f}{tag}")
+        print(f"  {name}: {d.type} {d.confidence:.2f}{note}{tag}")
+
+    def send_tracks(tracks) -> None:
+        """끝난 트랙마다 가장 신뢰도 높은 프레임으로 관측 1건."""
+        for tr in tracks:
+            image, fix, i, name = tr.payload
+            send(tr.best, image, fix, i, name, note=f" (탐지 {tr.hits}회 합침, {tr.last_t - tr.start_t:.1f}초)")
 
     print(f"[{args.device_id}] {args.video or args.segment} 프레임 {len(frames)}장, 탐지 주기 {args.detect_every}, "
-          f"차선 주기 {args.lane_every}, 배속 {args.speed}{', 보내지 않음' if args.dry_run else ''}")
+          f"차선 주기 {args.lane_every}, 품질 주기 {args.quality_every}, "
+          f"{'합치지 않음' if merger is None else f'합치기 {args.merge_gap:g}초'}, 배속 {args.speed}"
+          f"{', 보내지 않음' if args.dry_run else ''}")
     try:
         for i, frame in enumerate(frames):
             fix = frame.fix
@@ -189,35 +242,43 @@ def drive(args: argparse.Namespace) -> dict:
                 print(f"  {frame.name}: 위치 없음, 건너뜀")
                 continue
             ft = fix.time_s if fix.time_s is not None else float(i)
-            run_detect = i % args.detect_every == 0
-            run_lane = args.lane_every > 0 and i % args.lane_every == 0
+            if merger:
+                send_tracks(merger.expire(ft))
+            steps = sched.plan(i)
+            run_detect, run_lane = steps.detect, steps.lane
             show = live is not None and live.due(ft)
-            if not (run_detect or run_lane or show):
+            if not (steps.any or show):
                 continue
 
             image = adjust_brightness(frame.load(), args.brightness)
             note = ""
-            if (run_detect or run_lane) and not args.no_quality:
-                q = measure(image)
+            if steps.quality:
+                with sched.run("quality"):
+                    q = measure(image)
                 if not q.ok:
-                    skipped_quality += 1
-                    run_detect = run_lane = False
+                    quality_bad += 1
+                    if run_detect or run_lane:
+                        skipped_quality += 1
+                        run_detect = run_lane = False
+                        print(f"  {frame.name}: 품질 나쁨({q.reason}), 탐지 건너뜀 "
+                              f"[밝기 {q.brightness:.0f}, 선명도 {q.sharpness:.0f}, 대비 {q.contrast:.0f}]")
                     note = f"품질 나쁨({q.reason}), 탐지 건너뜀"
-                    print(f"  {frame.name}: {note} "
-                          f"[밝기 {q.brightness:.0f}, 선명도 {q.sharpness:.0f}, 대비 {q.contrast:.0f}]")
             if run_detect:
-                t0 = time.perf_counter()
-                dets = detector.detect(image)
-                detect_s += time.perf_counter() - t0
-                detected_frames += 1
+                with sched.run("detect"):
+                    dets = detector.detect(image, frame=frame.name, t=ft)
                 if live:
                     live.add(dets, ft)
-                for d in dets:
-                    if d.type in SENT_TYPES:
+                sent_dets = [d for d in dets if d.type in SENT_TYPES]
+                if merger:
+                    send_tracks(merger.update(sent_dets, ft, payload=(image, fix, i, frame.name)))
+                else:
+                    for d in sent_dets:
                         send(d, image, fix, i, frame.name)
 
             if run_lane:
-                lw = lane_meter.check(image, t=fix.time_s)
+                # 차선 마모는 LaneWearTracker 가 이미 마모 구간마다 1건만 내므로 합치지 않는다
+                with sched.run("lane"):
+                    lw = lane_meter.check(image, t=fix.time_s)
                 if lw:
                     if live:
                         live.add([lw], ft, replace=False)
@@ -227,6 +288,8 @@ def drive(args: argparse.Namespace) -> dict:
     except KeyboardInterrupt:
         print("중단")
     finally:
+        if merger:
+            send_tracks(merger.flush())  # 열린 트랙을 모두 내보낸 뒤 주행을 닫는다
         # 주행 중에는 알리지 않고 끝난 뒤에 한 번만 알린다 (주행을 닫으면 시민의 확인 목록이 생긴다)
         end = sender.end_trip()
         if end is not None:
@@ -234,21 +297,36 @@ def drive(args: argparse.Namespace) -> dict:
         if live:
             live.finish(sender.sent)
         sender.close()
+        if clipper is not None:
+            clipper.close()
 
-    avg = detect_s / detected_frames * 1000 if detected_frames else 0
-    print(f"[{args.device_id}] 끝. 탐지한 프레임 {detected_frames}, 보낸 결과 {sender.sent}건 "
-          f"({sender.bytes_sent / 1024:.1f}KB), 전송 실패 {sender.failed}, 위치 없음 {skipped_no_gps}, "
-          f"품질 나쁨 {skipped_quality}, "
-          f"탐지 평균 {avg:.0f}ms/장")
+    stages = sched.stats()
+    merged = (f"탐지 {merger.detections}회 → 트랙 {merger.closed}개" if merger else "합치지 않음")
+    print(f"[{args.device_id}] 끝. 탐지한 프레임 {stages['detect']['runs']}, {merged}, 보낸 관측 {sender.sent}건 "
+          f"({sender.bytes_sent / 1024:.1f}KB: 메타 {sender.bytes_meta / 1024:.1f} · 사진 {sender.bytes_snapshot / 1024:.1f} · "
+          f"클립 {sender.clips}개 {sender.bytes_clip / 1024:.1f}), 전송 실패 {sender.failed}, 위치 없음 {skipped_no_gps}, "
+          f"품질 나쁨 {quality_bad}프레임 (그중 분석 건너뜀 {skipped_quality}), 탐지 평균 {stages['detect']['ms_avg']:.0f}ms/장")
+    print(f"[{args.device_id}] {sched.summary()}")
     return {
         "frames": len(frames),
-        "detected_frames": detected_frames,
+        "trip_id": None if args.dry_run else str(sender.trip_id),
+        "detected_frames": stages["detect"]["runs"],
         "sent": sender.sent,
         "bytes_sent": sender.bytes_sent,
+        "bytes_meta": sender.bytes_meta,
+        "bytes_snapshot": sender.bytes_snapshot,
+        "bytes_clip": sender.bytes_clip,
+        "clips": sender.clips,
+        "clip_codec": clipper.codec if clipper is not None else "",
+        "clips_skipped_overlap": clipper.skipped_overlap if clipper is not None else 0,
         "failed": sender.failed,
         "skipped_no_gps": skipped_no_gps,
         "skipped_quality": skipped_quality,
-        "detect_ms_avg": avg,
+        "quality_bad": quality_bad,
+        "detect_ms_avg": stages["detect"]["ms_avg"],
+        "detections": merger.detections if merger else None,
+        "tracks": merger.closed if merger else None,
+        "stages": stages,
     }
 
 

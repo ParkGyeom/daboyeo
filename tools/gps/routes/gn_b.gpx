@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- gn_b: 강남대로 북행 차로, 강남역사거리 남쪽 ~ 교보타워사거리에서 사평대로로 좌회전 (약 880 m).
+     좌표: OpenStreetMap 강남대로 북행 way 521766182~521766186, 사평대로 way 494954965·541692164 (© OpenStreetMap contributors, ODbL).
+     강남대로 구간은 gn_a 경로와 같은 선이라 두 영상의 같은 지점이 같은 좌표가 된다 -->
+<gpx version="1.1" creator="daboyeo tools/gps" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>gn_b</name>
+    <trkseg>
+      <trkpt lat="37.497518" lon="127.027916"></trkpt>
+      <trkpt lat="37.497923" lon="127.027730"></trkpt>
+      <trkpt lat="37.497989" lon="127.027700"></trkpt>
+      <trkpt lat="37.498048" lon="127.027681"></trkpt>
+      <trkpt lat="37.498169" lon="127.027641"></trkpt>
+      <trkpt lat="37.498373" lon="127.027547"></trkpt>
+      <trkpt lat="37.498496" lon="127.027488"></trkpt>
+      <trkpt lat="37.498837" lon="127.027328"></trkpt>
+      <trkpt lat="37.499231" lon="127.027148"></trkpt>
+      <trkpt lat="37.499549" lon="127.026993"></trkpt>
+      <trkpt lat="37.499602" lon="127.026968"></trkpt>
+      <trkpt lat="37.499876" lon="127.026838"></trkpt>
+      <trkpt lat="37.500409" lon="127.026582"></trkpt>
+      <trkpt lat="37.501057" lon="127.026297"></trkpt>
+      <trkpt lat="37.501224" lon="127.026236"></trkpt>
+      <trkpt lat="37.501639" lon="127.026036"></trkpt>
+      <trkpt lat="37.501976" lon="127.025849"></trkpt>
+      <trkpt lat="37.502290" lon="127.025703"></trkpt>
+      <trkpt lat="37.502648" lon="127.025536"></trkpt>
+      <trkpt lat="37.503601" lon="127.025058"></trkpt>
+      <trkpt lat="37.503945" lon="127.024893"></trkpt>
+      <trkpt lat="37.504301" lon="127.024726"></trkpt>
+      <trkpt lat="37.504499" lon="127.024603"></trkpt>
+      <trkpt lat="37.504500" lon="127.024603"></trkpt>
+      <trkpt lat="37.504449" lon="127.024428"></trkpt>
+      <trkpt lat="37.504154" lon="127.023482"></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

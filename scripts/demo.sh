@@ -7,6 +7,9 @@
 #   scripts/demo.sh drive <모델.onnx> [기기 수] [구간] [배속]
 #                            가상 블랙박스를 기기 수만큼 동시에 돌린다 (기본 1대, 서울 우천 구간, 4배속)
 #                            2대째부터는 GPS 오차·밝기·시작 시점을 달리한다
+#   scripts/demo.sh replay <기록.jsonl> <영상> [기기 수] [배속]
+#                            모델 추론 없이 탐지 기록대로 영상을 운전한다 (모델 파일·빠른 CPU 가 없을 때).
+#                            기록은 미리 run 에 --record <기록.jsonl> 을 붙여 onnx 로 한 번 돌려 만든다
 #   scripts/demo.sh down     서버와 화면을 끈다 (DB 는 둔다. DB 까지 끄려면 down --db)
 #
 # 로그는 server_data/logs/ 에 남는다.
@@ -62,7 +65,7 @@ cmd_up() {
         say "  서버는 이미 떠 있다"
     else
         port_busy "$SERVER_PORT" && die "포트 $SERVER_PORT 을(를) 다른 프로그램이 쓰고 있다"
-        start_bg server "$PY" -m uvicorn server.main:app --port "$SERVER_PORT"
+        PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-http://localhost:$WEB_PORT}" start_bg server "$PY" -m uvicorn server.main:app --port "$SERVER_PORT"
         wait_http "http://localhost:$SERVER_PORT/health" server
         say "  서버 준비됨 http://localhost:$SERVER_PORT"
     fi
@@ -106,8 +109,8 @@ cmd_status() {
     n=$({ pgrep -f "edge.blackbox.run" 2>/dev/null || true; } | wc -l | tr -d ' ')
     say "블랙박스 ${n}대 실행 중"
     if curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null 2>&1; then
-        curl -fs "http://localhost:$SERVER_PORT/api/defects" | "$PY" -c \
-            'import json,sys; d=json.load(sys.stdin); n=sum(x["status"]=="미신고" for x in d); print(f"결함 {len(d)}건 (미신고 {n})")'
+        curl -fs "http://localhost:$SERVER_PORT/api/v1/defects" | "$PY" -c \
+            'import json,sys; d=json.load(sys.stdin); n=sum(x["status"]=="unreported" for x in d); print(f"결함 {len(d)}건 (미신고 {n})")'
     fi
 }
 
@@ -115,8 +118,9 @@ cmd_reset() {
     docker info >/dev/null 2>&1 || die "Docker 가 꺼져 있다"
     pgrep -f "edge.blackbox.run" >/dev/null 2>&1 && die "가상 블랙박스가 돌고 있다. 끝난 뒤에 되돌린다"
     "$PY" -c "from server import db; db.init_db(); db.reset_db()"
-    rm -f server_data/snapshots/*.jpg
-    say "처음 상태로 되돌렸다 (결함·신고·사진 삭제, 시민 3명 다시 넣음)"
+    rm -f server_data/snapshots/*.jpg server_data/clips/*.mp4
+    rm -rf server_data/blackbox
+    say "처음 상태로 되돌렸다 (결함·신고·사진·클립, 블랙박스가 남긴 결함 구간 삭제, 시민 3명 다시 넣음)"
 }
 
 cmd_drive() {
@@ -130,11 +134,26 @@ cmd_drive() {
         --server "http://localhost:$SERVER_PORT" 2>&1 | tee "$LOGS/blackbox.log"
 }
 
+cmd_replay() {
+    local record=${1:-}; local video=${2:-}; local devices=${3:-1}; local speed=${4:-4}
+    [[ -n $record && -f $record && -n $video && -f $video ]] \
+        || die "기록과 영상을 준다: scripts/demo.sh replay data/replay/<영상>.jsonl data/videos/<영상>.mp4 [기기 수] [배속]"
+    [[ $devices =~ ^[1-3]$ ]] || die "기기 수는 1~3 (시연용 시민이 3명이다)"
+    curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null || die "서버가 꺼져 있다. scripts/demo.sh up 을 먼저 한다"
+    local every
+    every=$("$PY" -c 'import json,sys; print(json.loads(open(sys.argv[1]).readline())["detect_every"])' "$record") \
+        || die "$record 은(는) 탐지 기록이 아니다"
+
+    "$PY" -m edge.blackbox.variants --devices "$devices" --video "$video" --detector replay --record "$record" \
+        --detect-every "$every" --speed "$speed" --server "http://localhost:$SERVER_PORT" 2>&1 | tee "$LOGS/blackbox.log"
+}
+
 case ${1:-} in
     up) cmd_up ;;
     down) shift; cmd_down "${1:-}" ;;
     status) cmd_status ;;
     reset) cmd_reset ;;
     drive) shift; cmd_drive "$@" ;;
-    *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    replay) shift; cmd_replay "$@" ;;
+    *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

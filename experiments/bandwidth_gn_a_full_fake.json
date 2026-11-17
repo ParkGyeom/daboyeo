@@ -1,0 +1,48 @@
+{
+  "measured_at": "2026-11-16T18:11:34",
+  "video": "gn_a.mp4",
+  "video_duration_s": 2092.9,
+  "video_fps": 59.94,
+  "gps": "gn_a.gps.csv",
+  "detector": "fake: 5초부터 60초마다 결함 1개, 2초 보임",
+  "run_args": [
+    "--dry-run",
+    "--detect-every",
+    "10",
+    "--keep-dir",
+    "",
+    "--no-quality",
+    "--lane-every",
+    "0",
+    "--model",
+    "fake"
+  ],
+  "note": "gn_a 원본(유튜브 1080p60 VP9) 전체. 가짜 GPS(도곡동→한남대교 직선). 가짜 탐지",
+  "devices": [
+    {
+      "frames": 125451,
+      "trip_id": null,
+      "detected_frames": 12546,
+      "sent": 420,
+      "bytes_sent": 18103128,
+      "bytes_meta": 165122,
+      "bytes_snapshot": 11620515,
+      "bytes_clip": 6317491,
+      "clips": 35,
+      "clip_codec": "h264",
+      "clips_skipped_overlap": 385,
+      "failed": 0,
+      "skipped_no_gps": 0,
+      "skipped_quality": 0,
+      "detect_ms_avg": 0.0050442719673910105,
+      "device_id": "bb-01"
+    }
+  ],
+  "clip_codec": "h264",
+  "bytes_sent_per_device": 18103128,
+  "baseline_a_file_bytes": 789375918,
+  "baseline_b_bytes": 2616175000,
+  "bitrate_mbps_b": 10.0,
+  "reduction_a": 0.9770665311834354,
+  "reduction_b": 0.9930803069366537
+}

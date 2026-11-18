@@ -1,0 +1,112 @@
+{
+ "preds": "/Users/parkgyeom/daboyeo/data/presentation/rdd_pothole/preds.json",
+ "conf_file": "ai/models/detector_v3.json",
+ "class_conf": {
+  "pothole": 0.31,
+  "crack": 0.42
+ },
+ "definitions": {
+  "box_iou50": "박스 단위: 경보 박스 하나가 같은 클래스 정답 박스와 IoU 0.5 이상 겹치면 맞음 (정답 하나에 경보 하나, 점수 높은 순). 정밀도 = 맞은 경보 / 전체 경보, 재현율 = 찾은 정답 박스 / 전체 정답 박스",
+  "image_recall": "사진 단위 재현율 = 그 클래스 정답 박스가 있는 사진 중, 같은 클래스 경보가 하나라도 뜬 사진 비율 (위치 무관)",
+  "image_precision": "사진 단위 정밀도 = 그 클래스 경보가 뜬 사진 중, 그 클래스 정답이 실제로 있는 사진 비율 (위치 무관)",
+  "overlap": "겹침 조건 (참고): 경보 박스가 같은 클래스 정답 박스와 조금이라도 겹칠 때만 '알아챔'으로 센 사진 단위 값"
+ },
+ "all": {
+  "images": 3526,
+  "excluded_countries": [],
+  "pothole": {
+   "box_iou50": {
+    "conf": 0.31,
+    "tp": 196,
+    "fp": 87,
+    "n_gt": 638,
+    "P": 0.693,
+    "R": 0.307
+   },
+   "image": {
+    "conf": 0.31,
+    "images": 3526,
+    "gt_images": 348,
+    "alert_images": 210,
+    "hit_images": 190,
+    "hit_images_overlap": 184,
+    "recall": 0.546,
+    "precision": 0.905,
+    "recall_overlap": 0.529,
+    "precision_overlap": 0.876
+   }
+  },
+  "crack": {
+   "box_iou50": {
+    "conf": 0.42,
+    "tp": 1603,
+    "fp": 390,
+    "n_gt": 4239,
+    "P": 0.804,
+    "R": 0.378
+   },
+   "image": {
+    "conf": 0.42,
+    "images": 3526,
+    "gt_images": 1995,
+    "alert_images": 1369,
+    "hit_images": 1316,
+    "hit_images_overlap": 1293,
+    "recall": 0.66,
+    "precision": 0.961,
+    "recall_overlap": 0.648,
+    "precision_overlap": 0.944
+   }
+  }
+ },
+ "excluding": {
+  "images": 3064,
+  "excluded_countries": [
+   "United_States"
+  ],
+  "pothole": {
+   "box_iou50": {
+    "conf": 0.31,
+    "tp": 195,
+    "fp": 86,
+    "n_gt": 624,
+    "P": 0.694,
+    "R": 0.312
+   },
+   "image": {
+    "conf": 0.31,
+    "images": 3064,
+    "gt_images": 336,
+    "alert_images": 208,
+    "hit_images": 189,
+    "hit_images_overlap": 183,
+    "recall": 0.562,
+    "precision": 0.909,
+    "recall_overlap": 0.545,
+    "precision_overlap": 0.88
+   }
+  },
+  "crack": {
+   "box_iou50": {
+    "conf": 0.42,
+    "tp": 1067,
+    "fp": 242,
+    "n_gt": 3228,
+    "P": 0.815,
+    "R": 0.331
+   },
+   "image": {
+    "conf": 0.42,
+    "images": 3064,
+    "gt_images": 1535,
+    "alert_images": 977,
+    "hit_images": 925,
+    "hit_images_overlap": 907,
+    "recall": 0.603,
+    "precision": 0.947,
+    "recall_overlap": 0.591,
+    "precision_overlap": 0.928
+   }
+  }
+ }
+}

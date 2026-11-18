@@ -13,6 +13,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from edge.blackbox.live import COLORS, LABELS, LIVE_DIR  # noqa: E402
+import api  # noqa: E402
 
 STALE_S = 5  # 이 시간 동안 새 프레임이 없으면 멈춘 것으로 본다
 
@@ -68,7 +69,8 @@ def view() -> None:
                 state = "⏸ 멈춤"
             else:
                 state = "🔴 주행 중"
-            st.markdown(f"#### {s['device_id']}  \n{state}")
+            # 제목은 차량 번호 (12가 3456). 기기 이름(bb-01)은 서버에 등록된 번호로 바꾼다
+            st.markdown(f"#### {api.plate_of(s['device_id'])}  \n{state}")
             if img:
                 st.image(img, width="stretch")
             t = s.get("t")

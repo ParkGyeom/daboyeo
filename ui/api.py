@@ -54,6 +54,16 @@ def plates() -> list[str]:
     return sorted({u["vehicle_plate"] for u in _users() if u.get("vehicle_plate")})
 
 
+def plate_of(label: str) -> str:
+    """기기 이름(bb-01)을 차량 번호(12가 3456)로. 서버가 없거나 번호가 없으면 기기 이름 그대로."""
+    try:
+        users = _users()
+    except ApiError:
+        return label
+    return next((u["vehicle_plate"] for u in users
+                 if u.get("vehicle_label") == label and u.get("vehicle_plate")), label)
+
+
 def clock(iso: str) -> str:
     """서버가 준 시각(ISO 8601)을 한국 시간 '오후 3:05' 꼴로."""
     t = datetime.fromisoformat(iso).astimezone(KST)

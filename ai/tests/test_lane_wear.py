@@ -505,3 +505,58 @@ def test_eval_threshold_rows():
     assert r[0.4]["precision"] == pytest.approx(0.5) and r[0.4]["recall"] == pytest.approx(0.5)
     assert r[1.0]["flag"] == pytest.approx(4 / 6) and r[1.0]["clear_to_worn"] == pytest.approx(2 / 4)
     assert r[1.0]["recall"] == 1.0
+
+
+# ---- 차선 분할 마스크 (handoff 21장, 실험) -----------------------------------------------
+
+LANES = [((260, 690), (590, 440)), ((1020, 690), (690, 440))]
+
+
+def lane_mask(which=(0, 1), thickness=40, shape=(H, W)):
+    m = np.zeros(shape, np.uint8)
+    sy, sx = shape[0] / H, shape[1] / W
+    for i in which:
+        (xb, yb), (xt, yt) = LANES[i]
+        cv2.line(m, (round(xb * sx), round(yb * sy)), (round(xt * sx), round(yt * sy)), 255,
+                 max(1, round(thickness * sx)))
+    return m
+
+
+def test_mask_over_lanes_keeps_result(meter):
+    img = draw_lanes(road_frame(), (210, 210, 210))
+    a, b = meter.measure(img), meter.measure(img, lane_mask=lane_mask())
+    assert b.lane_found and not b.is_worn
+    assert abs(a.contrast - b.contrast) < 0.1 * a.contrast
+
+
+def test_empty_mask_finds_nothing(meter):
+    img = draw_lanes(road_frame(), (210, 210, 210))
+    assert not meter.measure(img, lane_mask=np.zeros((H, W), np.uint8)).lane_found
+
+
+def test_mask_drops_stripes_outside_lanes(meter):
+    img = draw_lanes(road_frame(3), (210, 210, 210))
+    cv2.line(img, (640, 690), (640, 450), (210, 210, 210), 12)  # 가운데 줄무늬 (차선 아닌 노면표시라고 치자)
+    _, segs = meter.measure_debug(img)
+    assert any(abs((s[0] + s[2]) / 2 - 640) < 30 for s in segs)
+    r, segs = meter.measure_debug(img, lane_mask=lane_mask())
+    assert r.lane_found
+    assert not any(abs((s[0] + s[2]) / 2 - 640) < 30 for s in segs)
+
+
+def test_mask_any_resolution_and_left_only(meter):
+    img = draw_lanes(road_frame(4), (210, 210, 210))
+    r, segs = meter.measure_debug(img, lane_mask=lane_mask(which=(0,), shape=(H // 2, W // 2)))
+    assert segs and all(max(s[0], s[2]) < W / 2 for s in segs)
+
+
+def test_mask_rel_delta_finds_faint_lane_only_with_mask():
+    img = draw_lanes(road_frame(5), (ROAD + 5,) * 3, thickness=14)  # 노면보다 약 6% 밝음 (< rel_delta 8%)
+    loose = LaneWearMeter(mask_rel_delta=0.03)
+    assert not loose.measure(img).lane_found          # 마스크 없으면 그대로 (rel_delta 0.08)
+    assert loose.measure(img, lane_mask=lane_mask()).lane_found
+
+
+def test_bad_mask_shape_raises(meter):
+    with pytest.raises(ValueError):
+        meter.measure(road_frame(), lane_mask=np.zeros((H, W, 3), np.uint8))

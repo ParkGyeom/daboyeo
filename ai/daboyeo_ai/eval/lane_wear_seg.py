@@ -56,6 +56,7 @@ REVIEW_VARIANTS = ("seg", "seg_rd05", "seg_m15", "seg+motion", "seg_rd05+motion"
                    "seg+p25_only+motion+guard", "seg+sqrt_rel_len+motion+guard", "seg_rd05+p25_only+motion+guard",
                    "seg_m15+p25_only+motion+guard")
 THRESHOLDS = (0.4, 0.5, 0.6, 0.8, 1.0)
+WINDOW_VARIANTS = ("base (17장 지금)", "seg", "seg+p25_only+motion+guard")
 
 
 def measure_clip(video: Path, model: Path, every: int = 3, threads: int = 1) -> list[dict]:
@@ -190,6 +191,20 @@ def summarize_clip(clip: str, recs: list[dict], review: dict[str, str], stops: l
     return {"stats": stats, "mask_px_mean": round(float(np.mean(mp)), 4) if mp else None, "rows": rows}
 
 
+def window_rows(clip: str, recs: list[dict], review: dict[str, str], start: float, end: float,
+                variants: tuple[str, ...] = WINDOW_VARIANTS, thresholds=THRESHOLDS) -> list[dict]:
+    """클립을 [start, end] 초로 잘라 돌린 것처럼 (tracker 가 start 에서 새로 시작) 확정·눈 분류를 센다.
+    시연에서 한 구간만 잘라 보여 줄 때 그 구간 안 헛것을 미리 보려는 것 (handoff 23-6)."""
+    w = [r for r in recs if start <= r["t"] <= end]
+    rows = []
+    for vn in variants:
+        for thr in thresholds:
+            ts = confirmed_times(replay(w, thr, CONFIRM_K, CONFIRM_N, VARIANTS[vn]))
+            rows.append({"window": [start, end], "variant": vn, "threshold": thr, "confirmed": len(ts),
+                         **tally(ts, clip, review), "times": [round(t, 2) for t in ts]})
+    return rows
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -201,11 +216,30 @@ def main(argv: list[str] | None = None) -> None:
     u = sub.add_parser("summarize")
     u.add_argument("--out", type=Path, default=Path("experiments/lane_wear_seg.json"))
     u.add_argument("--stopped", nargs="*", default=[], metavar="CLIP:A-B")
+    wd = sub.add_parser("window", help="한 구간만 잘라 돌린 것처럼 (시연 구간 고르기, 23-6)")
+    wd.add_argument("--clip", required=True)
+    wd.add_argument("--windows", nargs="+", required=True, metavar="A-B")
+    wd.add_argument("--out", type=Path, default=None)
     for p in (m, s):
         p.add_argument("--model", type=Path, default=Path("ai/models/lane_seg_v1.onnx"))
-    for p in (m, s, u):
+    for p in (m, s, u, wd):
         p.add_argument("--out-dir", type=Path, default=OUT_DIR)
     a = ap.parse_args(argv)
+
+    if a.cmd == "window":
+        recs = json.loads((a.out_dir / a.clip / "frames.json").read_text())["frames"]
+        rp = a.out_dir / "review.json"
+        review = json.loads(rp.read_text()) if rp.exists() else {}
+        rows = []
+        for spec in a.windows:
+            s0, e0 = (float(x) for x in spec.split("-"))
+            rows += window_rows(a.clip, recs, review, s0, e0)
+        for r in rows:
+            print(f"{r['window'][0]:g}-{r['window'][1]:g} {r['variant']:28s} thr={r['threshold']} n={r['confirmed']} "
+                  f"real={r['real']} amb={r['amb']} fp={r['fp']} unl={r['unlabeled']} {r['times']}")
+        if a.out:
+            a.out.write_text(json.dumps({"clip": a.clip, "rows": rows}, ensure_ascii=False, indent=1) + "\n")
+        return
 
     if a.cmd == "measure":
         for v in a.clips:

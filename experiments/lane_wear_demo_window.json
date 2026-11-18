@@ -1,0 +1,1366 @@
+{
+ "clip": "gn_b_3320-3620",
+ "rows": [
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.4,
+   "confirmed": 7,
+   "real": 1,
+   "amb": 3,
+   "fp": 3,
+   "unlabeled": 0,
+   "fp_rate": 0.429,
+   "times": [
+    121.95,
+    124.75,
+    126.85,
+    139.4,
+    141.0,
+    142.15,
+    144.65
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.5,
+   "confirmed": 8,
+   "real": 1,
+   "amb": 3,
+   "fp": 4,
+   "unlabeled": 0,
+   "fp_rate": 0.5,
+   "times": [
+    121.85,
+    124.75,
+    126.85,
+    139.4,
+    141.0,
+    142.1,
+    144.65,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.6,
+   "confirmed": 9,
+   "real": 1,
+   "amb": 4,
+   "fp": 4,
+   "unlabeled": 0,
+   "fp_rate": 0.444,
+   "times": [
+    121.75,
+    124.75,
+    126.85,
+    139.3,
+    140.4,
+    142.05,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.8,
+   "confirmed": 8,
+   "real": 1,
+   "amb": 3,
+   "fp": 4,
+   "unlabeled": 0,
+   "fp_rate": 0.5,
+   "times": [
+    121.55,
+    124.7,
+    126.85,
+    139.15,
+    142.0,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 1.0,
+   "confirmed": 9,
+   "real": 2,
+   "amb": 4,
+   "fp": 3,
+   "unlabeled": 0,
+   "fp_rate": 0.333,
+   "times": [
+    121.5,
+    124.6,
+    126.85,
+    132.9,
+    135.8,
+    137.05,
+    139.05,
+    144.45,
+    145.6
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.4,
+   "confirmed": 9,
+   "real": 2,
+   "amb": 5,
+   "fp": 2,
+   "unlabeled": 0,
+   "fp_rate": 0.222,
+   "times": [
+    124.85,
+    126.9,
+    138.35,
+    139.4,
+    141.45,
+    142.25,
+    143.2,
+    144.5,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.5,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 3,
+   "fp": 2,
+   "unlabeled": 0,
+   "fp_rate": 0.286,
+   "times": [
+    124.8,
+    126.9,
+    138.35,
+    139.4,
+    143.2,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.6,
+   "confirmed": 9,
+   "real": 3,
+   "amb": 3,
+   "fp": 3,
+   "unlabeled": 0,
+   "fp_rate": 0.333,
+   "times": [
+    121.75,
+    124.8,
+    126.9,
+    136.05,
+    138.3,
+    139.4,
+    143.15,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.8,
+   "confirmed": 11,
+   "real": 2,
+   "amb": 4,
+   "fp": 5,
+   "unlabeled": 0,
+   "fp_rate": 0.455,
+   "times": [
+    121.65,
+    124.75,
+    126.9,
+    129.05,
+    135.75,
+    137.05,
+    138.3,
+    143.1,
+    144.35,
+    145.85,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 1.0,
+   "confirmed": 10,
+   "real": 2,
+   "amb": 3,
+   "fp": 5,
+   "unlabeled": 0,
+   "fp_rate": 0.5,
+   "times": [
+    121.55,
+    124.55,
+    126.9,
+    129.0,
+    135.2,
+    137.05,
+    138.25,
+    144.35,
+    145.75,
+    147.4
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.4,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.143,
+   "times": [
+    126.9,
+    138.45,
+    139.4,
+    141.5,
+    143.25,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.5,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    126.9,
+    138.45,
+    139.4,
+    143.2,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.6,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 3,
+   "fp": 2,
+   "unlabeled": 0,
+   "fp_rate": 0.286,
+   "times": [
+    126.9,
+    138.45,
+    139.4,
+    143.15,
+    144.35,
+    145.95,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.8,
+   "confirmed": 12,
+   "real": 2,
+   "amb": 5,
+   "fp": 5,
+   "unlabeled": 0,
+   "fp_rate": 0.417,
+   "times": [
+    122.15,
+    124.85,
+    126.9,
+    128.95,
+    132.45,
+    135.25,
+    138.45,
+    139.4,
+    143.1,
+    144.35,
+    145.85,
+    147.0
+   ]
+  },
+  {
+   "window": [
+    120.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 1.0,
+   "confirmed": 11,
+   "real": 3,
+   "amb": 2,
+   "fp": 6,
+   "unlabeled": 0,
+   "fp_rate": 0.545,
+   "times": [
+    122.15,
+    124.75,
+    126.9,
+    128.95,
+    131.8,
+    134.8,
+    136.75,
+    138.25,
+    139.4,
+    145.55,
+    148.5
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.4,
+   "confirmed": 4,
+   "real": 1,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    139.4,
+    141.0,
+    142.15,
+    144.65
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 1,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.2,
+   "times": [
+    139.4,
+    141.0,
+    142.1,
+    144.65,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.6,
+   "confirmed": 6,
+   "real": 1,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    139.3,
+    140.4,
+    142.05,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.8,
+   "confirmed": 5,
+   "real": 1,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.2,
+   "times": [
+    139.15,
+    142.0,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 1.0,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 4,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    132.9,
+    135.8,
+    137.05,
+    139.05,
+    144.45,
+    145.6
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.4,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 5,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.35,
+    139.4,
+    141.45,
+    142.25,
+    143.2,
+    144.5,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 2,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.35,
+    139.4,
+    143.2,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.6,
+   "confirmed": 6,
+   "real": 3,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    136.05,
+    138.3,
+    139.4,
+    143.15,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.8,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.143,
+   "times": [
+    135.75,
+    137.05,
+    138.3,
+    143.1,
+    144.35,
+    145.85,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 1.0,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    135.2,
+    137.05,
+    138.25,
+    144.35,
+    145.75,
+    147.4
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.4,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 4,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.45,
+    139.4,
+    141.5,
+    143.25,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 2,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.45,
+    139.4,
+    143.2,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.6,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.143,
+   "times": [
+    132.5,
+    138.45,
+    139.4,
+    143.15,
+    144.35,
+    145.95,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.8,
+   "confirmed": 8,
+   "real": 2,
+   "amb": 5,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.125,
+   "times": [
+    132.0,
+    135.25,
+    138.45,
+    139.4,
+    143.1,
+    144.35,
+    145.85,
+    147.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 1.0,
+   "confirmed": 8,
+   "real": 3,
+   "amb": 2,
+   "fp": 3,
+   "unlabeled": 0,
+   "fp_rate": 0.375,
+   "times": [
+    129.1,
+    130.6,
+    134.8,
+    136.75,
+    138.25,
+    139.4,
+    145.55,
+    148.5
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.4,
+   "confirmed": 4,
+   "real": 1,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    139.4,
+    141.0,
+    142.15,
+    144.65
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 1,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.2,
+   "times": [
+    139.4,
+    141.0,
+    142.1,
+    144.65,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.6,
+   "confirmed": 6,
+   "real": 1,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    139.3,
+    140.4,
+    142.05,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.8,
+   "confirmed": 5,
+   "real": 1,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.2,
+   "times": [
+    139.15,
+    142.0,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 1.0,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 4,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    132.9,
+    135.8,
+    137.05,
+    139.05,
+    144.45,
+    145.6
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.4,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 5,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.35,
+    139.4,
+    141.45,
+    142.25,
+    143.2,
+    144.5,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 2,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.35,
+    139.4,
+    143.2,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.6,
+   "confirmed": 6,
+   "real": 3,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    136.05,
+    138.3,
+    139.4,
+    143.15,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 0.8,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.143,
+   "times": [
+    135.75,
+    137.05,
+    138.3,
+    143.1,
+    144.35,
+    145.85,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg",
+   "threshold": 1.0,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    135.2,
+    137.05,
+    138.25,
+    144.35,
+    145.75,
+    147.4
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.4,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 4,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.45,
+    139.4,
+    141.5,
+    143.25,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 2,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.45,
+    139.4,
+    143.2,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.6,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    138.45,
+    139.4,
+    143.15,
+    144.35,
+    145.95,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.8,
+   "confirmed": 9,
+   "real": 2,
+   "amb": 6,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.111,
+   "times": [
+    132.0,
+    132.45,
+    135.25,
+    138.45,
+    139.4,
+    143.1,
+    144.35,
+    145.85,
+    147.0
+   ]
+  },
+  {
+   "window": [
+    130.0,
+    150.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 1.0,
+   "confirmed": 7,
+   "real": 3,
+   "amb": 2,
+   "fp": 2,
+   "unlabeled": 0,
+   "fp_rate": 0.286,
+   "times": [
+    131.2,
+    134.8,
+    136.75,
+    138.25,
+    139.4,
+    145.55,
+    148.5
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.4,
+   "confirmed": 4,
+   "real": 1,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    139.4,
+    141.0,
+    142.15,
+    144.65
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 1,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.2,
+   "times": [
+    139.4,
+    141.0,
+    142.1,
+    144.65,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.6,
+   "confirmed": 6,
+   "real": 1,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    139.3,
+    140.4,
+    142.05,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 0.8,
+   "confirmed": 5,
+   "real": 1,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.2,
+   "times": [
+    139.15,
+    142.0,
+    143.15,
+    144.55,
+    146.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "base (17장 지금)",
+   "threshold": 1.0,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 4,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    132.9,
+    135.8,
+    137.05,
+    139.05,
+    144.45,
+    145.6
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg",
+   "threshold": 0.4,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 5,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.35,
+    139.4,
+    141.45,
+    142.25,
+    143.2,
+    144.5,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 2,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.35,
+    139.4,
+    143.2,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg",
+   "threshold": 0.6,
+   "confirmed": 6,
+   "real": 3,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    136.05,
+    138.3,
+    139.4,
+    143.15,
+    144.35,
+    145.85
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg",
+   "threshold": 0.8,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.143,
+   "times": [
+    135.75,
+    137.05,
+    138.3,
+    143.1,
+    144.35,
+    145.85,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg",
+   "threshold": 1.0,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 3,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.167,
+   "times": [
+    135.2,
+    137.05,
+    138.25,
+    144.35,
+    145.75,
+    147.4
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.4,
+   "confirmed": 6,
+   "real": 2,
+   "amb": 4,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.45,
+    139.4,
+    141.5,
+    143.25,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.5,
+   "confirmed": 5,
+   "real": 2,
+   "amb": 3,
+   "fp": 0,
+   "unlabeled": 0,
+   "fp_rate": 0.0,
+   "times": [
+    138.45,
+    139.4,
+    143.2,
+    144.35,
+    145.95
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.6,
+   "confirmed": 7,
+   "real": 2,
+   "amb": 4,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.143,
+   "times": [
+    132.5,
+    138.45,
+    139.4,
+    143.15,
+    144.35,
+    145.95,
+    147.45
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 0.8,
+   "confirmed": 8,
+   "real": 2,
+   "amb": 5,
+   "fp": 1,
+   "unlabeled": 0,
+   "fp_rate": 0.125,
+   "times": [
+    132.0,
+    135.25,
+    138.45,
+    139.4,
+    143.1,
+    144.35,
+    145.85,
+    147.0
+   ]
+  },
+  {
+   "window": [
+    128.0,
+    148.0
+   ],
+   "variant": "seg+p25_only+motion+guard",
+   "threshold": 1.0,
+   "confirmed": 7,
+   "real": 3,
+   "amb": 2,
+   "fp": 2,
+   "unlabeled": 0,
+   "fp_rate": 0.286,
+   "times": [
+    129.1,
+    130.6,
+    134.8,
+    136.75,
+    138.25,
+    139.4,
+    145.55
+   ]
+  }
+ ]
+}

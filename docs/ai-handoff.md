@@ -1353,3 +1353,112 @@ uv run python -m daboyeo_ai.eval.lane_wear_figs rmdd --root data/rmdd --boxes da
   1. "차선 페인트가 옆 노면보다 얼마나 밝은지(대비)를 잰다 — 학습 없이 영상 처리만, CPU 프레임당 약 5 ms"
   2. "실제 마모 등급이 붙은 차선 1,994개(RMDD)로 확인: 많이 닳은 차선과 멀쩡한 차선을 84% 맞게 가림. 처음 보는 사진에서 많이 닳은 차선 85개 중 46개를 찾고 멀쩡한 차선 255개 중 27개만 잘못 짚음"
   3. "한국 주행 영상에서는 횡단보도·노면 글자를 차선으로 착각해 실시간 신고에서는 뺐다 (분할 모델로 횡단보도 오탐 26 → 4건까지 줄임)"
+
+## 25. 표지판 파손 판정 다시 해 보기 — 공개 표지판 파손 사진(Roboflow) 추가 (11/18, 결과: **통과 못 함 → 표지판 파손 판정은 계속 안 씀 (9장 그대로). 공개 사진을 더해도 블랙박스 크롭 성능은 거의 그대로 (AUC 0.84 → 0.85)**)
+
+> 9장 후속. 11/15 에 파손 판정을 뺀 이유는 KRID 파손 크롭이 139개뿐이었기 때문 (v1b test F1 0.43, 정상 오탐률 15.7%).
+> Roboflow 조사(11/18)에서 찾은 공개 표지판 파손 사진을 학습에 더하면 시연 영상의 "실험 기능" 구간에 넣을 만큼 좋아지는지 본다.
+> **판정은 v1b 와 똑같이 KRID val·test 로만** 한다 (블랙박스와 같은 도메인). 가드레일은 공개 파손 데이터가 사실상 없어 손대지 않는다.
+
+### 25-1. 데이터
+
+받은 것 (박겸 승인, 모두 CC BY 4.0, 합계 136 MB, `data/roboflow_signs/` · 출처·버전은 `data/roboflow_signs/sources.json`):
+
+| Roboflow Universe | 버전·형식 | 사진 | 원래 클래스 (박스) |
+|---|---|---|---|
+| `sign-detection-x0fra/new-damaged-sign` | v2 yolov11 (640×640 늘림) | 643 | bent 44 · broken-sheet 38 · crack 23 · rust 131 · not-damaged 342 · graffiti 82 |
+| `nick-g857q/damaged-road-sign-detection` | v3 yolov11 (원본 크기) | 1,677 | damaged 1,060 · healthy 778 |
+| `isuru-gnkcl/smart-city-damage-sign` | v4 yolov5 (원본 크기, 대비 늘림) | 547 | bent 236 · broken sheet 69 · rust 76 · normal 408 · graffiti 56 |
+
+- `matyworkspace/traffic-signs-damaged-healthy` 는 스톡 사진 워터마크라 안 받았다.
+- **라벨 바꾸기** (`ai/daboyeo_ai/data/sign_damage.py` `RF_LABEL`): bent·broken sheet·crack·rust·damaged → **damaged**, not-damaged·normal·healthy → **normal**.
+  **graffiti(낙서)는 뺐다** (138개): KRID 파손 표지판은 탈색·벗겨짐·휨이고 낙서는 없으며, 정상으로 넣기에도 표지판 면이 가려져 애매하다.
+  단 nick 의 `damaged` 에는 낙서·스티커 붙은 표지판도 섞여 있어 다 걸러지지는 않는다.
+- **길쭉한 박스 뺌** (195개): 세로/가로 > 2.5 또는 가로/세로 > 4. 이런 박스(기둥째 넘어진 표지판·기둥 조각, 주로 isuru `bent`)는 damaged 174 대 normal 5 라 "길쭉하면 파손"이라는 지름길이 된다. KRID 표지판 크롭은 99% 가 세로/가로 2.5 이하.
+- **중복 정리**: 크롭 dHash(64비트) 해밍 거리 ≤ 4 를 같은 것으로 보고 하나만 남김 → **837개 제거**. 대부분 같은 원본 사진: nick 안에서 516, **x0fra 사진이 nick 에 다시 들어 있음 277**, isuru 연속 프레임 45. 그래서 세 출처 사이에 겹치는 사진은 남지 않는다. 중복끼리 라벨이 다른 경우 3.
+- 남은 크롭: **damaged 959 · normal 1,170**. 원본 사진 단위로 15% 는 학습에 안 쓰고 같은 도메인 확인용(holdout: damaged 155 · normal 167), **train 에 damaged 804 · normal 1,003**.
+- **도메인 차이 줄이기** (`degrade`): Roboflow 크롭은 가까이서 찍어 크고 선명하다 (긴 변 중앙값 224 px 이상). KRID 표지판 크롭은 긴 변 중앙값 약 90 px, 짧은 변 하위 10% 약 35 px, 흐리다.
+  그래서 Roboflow 크롭마다 긴 변을 40~160 px(로그 균등)로 줄이고, 가우시안 블러 σ 0~1.2, JPEG 품질 45~90 으로 다시 압축한 사본만 쓴다 (크롭마다 고정된 난수).
+- 크롭 규칙은 KRID 와 같다: `facility_crop` (pad 0.1, 긴 변 224 이하) → 학습·추론 때 `square_input` (정사각형 224).
+- 묶음: `data/sign_damage_v2/sign_rf.zip` (7.7 MB, `sign_rf/{train,holdout}/{damaged,normal}/*.jpg` + `manifest.csv` + `sources.json`).
+
+```bash
+uv run python -m daboyeo_ai.data.sign_damage crops --rf-dir data/roboflow_signs --out data/sign_damage_v2 --zip data/sign_damage_v2/sign_rf.zip   # 약 10초
+```
+
+### 25-2. 방법
+
+- 모델·학습 설정은 v1b 와 같다: YOLO11n-cls 224, 60 epoch, 조기 종료 없음, `last.pt`, 좌우 반전·scale 0.3·randaugment, seed 0.
+- val·test 는 **KRID 만** (v1b 와 같은 크롭: val 파손 15·정상 150, test 파손 17·정상 170, 표지판만이면 파손 9·정상 90). Roboflow 는 train 에만.
+- 데이터 조합 5가지를 **Mac 에서** 같은 코드로 학습했다 (`experiments/sign_damage_v2_local.py`, MPS, 조합 하나 10~25분). Colab v1b 와 기계·난수가 달라서 **KRID 만으로 다시 학습한 `krid_all` 이 이번 비교의 기준선**이다.
+
+| 이름 | 시설물 | Roboflow | KRID train 정상 배수 |
+|---|---|---|---|
+| `krid_all` | 가드레일+표지판 | 없음 | 5 (= v1b 데이터) |
+| `krid_sign` | 표지판 | 없음 | 5 |
+| `rf_all` | 가드레일+표지판 | 있음 | 5 |
+| `rf_sign` | 표지판 | 있음 | 5 |
+| `rf_sign20` | 표지판 | 있음 | 20 (KRID 정상을 더 넣어 오탐 줄이기 시도) |
+
+- 지표 (v1b 와 같음): 임계값 = KRID val F1 최대 → KRID test F1·P·R, test 정상 크롭 **전부**(4,848장, 표지판 3,303 · 가드레일 1,545)의 오탐률.
+- 보조 지표 (`experiments/sign_damage_v2_fpr5.py`): val 파손 표지판이 9개뿐이라 F1 최대 임계값이 0.000~0.882 로 크게 흔들린다. 그래서
+  임계값 없는 **AUC** (test 표지판 파손 9 · 정상 3,303)와, **KRID val 정상 표지판 전부(4,356장)의 5% 만 넘는 점수**를 임계값으로 한 test 결과도 낸다.
+
+```bash
+uv run --with ultralytics --with onnx --with onnxslim --with onnxruntime python experiments/sign_damage_v2_local.py \
+    --krid-cls data/sign_damage_v2/krid/cls --rf-root data/sign_damage_v2 --work data/sign_damage_v2/runs \
+    --json experiments/sign_damage_v2_local.json            # krid.zip 의 cls/ 를 data/sign_damage_v2/krid/ 에 먼저 풀 것
+uv run --with onnxruntime python experiments/sign_damage_v2_fpr5.py --krid-cls data/sign_damage_v2/krid/cls \
+    --work data/sign_damage_v2/runs --json experiments/sign_damage_v2_local.json
+```
+
+### 25-3. 결과 (KRID test, 표지판)
+
+| 모델 | 임계값 (val F1 최대) | 표지판 F1 (P / R) | 파손 9개 중 | 정상 표지판 오탐률 (3,303장) | 가드레일 오탐률 | AUC | val 오탐 5% 기준: 파손 9개 중 · test 오탐 |
+|---|---|---|---|---|---|---|---|
+| v1b (11/15, Colab) | — | 전체 0.43 (0.32 / 0.65)¹ | — | **13.5%** | 20.5% | — | — |
+| `krid_all` (기준선) | 0.189 | 0.31 (0.24 / 0.44) | 4 | 7.3% | 19.4% | 0.84 | 3 · 4.9% |
+| `krid_sign` | 0.006 | 0.36 (0.25 / 0.67) | 6 | 24.0% | — | 0.84 | 4 · 4.9% |
+| `rf_all` | 0.008 | 0.35 (0.23 / 0.78) | 7 | 20.2% | 42.3% | **0.86** | 4 · 4.2% |
+| `rf_sign` | 0.882 | 0.27 (0.33 / 0.22) | 2 | **2.7%** | — | 0.85 | 4 · 5.4% |
+| `rf_sign20` | 0.000 | **0.50** (0.37 / 0.78) | 7 | 19.4% | — | 0.83 | **5** · 4.0% |
+
+¹ v1b 는 가드레일+표지판 전체 값 (파손 17개). 표지판만 따로 낸 F1 은 기록이 없다. 숫자는 `experiments/sign_damage_v2_local.json`.
+
+같은 도메인(Roboflow holdout, 학습에 안 쓴 공개 사진 322장, 각 모델 임계값):
+
+| 모델 | F1 (P / R) |
+|---|---|
+| `krid_all` (Roboflow 안 씀) | 0.33 (0.58 / 0.23) |
+| `rf_sign` | **0.86 (0.98 / 0.77)** — 파손 155개 중 119개, 정상 167개 중 3개 오판 |
+| `rf_all` · `rf_sign20` | 0.85 · 0.82 |
+
+### 25-4. 판정 — **통과 못 함, 표지판 파손 판정은 계속 안 쓴다**
+
+- 기준(F1 ≥ 0.6 그리고 정상 오탐률 ≤ 5%)을 **둘 다 넘은 모델은 없다.** F1 이 가장 높은 `rf_sign20`(0.50)은 정상 표지판 19% 를 의심으로 짚고, 오탐이 가장 적은 `rf_sign`(2.7%)은 파손 9개 중 2개만 잡는다.
+- **공개 사진을 더해도 블랙박스 크롭 성능은 거의 그대로다.** 임계값과 상관없는 AUC 가 0.84 → 0.85~0.86, 오탐 5% 로 맞추면 파손 9개 중 3개 → 4~5개 (1~2개 차이, 파손이 9개뿐이라 우연 범위). 그때 정밀도는 2~4% — 의심 판정 25~50번 중 1번만 진짜 파손.
+- 같은 도메인(공개 사진)에서는 잘 된다 (F1 0.86, 정밀도 0.98). 즉 **모델이 '파손'을 못 배운 게 아니라, 가까이서 찍은 서양 표지판 사진의 파손(녹·휨·낙서)이 블랙박스에서 멀리 흐리게 찍힌 한국 표지판의 파손(탈색·벗겨짐)으로 옮겨 가지 않는다.** 작게·흐리게 만든 사본으로도 이 차이를 못 메웠다.
+- 임계값이 val 파손 9개에 크게 흔들린다 (0.000 ~ 0.882). 같은 데이터(v1b ↔ `krid_all`)를 다시 학습해도 F1 이 0.43 → 0.27(전체)로 바뀐다. 이 규모에서는 F1 0.1~0.2 차이는 의미가 없다.
+- **Colab 재학습은 하지 않아도 된다.** 노트북 03 은 v2 설정(`FACILITY="sign"`, `RF_PART="sign_rf.zip"`)으로 고쳐 두었지만, 로컬 5가지가 모두 기준에 한참 못 미쳐 Colab 에서 다시 돌려도 판단은 바뀌지 않는다.
+- 시연·정현우 쪽 변화 없음: 실시간 시연은 v3 탐지만, `Detection.damage` 항상 `None` (9장 그대로). `contracts/` 변경 없음.
+
+### 25-5. 발표 (제안)
+
+시연 영상 "실험 기능" 구간에 넣는다면 **"블랙박스에서 파손 판정이 된다"가 아니라 "해 봤고 이런 이유로 안 됐다"** 로만:
+
+- "공개 표지판 파손 사진 2,129장(중복 837장 정리)을 더해 표지판 파손 분류기를 다시 학습했다. **공개 사진에서는 파손 155개 중 119개(77%)를 잡고 정상 167개 중 3개만 잘못 짚었지만**, 우리 블랙박스 데이터(AI Hub)에서는 **정상 표지판의 5% 를 잘못 짚는 기준으로 파손 9개 중 4~5개**만 잡았다. 가까이서 찍은 사진과 달리고 있는 차에서 멀리 본 표지판은 다르다 → 블랙박스 해상도의 한국 표지판 파손 사진이 더 필요하다."
+- 짧게: "공개 사진 77% → 블랙박스 9개 중 4개. 데이터의 '보는 거리'가 다르면 옮겨 가지 않는다."
+- 그림: `data/presentation/sign_damage_v2/rf_holdout_{hit,miss,false,ok_normal}.jpg` (Roboflow holdout, `rf_sign`, 각 4장, `examples.json` 에 출처·점수). **출처 표기 필수**: "Roboflow Universe — sign-detection-x0fra/new-damaged-sign, nick-g857q/damaged-road-sign-detection, isuru-gnkcl/smart-city-damage-sign (CC BY 4.0)". 일부 원본 사진은 좌우가 뒤집혀 있다 (글자가 거울 글씨) — 슬라이드에서는 그런 장은 빼는 것이 좋다.
+  **AI Hub(KRID) 크롭은 공개 자료에 쓰지 않는다.**
+
+### 25-6. 한계
+
+- KRID 파손 표지판이 val 9 · test 9개뿐이다. 9개 중 1개가 F1 을 0.05~0.1 움직인다.
+- 학습은 Colab 이 아니라 Mac(MPS)에서 했다. 기준선 `krid_all` 과 v1b 가 같은 데이터인데도 숫자가 달라 (오탐률 7.3% vs 13.5%, 표지판 기준), 조합끼리 비교는 같은 Mac 학습끼리만 한다.
+- Roboflow 라벨 기준은 출처마다 다르고 공개되지 않았다. nick 의 `damaged` 에 낙서·스티커가 섞여 있고, 일부 사진은 좌우 반전·640×640 늘림이 되어 있다.
+- 크롭 하나씩의 판정이다. 실제 시연은 여러 프레임·여러 차량 투표(FR-7.2)라 크롭 단위 오탐보다는 덜 나쁠 수 있지만, 정밀도 2~4% 는 투표로도 메우기 어렵다.
+
+### 25-7. 박겸이 할 것 · 정현우에게 전할 것
+
+- 박겸: 할 것 없음 (Colab 재학습 불필요). 발표에 넣을지만 정한다 (25-5). 다시 해 보고 싶으면 노트북 03 을 열고 Drive `daboyeo_data/parts/` 에 `sign_rf.zip` 을 올린 뒤 위에서부터 실행 (설정 셀 `VERSION="v2"` 그대로).
+- 정현우: 바뀌는 것 없음.

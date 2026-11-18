@@ -6,6 +6,7 @@
 import streamlit as st
 
 import api
+import naver_map
 
 st.markdown("<style>.block-container{max-width:430px;padding-top:2rem}</style>", unsafe_allow_html=True)
 
@@ -38,10 +39,11 @@ for rid in st.session_state.get("link_reports", []):
     b = r["payload"]
     with st.container(border=True):
         st.success("✅ 신고가 접수됐어요 (제출됨, 모의)")
+        where = (naver_map.place(b["location"].get("address"))
+                 or f"위치 {b['location']['lat']:.5f}, {b['location']['lon']:.5f}")
         st.caption(
-            f"{api.TYPE_KO.get(b['defect_type'], b['defect_type'])} · {api.RISK_KO.get(b['risk_level'], '')}  \n"
-            f"위치 {b['location']['lat']:.5f}, {b['location']['lon']:.5f} · {b['location']['jurisdiction']}  \n"
-            f"신고자 {b['reporter']} · {b['reported_at'].replace('T', ' ')}  \n"
+            f"{api.TYPE_KO.get(b['defect_type'], b['defect_type'])} · {where} · {b['location']['jurisdiction']}  \n"
+            f"신고자 {b['reporter']} · {api.when(b['reported_at'])}  \n"
             f"포상 {'대상' if r['reward_valid'] else '대상 아님'}"
         )
 
@@ -55,10 +57,12 @@ for d in items:
         photo = api.snapshot_bytes(d["snapshot_path"])
         if photo:
             st.image(photo, width="stretch")
-        badge = "🔴" if d["risk_level"] == "urgent" else "🟡"
-        st.markdown(f"**{api.TYPE_KO.get(d['defect_type'], d['defect_type'])}** · {badge} {api.RISK_KO[d['risk_level']]}")
+        st.markdown(f"**{api.TYPE_KO.get(d['defect_type'], d['defect_type'])}**")
+        if addr := naver_map.place(d.get("address")):
+            st.markdown(f"📍 {addr}")
+        naver_map.mini(d["lat"], d["lon"], d["defect_type"])
         st.caption(
-            f"위치 {d['lat']:.5f}, {d['lon']:.5f} · {d['jurisdiction']}  \n"
+            f"관할 {d['jurisdiction']}  \n"
             f"AI 신뢰도 {d['confidence']:.2f} · 관측 차량 {d['vehicle_count']}대 · "
             f"포상 {'대상' if d['reward_eligible_road'] else '대상 아님'}"
         )

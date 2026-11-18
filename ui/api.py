@@ -1,12 +1,13 @@
 """화면이 쓰는 서버 API(/api/v1) 호출. 화면은 DB에 직접 접근하지 않는다.
 
-서버가 주는 값은 001_init.sql 의 영어 이름(unreported, urgent, …)이고, 한국어 표시는 여기서 붙인다.
+서버가 주는 값은 001_init.sql 의 영어 이름(unreported, pothole, …)이고, 한국어 표시는 여기서 붙인다.
+risk_level 은 서버·신고서 데이터에는 남아 있지만 화면에는 쓰지 않는다 (판별은 우리 몫이 아니다).
 """
 
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import httpx
 import streamlit as st
@@ -16,7 +17,6 @@ API = SERVER + "/api/v1"
 
 TYPE_KO = {"pothole": "포트홀", "crack": "균열", "lane_wear": "차선 마모",
            "guardrail_damage": "가드레일", "sign_damage": "표지판"}
-RISK_KO = {"urgent": "빠른 보수", "routine": "정기 보수"}
 STATUS_KO = {"unreported": "미신고", "reported": "신고됨", "under_repair": "보수 중"}
 
 
@@ -40,10 +40,22 @@ def _call(method: str, path: str, **kw):
     return r.json()
 
 
+KST = timezone(timedelta(hours=9))
+
+
 @st.cache_data(ttl=30, show_spinner=False)
+def _users() -> list[dict]:
+    return _call("GET", "/users")
+
+
 def users() -> dict[str, str]:
-    """시민 id → '시민 A (bb-01)'."""
-    return {u["id"]: f"{u['name']} ({u['vehicle_label']})" for u in _call("GET", "/users")}
+    """시민 id → '시민 A (12가 3456)'. 번호가 없는 차량은 기기 이름(bb-01)."""
+    return {u["id"]: f"{u['name']} ({u.get('vehicle_plate') or u['vehicle_label']})" for u in _users()}
+
+
+def plates() -> list[str]:
+    """등록된 차량 번호 (관리자 지도의 차량 고르기)."""
+    return sorted({u["vehicle_plate"] for u in _users() if u.get("vehicle_plate")})
 
 
 def pick_user(key: str = "user_id") -> str:
@@ -58,8 +70,19 @@ def pick_user(key: str = "user_id") -> str:
 
 def clock(iso: str) -> str:
     """서버가 준 시각(ISO 8601)을 한국 시간 '오후 3:05' 꼴로."""
-    t = datetime.fromisoformat(iso).astimezone(timezone(timedelta(hours=9)))
+    t = datetime.fromisoformat(iso).astimezone(KST)
     return f"{'오전' if t.hour < 12 else '오후'} {(t.hour % 12) or 12}:{t.minute:02d}"
+
+
+def when(iso: str) -> str:
+    """날짜까지: '11월 18일 오후 3:05'."""
+    t = datetime.fromisoformat(iso).astimezone(KST)
+    return f"{t.month}월 {t.day}일 {clock(iso)}"
+
+
+def short_when(iso: str) -> str:
+    """표에 쓰는 짧은 시각: '11/18 15:05'."""
+    return f"{datetime.fromisoformat(iso).astimezone(KST):%m/%d %H:%M}"
 
 
 def findings(user_id: str) -> list[dict]:
@@ -87,9 +110,14 @@ def user_reports(user_id: str) -> list[dict]:
     return _call("GET", f"/users/{user_id}/reports")
 
 
-def defects(type: str | None = None, status: str | None = None) -> list[dict]:
-    params = {k: v for k, v in {"type": type, "status": status}.items() if v}
-    return _call("GET", "/defects", params=params)
+def defects(type: str | None = None, status: str | None = None, region1: str | None = None,
+            region2: str | None = None, region3: str | None = None, vehicle: str | None = None,
+            date_from: date | None = None, date_to: date | None = None) -> list[dict]:
+    """관리자 지도의 결함 목록. None 인 조건은 걸지 않는다. region3="" 는 동이 없는 결함."""
+    params = {"type": type, "status": status, "region1": region1, "region2": region2, "region3": region3,
+              "vehicle": vehicle, "date_from": date_from and date_from.isoformat(),
+              "date_to": date_to and date_to.isoformat()}
+    return _call("GET", "/defects", params={k: v for k, v in params.items() if v is not None})
 
 
 def set_status(defect_id: str, status: str) -> dict:

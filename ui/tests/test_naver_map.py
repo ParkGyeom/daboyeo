@@ -24,7 +24,7 @@ def test_mini_without_key_falls_back_offline():
         import naver_map
 
         naver_map.key_id = lambda: None
-        naver_map.mini(37.49899, 127.02713, "urgent")
+        naver_map.mini(37.49899, 127.02713, "crack")
 
     at = AppTest.from_function(app).run()
     assert not at.exception

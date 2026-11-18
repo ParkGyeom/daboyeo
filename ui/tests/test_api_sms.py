@@ -18,5 +18,11 @@ def test_lines_kept_link_clickable_and_symbols_literal():
     assert md[3].startswith("확인·신고: [") and md[3].endswith(f"]({URL})")
 
 
+def test_blank_lines_split_paragraphs_and_link_alone_on_its_line():
+    md = api.sms_markdown("제목\n\n▶ 확인·신고하기\n" + URL, URL)
+    assert "\n  \n" in md  # 빈 줄 → 문단 사이 간격 (실제 문자처럼 덩어리로 나뉨)
+    assert md.endswith(f"[{api._md_escape(URL)}]({URL})")
+
+
 def test_body_without_link_still_renders():
     assert api.sms_markdown("한 줄", URL) == "한 줄"

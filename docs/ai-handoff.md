@@ -1015,3 +1015,74 @@ uv run python -m daboyeo_ai.eval.rdd_figs --zip data/aihub/parts/rdd2022.zip --m
 uv run python -m daboyeo_ai.eval.ab_overlap sheets             # 짝 후보 A(위)·B(아래) 프레임 → data/ab_overlap/ (커밋 안 함)
 uv run python -m daboyeo_ai.eval.ab_overlap run --json experiments/ab_overlap.json   # 탐지 캐시: demo_clip run 의 data/demo_clip_eval/<gn_a|gn_b>/raw.json
 ```
+
+## 21. 더 큰 탐지 모델 v4 (YOLO11s) — v3 와 같은 데이터·같은 평가로 교체 판단 (11/18 시작, 결과: **TBD — 11/21 판단. 그때까지 결과가 없으면 v3 유지**)
+
+v3 (YOLO11n) 는 RDD2022 test 에서 시연 기준으로 포트홀 P 0.69 / R 0.31, 균열 P 0.80 / R 0.38 (19장), 시연 클립 균열 10곳 중 3곳 (18장).
+재현율을 올리려고 같은 데이터(`krid` + `rdd2022` + `road_v3`)로 **더 큰 모델 YOLO11s** 를 학습해 비교한다. **시연 기본 모델은 계속 v3** 이고, 아래 기준을 모두 넘을 때만 바꾼다.
+
+### 21-1. 학습 (Colab, `02_train_detector.ipynb` — 설정 셀이 v4)
+
+`VERSION="v4"`, `PARTS` 는 v3 와 같음, `BASE_MODEL="yolo11s.pt"` (COCO 사전학습 — n급 가중치는 s급에 못 옮겨서 처음부터), `EPOCHS=40`, `PATIENCE=15`, 640, batch 32.
+3-1 출처별 평가는 `COMPARE_WITH=detector_v3.pt` 와 같은 라벨로 잰다. 데이터 로더는 런타임 CPU 수만큼 (`workers=min(8, CPU 수)`, T4 는 2).
+여유가 있으면 `VERSION="v4m"`, `BASE_MODEL="yolo11m.pt"`, `BATCH=16` 으로 한 번 더 (아래 비교를 같은 방법으로).
+
+예상 시간 (재지 않음 — YOLO11s 는 n 의 약 3배 계산, train 약 3.6만 장): **L4 약 2~3시간, A100 약 1.5~2시간, T4 약 5~6시간** + 풀기·평가·내보내기 20분.
+세션이 끊겨도 Drive `runs/v4/weights/last.pt` 에서 이어진다 (위에서부터 다시 '모두 실행'). `is_finished` 확인은 그대로.
+04 노트북(차선 분할)과 저장 폴더가 겹치지 않는다 (`runs/v4`·`/content/dataset_v4` vs `runs/lane_seg_v1`·`/content/lane_seg`).
+
+### 21-2. 비교 (Mac, v4 가 생기면 — 전부 v3 와 같은 도구·같은 규칙)
+
+Drive `daboyeo_data/models/detector_v4.onnx`·`detector_v4.json` → `/Users/parkgyeom/daboyeo/ai/models/`. v3 결과 파일은 덮어쓰지 않는다 (v4 는 이름에 `_v4`).
+
+```bash
+cd /Users/parkgyeom/daboyeo
+# 1) 클래스별 기준 — v3 와 같은 test·규칙 (pothole·guardrail·sign 정밀도 ≥ 0.7, crack 정밀도 ≥ 0.8)
+uv run python -m daboyeo_ai.eval.conf_thresholds --model ai/models/detector_v4.onnx --parts-dir data/aihub/parts --out-dir data/model_gate/conf_v4
+cp data/model_gate/conf_v4/conf_thresholds.json experiments/conf_thresholds_v4.json && cp data/model_gate/conf_v4/conf_thresholds.csv experiments/conf_thresholds_v4.csv
+uv run python -m daboyeo_ai.eval.model_gate conf experiments/conf_thresholds_v4.json --out experiments/class_conf_v4.json
+# 2) RDD2022 test 포트홀·균열 (탐지 캐시 preds.json — v3 는 data/presentation/rdd_pothole/preds.json)
+uv run python -m daboyeo_ai.eval.rdd_figs --zip data/aihub/parts/rdd2022.zip --model ai/models/detector_v4.onnx \
+    --card experiments/class_conf_v4.json --out data/model_gate/rdd_v4
+# 3) 시연 클립 gn_a·gn_b 이벤트 단위 (18장과 같은 strict 정답, 0.5초 간격). v3 도 같은 명령으로 (캐시가 있어 금방)
+mkdir -p data/demo_gt/gt_strict && for f in experiments/gt_events/gn_*.csv; do awk -F, '$5 !~ /^amb/' "$f" > data/demo_gt/gt_strict/$(basename $f); done
+uv run python -m daboyeo_ai.eval.model_gate conf experiments/conf_thresholds_v3.json --out data/model_gate/class_conf_v3.json
+for v in v3 v4; do
+  uv run python -m daboyeo_ai.eval.eval_detector data/videos/gn_a_2050-2510.mp4 data/videos/gn_b_3320-3620.mp4 \
+      --model ai/models/detector_$v.onnx --every 30 --conf-json $([ $v = v3 ] && echo data/model_gate/class_conf_v3.json || echo experiments/class_conf_v4.json) \
+      --gt-dir data/demo_gt/gt_strict --cache-dir data/eval_cache_$v --out data/model_gate/demo_$v
+done
+# 4) CPU (M4 Pro, 시연 클립 60 fps — bench_cpu_v3 와 같은 설정)
+uv run python -m daboyeo_ai.eval.bench_cpu run --model ai/models/detector_v4.onnx --src data/videos/gn_b_3320-3620.mp4 \
+    --res 640x360 1280x720 --threads 1 2 --repeat 3 --video-fps 60 --intervals 1 3 5 10 15 30 --out experiments/bench_cpu_v4.csv
+# 5) 표 + 판정 → experiments/model_gate_v4.json
+uv run python -m daboyeo_ai.eval.model_gate judge --old v3 --new v4 \
+    --rdd v3=data/presentation/rdd_pothole/preds.json --rdd v4=data/model_gate/rdd_v4/preds.json \
+    --demo v3=data/model_gate/demo_v3/summary.json --demo v4=data/model_gate/demo_v4/summary.json \
+    --out experiments/model_gate_v4.json
+```
+
+`model_gate judge` 를 v3 끼리 돌려 확인함 (11/18): RDD 포트홀 conf 0.31 P 0.693 R 0.307, 균열 0.42 P 0.804 R 0.378 (19장과 같음),
+시연 클립 균열 정답 10 · 찾음 3 · 경보 6 (진짜 4, 헛것 2) (18장과 같음), 1스레드 21.7 ms · 60 fps 10프레임마다 계산/영상 시간 0.13.
+
+### 21-3. 교체 기준 (11/21 판단, `model_gate` 상단 상수 — 셋 다 넘어야 교체)
+
+1. **RDD2022 test 재현율**: 포트홀·균열 각각 v3 보다 **+5%p 이상**, **같은 정밀도에서** (v4 기준을 0.01 씩 올려 RDD 정밀도가 v3 (포트홀 0.693 · 균열 0.804) 이상이 되는 가장 낮은 기준).
+   v4 자기 규칙 기준(시연에 쓸 기준)의 P/R 도 같이 적는다.
+2. **시연 클립 균열** (v4 자기 규칙 기준): 찾은 정답 ≥ v3 (3곳) 이고 헛것 이벤트가 v3 (2건) 보다 많지 않음. 포트홀·가드레일·표지판은 표에만 (판정 제외 — 포트홀 정답 1개, 시설물은 서버로 안 보냄).
+3. **CPU**: 1스레드, 60 fps 영상을 10프레임마다 분석할 때 계산 시간 ÷ 영상 시간 < 1 (640x360·1280x720 모두).
+
+### 21-4. 결과 (TBD — v4 가 오면 21-2 를 돌려 채운다)
+
+| 항목 | v3 | v4 |
+|---|---|---|
+| 공개 test mAP50 (pothole · crack · guardrail · sign) | 0.460 · 0.508 · 0.716 · 0.703 | TBD |
+| 클래스별 기준 (v3 규칙) | 0.31 · 0.42 · 0.21 · 0.21 | TBD |
+| RDD test 포트홀 P / R (같은 정밀도) | 0.693 / 0.307 | TBD |
+| RDD test 균열 P / R (같은 정밀도) | 0.804 / 0.378 | TBD |
+| 시연 클립 균열 찾음 / 경보 (진짜·헛것) | 3 / 10 · 6 (4·2) | TBD |
+| CPU 1스레드 ms · 10프레임마다 계산/영상 | 21.7 · 0.13 | TBD |
+| 판정 | — | TBD |
+
+통과하면 정현우용 교체 요청(모델 경로 `ai/models/detector_v4.onnx`, 기준 `load_class_conf("experiments/class_conf_v4.json")` 또는 카드 `class_conf_draft`,
+replay 기록 다시 만들기 — `--record` 는 모델이 바뀌면 다시)을 여기에 적는다. 미달이면 v3 유지, 이 표는 발표 "다음 단계" 근거.

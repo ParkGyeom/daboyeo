@@ -69,9 +69,13 @@ def parse_region(body: dict) -> tuple[str | None, str | None, str | None]:
 
 
 def parse(body: dict) -> Place:
-    """응답 전체를 Place 로. 주소를 만들 수 없으면 NOWHERE."""
+    """응답 전체를 Place 로. 주소를 만들 수 없으면 NOWHERE.
+    주소는 있는데 시·도가 없으면 region1 을 "" 로 둔다 (NULL 이면 fill_missing 이 끝없이 다시 묻는다)."""
     addr = format_address(body)
-    return Place(addr, *parse_region(body)) if addr else NOWHERE
+    if not addr:
+        return NOWHERE
+    r1, r2, r3 = parse_region(body)
+    return Place(addr, r1 or "", r2, r3)
 
 
 def format_address(body: dict) -> str | None:
@@ -127,15 +131,16 @@ def reverse(lat: float, lon: float) -> Place | None:
     return None
 
 
-# 받지 못했으면(None) 이미 있던 값을 지우지 않는다
-_SAVE = """UPDATE defects SET address = coalesce(%s, address), region1 = coalesce(%s, region1),
+# 받지 못했으면(None) 이미 있던 값을 지우지 않는다. '결과 없음'("")도 이미 있던 주소는 지우지 않는다
+_SAVE = """UPDATE defects SET address = coalesce(nullif(%s, ''), address, %s), region1 = coalesce(%s, region1),
                           region2 = coalesce(%s, region2), region3 = coalesce(%s, region3),
                           address_tried_at = now()
            WHERE id = %s"""
 
 
 def _save(conn: psycopg.Connection, defect_id, place: Place | None) -> None:
-    conn.execute(_SAVE, (*(place or (None, None, None, None)), defect_id))
+    a, r1, r2, r3 = place or (None, None, None, None)
+    conn.execute(_SAVE, (a, a, r1, r2, r3, defect_id))
 
 
 def fill_one(conn: psycopg.Connection, defect_id) -> str | None:

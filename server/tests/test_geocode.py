@@ -108,3 +108,23 @@ def test_address_without_region_is_filled_again(client, monkeypatch):
     [d] = client.get("/api/v1/defects").json()
     assert d["region3"] == "역삼동"
     assert geocode.fill_missing() == 0  # 다 채웠으면 다시 부르지 않는다
+
+
+def test_address_without_province_gets_empty_region1():
+    """시·도가 없는 응답이면 region1 을 "" 로 저장해 다시 묻지 않게 한다."""
+    body = {"results": [{"name": "roadaddr", "region": {}, "land": {"name": "강남대로", "number1": "396"}}]}
+    assert geocode.parse(body) == geocode.Place("강남대로 396", "", None, None)
+
+
+@needs_db
+def test_no_result_does_not_wipe_saved_address(client, monkeypatch):
+    monkeypatch.setattr(geocode, "keys", lambda: ("id", "secret"))
+    monkeypatch.setattr(geocode, "reverse", lambda lat, lon: geocode.NOWHERE)
+    trip = start(client)
+    observe(client, trip)
+    with db.connect() as conn:
+        conn.execute("UPDATE defects SET address = '서울 강남구 강남대로 396', region1 = NULL, "
+                     "address_tried_at = now() - interval '1 hour'")
+    geocode.fill_missing()
+    [d] = client.get("/api/v1/defects").json()
+    assert d["address"] == "서울 강남구 강남대로 396"

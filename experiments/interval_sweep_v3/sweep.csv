@@ -1,0 +1,31 @@
+interval,group,defect_type,n_gt,n_missed,miss_rate,n_pred,precision,frames_analyzed,frames_total,analyzed_per_min,missed_ids
+1,defect,pothole,1,1,1.000,0,,26646,26646,3597.9,B_P01
+1,defect,crack,10,5,0.500,13,0.462,26646,26646,3597.9,A_C02 B_C03 B_C04 B_C05 B_C06
+1,facility_presence,guardrail_damage,5,0,0.000,64,0.391,26646,26646,3597.9,
+1,facility_presence,sign_damage,9,0,0.000,16,0.375,26646,26646,3597.9,
+1,defect,pothole+crack+lane_wear,11,6,0.545,13,0.462,26646,26646,3597.9,B_P01 A_C02 B_C03 B_C04 B_C05 B_C06
+3,defect,pothole,1,1,1.000,0,,8882,26646,1199.3,B_P01
+3,defect,crack,10,6,0.600,10,0.500,8882,26646,1199.3,A_C02 B_C03 B_C04 B_C05 B_C06 B_C11
+3,facility_presence,guardrail_damage,5,0,0.000,60,0.483,8882,26646,1199.3,
+3,facility_presence,sign_damage,9,0,0.000,23,0.348,8882,26646,1199.3,
+3,defect,pothole+crack+lane_wear,11,7,0.636,10,0.500,8882,26646,1199.3,B_P01 A_C02 B_C03 B_C04 B_C05 B_C06 B_C11
+5,defect,pothole,1,1,1.000,0,,5330,26646,719.7,B_P01
+5,defect,crack,10,5,0.500,11,0.636,5330,26646,719.7,A_C02 B_C03 B_C04 B_C05 B_C06
+5,facility_presence,guardrail_damage,5,0,0.000,61,0.426,5330,26646,719.7,
+5,facility_presence,sign_damage,9,0,0.000,19,0.421,5330,26646,719.7,
+5,defect,pothole+crack+lane_wear,11,6,0.545,11,0.636,5330,26646,719.7,B_P01 A_C02 B_C03 B_C04 B_C05 B_C06
+10,defect,pothole,1,1,1.000,0,,2665,26646,359.8,B_P01
+10,defect,crack,10,6,0.600,9,0.667,2665,26646,359.8,A_C02 B_C03 B_C04 B_C05 B_C06 B_C11
+10,facility_presence,guardrail_damage,5,0,0.000,58,0.466,2665,26646,359.8,
+10,facility_presence,sign_damage,9,0,0.000,24,0.375,2665,26646,359.8,
+10,defect,pothole+crack+lane_wear,11,7,0.636,9,0.667,2665,26646,359.8,B_P01 A_C02 B_C03 B_C04 B_C05 B_C06 B_C11
+15,defect,pothole,1,1,1.000,0,,1777,26646,239.9,B_P01
+15,defect,crack,10,7,0.700,9,0.556,1777,26646,239.9,A_C02 B_C01 B_C03 B_C04 B_C05 B_C06 B_C11
+15,facility_presence,guardrail_damage,5,0,0.000,54,0.481,1777,26646,239.9,
+15,facility_presence,sign_damage,9,0,0.000,27,0.333,1777,26646,239.9,
+15,defect,pothole+crack+lane_wear,11,8,0.727,9,0.556,1777,26646,239.9,B_P01 A_C02 B_C01 B_C03 B_C04 B_C05 B_C06 B_C11
+30,defect,pothole,1,1,1.000,0,,889,26646,120.0,B_P01
+30,defect,crack,10,7,0.700,6,0.667,889,26646,120.0,A_C02 B_C01 B_C03 B_C04 B_C05 B_C06 B_C11
+30,facility_presence,guardrail_damage,5,0,0.000,49,0.469,889,26646,120.0,
+30,facility_presence,sign_damage,9,0,0.000,34,0.382,889,26646,120.0,
+30,defect,pothole+crack+lane_wear,11,8,0.727,6,0.667,889,26646,120.0,B_P01 A_C02 B_C01 B_C03 B_C04 B_C05 B_C06 B_C11

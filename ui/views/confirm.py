@@ -65,7 +65,7 @@ for d in items:
         st.markdown(f"**{api.TYPE_KO.get(d['defect_type'], d['defect_type'])}** · {badge} {api.RISK_KO[d['risk_level']]}")
         if addr := naver_map.place(d.get("address")):
             st.markdown(f"📍 {addr}")
-        naver_map.mini(d["lat"], d["lon"], d["risk_level"])
+        naver_map.mini(d["lat"], d["lon"], d["risk_level"], defect_type=d["defect_type"])
         st.caption(
             f"관할 {d['jurisdiction']}  \n"
             f"AI 신뢰도 {d['confidence']:.2f} · 관측 차량 {d['vehicle_count']}대 · "

@@ -48,7 +48,8 @@ rows = {
     "분기": r["quarter"],
 }
 st.markdown("**위치**")
-naver_map.mini(b["location"]["lat"], b["location"]["lon"], b["risk_level"], height=200)
+naver_map.mini(b["location"]["lat"], b["location"]["lon"], b["risk_level"], height=200,
+             defect_type=b["defect_type"])
 st.table({"항목": list(rows), "내용": list(rows.values())})
 if st.button("확인·신고로 돌아가기"):
     st.switch_page("views/confirm.py")

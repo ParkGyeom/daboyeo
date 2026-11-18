@@ -47,11 +47,11 @@ def board():
     df["유형"] = df["defect_type"].map(api.TYPE_KO)
     df["severity"] = df["risk_level"].map(api.RISK_KO)
     df["상태"] = df["status"].map(api.STATUS_KO)
-    df["번호"] = df["id"].map(api.short)
+    df["위치"] = [naver_map.short_place(r.get("address")) for r in rows]
     if naver_map.key_id():
-        # 네이버 지도. 점을 누르면 지도 위에 상세 말풍선, 상태 변경은 아래 '결함 번호'에서
+        # 네이버 지도. 점을 누르면 지도 위에 상세 말풍선, 빈 곳을 누르면 닫힘. 상태 변경은 아래 '결함 고르기'에서
         naver_map.render(rows)
-        st.caption("지도 © NAVER Corp. · 점을 누르면 상세가 뜹니다. 상태 변경은 아래에서 결함 번호를 고릅니다.")
+        st.caption("지도 © NAVER Corp. · 점을 누르면 상세가 뜨고, 빈 곳을 누르면 닫힙니다. 상태 변경은 아래에서 결함을 고릅니다.")
     else:
         _altair_map(df)
     _detail(df, rows)
@@ -80,7 +80,7 @@ def _altair_map(df: pd.DataFrame) -> None:
                             scale=alt.Scale(domain=list(SEV_COLOR), range=list(SEV_COLOR.values()))),
             shape=alt.Shape("상태:N", title="상태",
                             scale=alt.Scale(domain=list(STATUS_SHAPE), range=list(STATUS_SHAPE.values()))),
-            tooltip=["번호", "유형", "severity", "상태", "vehicle_count", "confidence"],
+            tooltip=["위치", "유형", "severity", "상태", "vehicle_count", "confidence"],
         )
         .add_params(pick)
     )
@@ -107,25 +107,36 @@ def _altair_map(df: pd.DataFrame) -> None:
         st.session_state["dash_pick"] = sel[0]["id"]
 
 
+def _labels(rows: list[dict]) -> dict[str, str]:
+    """고르기 목록의 이름: "봉은사로 102 균열". 같은 이름이 여럿이면 뒤에 (2), (3) 을 붙인다."""
+    out, seen = {}, {}
+    for r in rows:
+        t = naver_map.title(r)
+        seen[t] = seen.get(t, 0) + 1
+        out[r["id"]] = t if seen[t] == 1 else f"{t} ({seen[t]})"
+    return out
+
+
 def _detail(df: pd.DataFrame, rows: list[dict]) -> None:
     """결함 표와 고른 결함의 상세·상태 변경."""
     left, right = st.columns([3, 2])
     left.dataframe(
-        df[["번호", "유형", "severity", "상태", "vehicle_count", "observation_count", "confidence", "jurisdiction"]]
+        df[["위치", "유형", "severity", "상태", "vehicle_count", "observation_count", "confidence", "jurisdiction"]]
         .rename(columns={"severity": "위험도", "vehicle_count": "차량 수",
                          "observation_count": "관측 수", "confidence": "최고 신뢰도", "jurisdiction": "관할"}),
         hide_index=True, width="stretch",
     )
     ids = df["id"].tolist()
     cur = st.session_state.get("dash_pick")
-    did = right.selectbox("결함 번호", ids, index=ids.index(cur) if cur in ids else 0, format_func=api.short)
+    labels = _labels(rows)
+    did = right.selectbox("결함 고르기", ids, index=ids.index(cur) if cur in ids else 0, format_func=labels.get)
     d = next(r for r in rows if r["id"] == did)
     photo = api.snapshot_bytes(d["snapshot_path"])
     if photo:
         right.image(photo, width=260)
     where = naver_map.place(d.get("address")) or f"{d['lat']:.6f}, {d['lon']:.6f}"
     right.markdown(
-        f"**#{api.short(d['id'])} {api.TYPE_KO[d['defect_type']]}** · {api.RISK_KO[d['risk_level']]} · "
+        f"**{naver_map.title(d)}** · {api.RISK_KO[d['risk_level']]} · "
         f"**{api.STATUS_KO[d['status']]}**  \n"
         f"{where} · {d['jurisdiction']}  \n"
         f"관측 {d['observation_count']}건 · 차량 {d['vehicle_count']}대 · 신뢰도 {d['confidence']:.2f}"

@@ -1,4 +1,4 @@
-"""차선 영역 분할 ONNX (YOLO-seg, 2클래스 lane·marking) → 프레임 크기 마스크 (handoff 21장, 실험).
+"""차선 영역 분할 ONNX (YOLO-seg, 2클래스 lane·marking) → 프레임 크기 마스크 (handoff 23장, 실험).
 
     seg = LaneSegmenter("ai/models/lane_seg_v1.onnx", threads=1)
     mask = seg.lane_mask(frame_bgr)          # uint8 H×W, 차선 255 / 나머지 0

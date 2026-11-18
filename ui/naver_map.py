@@ -14,7 +14,8 @@ components.html(srcdoc) 로 넣으면 주소가 없는 iframe 이라 네이버 �
 
 결함 목록은 iframe 주소의 # 뒤에 담는다. 목록이 바뀌면 # 만 바뀌어 지도는 다시 만들어지지 않고 점만 다시 찍힌다.
 지도는 iframe 이라 점을 눌러도 Streamlit 쪽으로 값이 돌아오지 않는다.
-그래서 점을 누르면 지도 위에 상세 말풍선(사진 포함)을 띄우고, 상태 변경은 아래 '결함 번호'에서 한다.
+그래서 점을 누르면 지도 위에 상세 말풍선(사진 포함)을 띄우고, 상태 변경은 아래 '결함 고르기'에서 한다.
+핀 색은 결함 유형(TYPE_COLOR), 모양은 상태, 빨간 테두리는 빠른 보수다.
 """
 
 from __future__ import annotations
@@ -36,6 +37,18 @@ PAGE = "/app/static/naver_map.html"
 MINI_PAGE = "/app/static/mini_map.html"
 FRESH_S = 20  # 새 결함을 강조하는 시간(초). 대시보드는 5초마다 다시 그리므로 네 번 정도 보인다
 SEV_COLOR = {"urgent": "#d62728", "routine": "#f2a900"}
+# 핀 색 = 결함 유형. 블랙박스 화면의 탐지 상자 색(edge/blackbox/live.py COLORS, BGR)과 같다
+TYPE_COLOR = {"pothole": "#e62828", "crack": "#ff9600", "lane_wear": "#ffdc00",
+              "guardrail_damage": "#28a0e6", "sign_damage": "#50c850"}
+
+
+def _ver(page: str) -> str:
+    """지도 페이지 파일의 수정 시각. 주소에 붙여 브라우저가 고치기 전 페이지를 캐시에서 꺼내 쓰지 않게 한다
+    (Streamlit 정적 파일은 Cache-Control 이 없어 브라우저가 알아서 캐시한다)."""
+    try:
+        return str(int((ROOT / "ui" / page.removeprefix("/app/")).stat().st_mtime))
+    except OSError:
+        return "0"
 
 
 def key_id() -> str | None:
@@ -54,6 +67,28 @@ def key_id() -> str | None:
 def place(address: str | None) -> str | None:
     """저장해 둔 주소를 화면 글자로: "서울 강남구 강남대로 396 부근". 없으면 None (server/geocode.py)."""
     return f"{address} 부근" if address else None
+
+
+def short_place(address: str | None) -> str:
+    """제목에 쓰는 짧은 위치: "서울 강남구 봉은사로 102" → "봉은사로 102". 결함 번호(id) 대신 쓴다.
+
+    도로명(…로·…길)부터 끝까지, 도로명이 없으면(지번 주소) 마지막 두 마디.
+    주소를 아직 못 받았으면(None) "위치 확인 중", 네이버가 주소 없음으로 답한 곳("")은 "주소 없는 곳".
+    """
+    if address is None:
+        return "위치 확인 중"
+    words = address.split()
+    if not words:
+        return "주소 없는 곳"
+    for i in range(len(words) - 1, -1, -1):
+        if words[i].endswith(("로", "길")):
+            return " ".join(words[i:])
+    return " ".join(words[-2:])
+
+
+def title(r: dict) -> str:
+    """결함 한 건의 제목: "봉은사로 102 균열"."""
+    return f"{short_place(r.get('address'))} {api.TYPE_KO.get(r['defect_type'], r['defect_type'])}"
 
 
 def fresh_ids(rows: list[dict], state: dict | None = None, now: float | None = None) -> set[str]:
@@ -76,8 +111,9 @@ def render(rows: list[dict], height: int = 560) -> None:
     fresh = fresh_ids(rows)
     data = [
         {
-            "id": api.short(r["id"]), "lat": r["lat"], "lon": r["lon"],
+            "id": api.short(r["id"]), "title": title(r), "lat": r["lat"], "lon": r["lon"],
             "type": api.TYPE_KO.get(r["defect_type"], r["defect_type"]),
+            "type_color": TYPE_COLOR.get(r["defect_type"], "#555"), "urgent": r["risk_level"] == "urgent",
             "severity": api.RISK_KO.get(r["risk_level"], r["risk_level"]),
             "status": api.STATUS_KO.get(r["status"], r["status"]),
             "color": SEV_COLOR.get(r["risk_level"], "#555"), "jurisdiction": r.get("jurisdiction"),
@@ -88,24 +124,29 @@ def render(rows: list[dict], height: int = 560) -> None:
         for r in rows
     ]
     blob = base64.urlsafe_b64encode(json.dumps(data, ensure_ascii=False).encode("utf-8")).decode("ascii")
-    components.iframe(f"{PAGE}?key={quote(key_id() or '', safe='')}#{blob}", height=height)
+    components.iframe(f"{PAGE}?v={_ver(PAGE)}&key={quote(key_id() or '', safe='')}#{blob}", height=height)
 
 
-def mini(lat: float, lon: float, risk_level: str | None = None, height: int = 170) -> None:
+def mini(lat: float, lon: float, risk_level: str | None = None, height: int = 170,
+         defect_type: str | None = None) -> None:
     """결함 한 곳의 작은 지도(핀 하나). 시민 확인 화면·신고서에서 좌표 글자 대신 쓴다.
+
+    핀 색은 유형(관리자 지도와 같은 TYPE_COLOR), 퍼지는 고리 색은 위험도.
 
     키가 없으면 받아 둔 도로선 위에 점(인터넷 없이), 도로도 없으면 좌표 글자.
     키가 있어도 인터넷이 없으면 지도 페이지가 좌표 글자로 대신 보인다.
     """
     if key := key_id():
-        color = SEV_COLOR.get(risk_level or "", "#d62728")
+        color = TYPE_COLOR.get(defect_type or "", SEV_COLOR.get(risk_level or "", "#d62728"))
+        ring = SEV_COLOR.get(risk_level or "", color)
         components.iframe(
-            f"{MINI_PAGE}?key={quote(key, safe='')}&lat={lat:.7f}&lon={lon:.7f}&color={quote(color, safe='')}",
+            f"{MINI_PAGE}?v={_ver(MINI_PAGE)}&key={quote(key, safe='')}&lat={lat:.7f}&lon={lon:.7f}"
+            f"&color={quote(color, safe='')}&ring={quote(ring, safe='')}",
             height=height,
         )
         st.caption("지도 © NAVER Corp.")
         return
-    _mini_roads(lat, lon, SEV_COLOR.get(risk_level or "", "#d62728"), height)
+    _mini_roads(lat, lon, TYPE_COLOR.get(defect_type or "", SEV_COLOR.get(risk_level or "", "#d62728")), height)
 
 
 def _mini_roads(lat: float, lon: float, color: str, height: int) -> None:

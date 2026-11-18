@@ -2,7 +2,8 @@
 <!--
   결함 한 곳의 작은 네이버 지도(핀 하나). 시민 확인 화면·신고서에서 좌표 글자 대신 쓴다.
   ui/naver_map.py 의 mini() 가 /app/static/ 주소로 iframe 에 띄운다(srcdoc 은 네이버 인증 실패).
-    ?key=<NAVER_MAP_KEY_ID>&lat=..&lon=..&color=%23d62728
+    ?key=<NAVER_MAP_KEY_ID>&lat=..&lon=..&color=%23ff9600&ring=%23d62728
+    color = 핀 색(결함 유형, 관리자 지도와 같다), ring = 퍼지는 고리 색(위험도). ring 이 없으면 color
   인터넷이 없으면 좌표 글자로 대신 보인다.
 -->
 <html lang="ko"><head><meta charset="utf-8">
@@ -23,7 +24,8 @@
 <script>
   var q = new URLSearchParams(location.search);
   var lat = parseFloat(q.get('lat')), lon = parseFloat(q.get('lon'));
-  var color = /^#[0-9a-fA-F]{3,6}$/.test(q.get('color') || '') ? q.get('color') : '#d62728';
+  function hex(v, dflt) { return /^#[0-9a-fA-F]{3,6}$/.test(v || '') ? v : dflt; }
+  var color = hex(q.get('color'), '#d62728'), ring = hex(q.get('ring'), color);
   function fail(msg) {
     var e = document.getElementById('err');
     e.style.display = 'block';
@@ -38,7 +40,7 @@
     });
     new naver.maps.Marker({
       position: p, map: map,
-      icon: { content: '<div class="pin"><div class="ring" style="background:' + color + '"></div>' +
+      icon: { content: '<div class="pin"><div class="ring" style="background:' + ring + '"></div>' +
                        '<div class="dot" style="background:' + color + '"></div></div>',
               anchor: new naver.maps.Point(13, 13) }
     });

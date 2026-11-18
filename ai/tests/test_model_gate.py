@@ -88,3 +88,34 @@ def test_conf_cli_writes_class_conf(tmp_path):
     from daboyeo_ai.inference import load_class_conf
 
     assert load_class_conf(out) == {"pothole": 0.3, "crack": 0.45, "guardrail": 0.2, "sign": 0.25}
+
+
+def test_image_level_recall_precision_and_overlap():
+    from daboyeo_ai.eval.model_gate import image_level
+
+    ims = [
+        {"name": "rdd_Japan_1", "gts": [{"cls": "pothole", "box": B}], "preds": [{"cls": "pothole", "score": 0.5, "box": B}]},
+        # 정답 있고 경보도 있지만 다른 곳 → 위치 무관이면 알아챔, 겹침 조건이면 못 알아챔
+        {"name": "rdd_Japan_2", "gts": [{"cls": "pothole", "box": B}], "preds": [{"cls": "pothole", "score": 0.5, "box": FAR}]},
+        # 정답 있고 경보는 기준 미만 → 놓침
+        {"name": "rdd_Japan_3", "gts": [{"cls": "pothole", "box": B}], "preds": [{"cls": "pothole", "score": 0.2, "box": B}]},
+        # 정답 없는데 경보 → 헛것 사진
+        {"name": "rdd_Japan_4", "gts": [{"cls": "crack", "box": B}], "preds": [{"cls": "pothole", "score": 0.9, "box": B}]},
+        # 조금만 겹침 (IoU < 0.5) → 겹침 조건에서는 알아챔
+        {"name": "rdd_Japan_5", "gts": [{"cls": "pothole", "box": B}], "preds": [{"cls": "pothole", "score": 0.4, "box": [8, 8, 30, 30]}]},
+    ]
+    r = image_level(ims, "pothole", 0.31)
+    assert (r["gt_images"], r["alert_images"], r["hit_images"], r["hit_images_overlap"]) == (4, 4, 3, 2)
+    assert r["recall"] == 0.75 and r["precision"] == 0.75
+    assert r["recall_overlap"] == 0.5 and r["precision_overlap"] == 0.5
+
+
+def test_image_report_excludes_country():
+    from daboyeo_ai.eval.model_gate import image_report
+
+    ims = [{"name": "rdd_United_States_1", "gts": [{"cls": "crack", "box": B}], "preds": []},
+           {"name": "rdd_Japan_1", "gts": [{"cls": "crack", "box": B}], "preds": [{"cls": "crack", "score": 0.9, "box": B}]}]
+    conf = {"pothole": 0.31, "crack": 0.42}
+    assert image_report(ims, conf)["crack"]["image"]["recall"] == 0.5
+    ex = image_report(ims, conf, ["United_States"])
+    assert ex["images"] == 1 and ex["crack"]["image"]["recall"] == 1.0 and ex["crack"]["box_iou50"]["R"] == 1.0

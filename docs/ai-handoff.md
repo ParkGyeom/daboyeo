@@ -1052,6 +1052,8 @@ for v in v3 v4; do
       --model ai/models/detector_$v.onnx --every 30 --conf-json $([ $v = v3 ] && echo data/model_gate/class_conf_v3.json || echo experiments/class_conf_v4.json) \
       --gt-dir data/demo_gt/gt_strict --cache-dir data/eval_cache_$v --out data/model_gate/demo_$v
 done
+# 3-1) 사진 단위 지표 (22장) — 박스 단위와 한 파일에
+uv run python -m daboyeo_ai.eval.model_gate image --preds data/model_gate/rdd_v4/preds.json --conf experiments/class_conf_v4.json --out experiments/image_level_v4.json
 # 4) CPU (M4 Pro, 시연 클립 60 fps — bench_cpu_v3 와 같은 설정)
 uv run python -m daboyeo_ai.eval.bench_cpu run --model ai/models/detector_v4.onnx --src data/videos/gn_b_3320-3620.mp4 \
     --res 640x360 1280x720 --threads 1 2 --repeat 3 --video-fps 60 --intervals 1 3 5 10 15 30 --out experiments/bench_cpu_v4.csv
@@ -1081,8 +1083,44 @@ uv run python -m daboyeo_ai.eval.model_gate judge --old v3 --new v4 \
 | RDD test 포트홀 P / R (같은 정밀도) | 0.693 / 0.307 | TBD |
 | RDD test 균열 P / R (같은 정밀도) | 0.804 / 0.378 | TBD |
 | 시연 클립 균열 찾음 / 경보 (진짜·헛것) | 3 / 10 · 6 (4·2) | TBD |
+| RDD test 사진 단위 포트홀 P / R (참고, 22장) | 0.905 / 0.546 | TBD |
+| RDD test 사진 단위 균열 P / R (참고, 22장) | 0.961 / 0.660 | TBD |
 | CPU 1스레드 ms · 10프레임마다 계산/영상 | 21.7 · 0.13 | TBD |
 | 판정 | — | TBD |
 
 통과하면 정현우용 교체 요청(모델 경로 `ai/models/detector_v4.onnx`, 기준 `load_class_conf("experiments/class_conf_v4.json")` 또는 카드 `class_conf_draft`,
 replay 기록 다시 만들기 — `--record` 는 모델이 바뀌면 다시)을 여기에 적는다. 미달이면 v3 유지, 이 표는 발표 "다음 단계" 근거.
+
+## 22. RDD2022 test 사진 단위 지표 — 박스 단위와 나란히 (11/18, 결과: **v3 포트홀 사진 재현율 0.55 · 정밀도 0.91, 균열 0.66 · 0.96. 위치 조건을 붙여도 1~3%p 만 내려가 후한 값이 아님. v4 는 오면 같은 명령으로**)
+
+박스 단위(IoU 0.5) 재현율 0.31 은 "결함 박스 하나하나를 정확한 위치로 찾았나" 라서, 사진에 결함이 있다는 것을 알아챘는지와는 다르다.
+블랙박스는 결함이 있는 장면에서 경보가 뜨는지가 중요하므로 사진 단위 값을 같이 낸다. **교체 판정(21-3)에는 쓰지 않는다** (참고·발표용).
+
+**정의 (발표에 그대로 쓸 수 있는 문장)** — RDD2022 test, 학습에 쓰지 않은 사진, 클래스별 시연 기준 이상 경보만 셈:
+- **박스 단위 (IoU 0.5)**: 경보 박스가 같은 종류 정답 박스와 50% 이상 겹치면 맞음 (정답 하나에 경보 하나). 정밀도 = 맞은 경보 ÷ 전체 경보, 재현율 = 찾은 정답 박스 ÷ 전체 정답 박스.
+- **사진 단위 재현율**: 그 종류 결함이 있는 사진 중, 같은 종류 경보가 하나라도 뜬 사진의 비율 (위치 무관).
+- **사진 단위 정밀도**: 그 종류 경보가 뜬 사진 중, 실제로 그 종류 결함이 있는 사진의 비율 (위치 무관).
+- **겹침 조건 (참고)**: 경보 박스가 같은 종류 정답 박스와 조금이라도 겹칠 때만 '알아챔'으로 센 사진 단위 값 — 위치 무관 값이 지나치게 후하지 않은지 확인용.
+
+```bash
+uv run python -m daboyeo_ai.eval.model_gate image --preds data/presentation/rdd_pothole/preds.json \
+    --conf ai/models/detector_v3.json --out experiments/image_level_v3.json     # v4 는 21-2 의 3-1)
+```
+
+**v3 (기준 pothole 0.31, crack 0.42)** — 전체 = RDD test 3,526장 (박스 단위 값이 19장과 같은 집합). US 제외 = 19장 슬라이드 규칙(스트리트뷰 워터마크)대로 United_States 462장을 뺀 3,064장.
+
+| 클래스 | 사진 | 박스 P / R (IoU 0.5) | 사진 단위 P / R | 겹침 조건 P / R | 정답 사진 · 경보 사진 |
+|---|---|---|---|---|---|
+| 포트홀 | 전체 3,526 | 0.693 / 0.307 | **0.905 / 0.546** | 0.876 / 0.529 | 348 · 210 |
+| | US 제외 3,064 | 0.694 / 0.312 | 0.909 / 0.562 | 0.880 / 0.545 | 336 · 208 |
+| 균열 | 전체 3,526 | 0.804 / 0.378 | **0.961 / 0.660** | 0.944 / 0.648 | 1,995 · 1,369 |
+| | US 제외 3,064 | 0.815 / 0.331 | 0.947 / 0.603 | 0.928 / 0.591 | 1,535 · 977 |
+
+v4: TBD (모델이 오면 `experiments/image_level_v4.json`, `model_gate judge` 출력에도 같은 표가 나온다).
+
+- 사진 단위 재현율이 박스 단위보다 훨씬 높다 (포트홀 0.31 → 0.55): 한 사진에 포트홀이 여러 개면 하나만 잡아도 '알아챔'이고, 박스 위치가 IoU 0.5 에 못 미쳐도 셈.
+- **겹침 조건을 붙여도 1~3%p 만 내려간다** → 위치 무관 값의 대부분은 실제 결함 위에 뜬 경보다. 다만 균열 정밀도 0.96 은 RDD 균열 사진이 많아서(정답 사진 1,995 / 3,526) 아무 데나 뜬 경보도 맞을 확률이 높다는 점은 밝혀 둔다.
+- 사진 단위 정밀도가 높은 것은 경보가 뜬 사진 대부분에 그 결함이 정말 있다는 뜻 — 헛것 사진 비율: 포트홀 약 10%, 균열 약 4%.
+- 한계: 해외 도로 사진이다. 시연 영상(한국, 블랙박스) 값은 18장의 이벤트 단위 (균열 10곳 중 3곳) 를 쓴다.
+
+발표용 한 줄 (제안): "학습에 안 쓴 공개 도로 사진에서, 포트홀이 있는 사진의 55%·균열이 있는 사진의 66% 에서 경보가 떴고, 경보가 뜬 사진의 91%·96% 에 실제 결함이 있었다 (박스 위치까지 맞힌 비율은 31%·38%)."

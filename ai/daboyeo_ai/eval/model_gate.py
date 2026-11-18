@@ -10,6 +10,8 @@
 - `bench_cpu run` 의 `.json` (M4 Pro, 시연 클립 60 fps) → 1스레드 10프레임마다 실시간 비율
 
     uv run python -m daboyeo_ai.eval.model_gate conf experiments/conf_thresholds_v4.json --out experiments/class_conf_v4.json
+    uv run python -m daboyeo_ai.eval.model_gate image --preds data/presentation/rdd_pothole/preds.json \\
+        --conf ai/models/detector_v3.json --out experiments/image_level_v3.json   # 사진 단위 (handoff 22장, 판정 제외)
     uv run python -m daboyeo_ai.eval.model_gate judge --old v3 --new v4 \\
         --rdd v3=data/presentation/rdd_pothole/preds.json --rdd v4=data/model_gate/rdd_v4/preds.json \\
         --demo v3=data/model_gate/demo_v3/summary.json --demo v4=data/model_gate/demo_v4/summary.json \\
@@ -31,13 +33,20 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .rdd_figs import pr_at
+from .rdd_figs import country_of, filter_preds, pr_at
 
 RDD_CLASSES = ("pothole", "crack")
 P07_CLASSES = ("pothole", "guardrail", "sign")  # 정밀도 ≥ 0.7 규칙. crack 만 ≥ 0.8 (v3 확정, handoff 16장)
 RECALL_GAIN = 0.05
 MIN_SUPPORT = 20  # 같은 정밀도 기준을 찾을 때 탐지가 이만큼은 있어야 한다 (conf_thresholds 와 같음)
 INTERVAL = 10
+IMAGE_DEFINITIONS = {
+    "box_iou50": "박스 단위: 경보 박스 하나가 같은 클래스 정답 박스와 IoU 0.5 이상 겹치면 맞음 (정답 하나에 경보 하나, 점수 높은 순). "
+                 "정밀도 = 맞은 경보 / 전체 경보, 재현율 = 찾은 정답 박스 / 전체 정답 박스",
+    "image_recall": "사진 단위 재현율 = 그 클래스 정답 박스가 있는 사진 중, 같은 클래스 경보가 하나라도 뜬 사진 비율 (위치 무관)",
+    "image_precision": "사진 단위 정밀도 = 그 클래스 경보가 뜬 사진 중, 그 클래스 정답이 실제로 있는 사진 비율 (위치 무관)",
+    "overlap": "겹침 조건 (참고): 경보 박스가 같은 클래스 정답 박스와 조금이라도 겹칠 때만 '알아챔'으로 센 사진 단위 값",
+}
 GRID = [round(0.05 + 0.01 * i, 2) for i in range(91)]  # 0.05 ~ 0.95
 
 
@@ -58,6 +67,47 @@ def matched_precision(images: Sequence[dict], cls: str, target_p: float,
         if r["P"] is not None and r["P"] >= target_p:
             return r
     return None
+
+
+def _overlaps(a: Sequence[float], b: Sequence[float]) -> bool:
+    """두 박스 (x1, y1, x2, y2) 가 조금이라도 겹치는가 (넓이 > 0)."""
+    return min(a[2], b[2]) > max(a[0], b[0]) and min(a[3], b[3]) > max(a[1], b[1])
+
+
+def image_level(images: Sequence[dict], cls: str, conf: float) -> dict:
+    """사진 단위 지표 (RDD test, 한 클래스, 기준 conf).
+
+    - 재현율 = 그 클래스 정답 박스가 있는 사진 중, 같은 클래스 경보(conf 이상)가 하나라도 뜬 사진 비율
+    - 정밀도 = 그 클래스 경보가 뜬 사진 중, 그 클래스 정답이 실제로 있는 사진 비율
+    - `_overlap` 변형 (참고): 경보 박스가 같은 클래스 정답 박스와 조금이라도 겹칠 때만 '알아챔'.
+      재현율 = 겹치는 경보가 있는 정답 사진 / 정답 사진, 정밀도 = 겹치는 경보가 있는 경보 사진 / 경보 사진
+    """
+    n_gt_img = n_alert_img = hit = hit_ov = 0
+    for im in images:
+        gts = [g["box"] for g in im["gts"] if g["cls"] == cls]
+        alerts = [p["box"] for p in filter_preds(im["preds"], {cls: conf}) if p["cls"] == cls]
+        ov = any(_overlaps(a, g) for a in alerts for g in gts)
+        n_gt_img += bool(gts)
+        n_alert_img += bool(alerts)
+        hit += bool(gts) and bool(alerts)
+        hit_ov += ov
+
+    def r(a, b):
+        return round(a / b, 3) if b else None
+
+    return {"conf": conf, "images": len(images), "gt_images": n_gt_img, "alert_images": n_alert_img,
+            "hit_images": hit, "hit_images_overlap": hit_ov,
+            "recall": r(hit, n_gt_img), "precision": r(hit, n_alert_img),  # 둘 다 분자 = 정답도 경보도 있는 사진
+            "recall_overlap": r(hit_ov, n_gt_img), "precision_overlap": r(hit_ov, n_alert_img)}
+
+
+def image_report(images: Sequence[dict], class_conf: dict[str, float], exclude_countries: Sequence[str] = ()) -> dict:
+    """포트홀·균열마다 박스 단위(IoU 0.5) + 사진 단위 (+ 겹침 변형). exclude_countries 의 사진은 뺀다."""
+    ims = [im for im in images if country_of(im["name"]) not in set(exclude_countries)]
+    out = {"images": len(ims), "excluded_countries": list(exclude_countries)}
+    for cls in RDD_CLASSES:
+        out[cls] = {"box_iou50": pr_at(ims, {cls: class_conf[cls]})[cls], "image": image_level(ims, cls, class_conf[cls])}
+    return out
 
 
 def rdd_compare(old_images: Sequence[dict], new_images: Sequence[dict],
@@ -125,7 +175,9 @@ def judge(old_card, new_card, old_conf, new_conf, old_rdd, new_rdd, old_demo, ne
     bench = bench_compare(old_bench, new_bench)
     gates = {"rdd_recall": all(rdd[c]["pass"] for c in RDD_CLASSES), "demo_crack": demo["crack_pass"],
              "cpu_realtime": bench["pass"]}
+    images = {"old": image_report(old_rdd, old_conf), "new": image_report(new_rdd, new_conf)}
     return {"public_mAP50": {"old": public_map50(old_card), "new": public_map50(new_card)},
+            "rdd2022_test_image_level": images,
             "class_conf": {"old": old_conf, "new": new_conf}, "rdd2022_test": rdd, "demo_clips": demo, "cpu": bench,
             "gates": gates, "replace": all(gates.values())}
 
@@ -149,6 +201,9 @@ def print_report(rep: dict, old: str, new: str) -> None:
         print(f"  {c:8s} {old} conf {o['conf']:.2f} P {_pct(o['P'])} R {_pct(o['R'])} | "
               f"{new} 자기 기준 conf {own['conf']:.2f} P {_pct(own['P'])} R {_pct(own['R'])} | "
               f"같은 정밀도 {sp_s} | 재현율 +{_pct(r['recall_gain'])} {'✓' if r['pass'] else '✗'}")
+    print("\n== RDD2022 test 사진 단위 (각자 기준, 판정 제외) ==")
+    for side, tag in (("old", old), ("new", new)):
+        print_image_report(rep["rdd2022_test_image_level"][side], tag)
     print("\n== 시연 클립 gn_a·gn_b (이벤트, strict) ==")
     for d, r in rep["demo_clips"].items():
         if d == "crack_pass":
@@ -166,6 +221,15 @@ def print_report(rep: dict, old: str, new: str) -> None:
           f"\n  시연 클립 균열 v3 이상·헛것 증가 없음: {'✓' if g['demo_crack'] else '✗'}"
           f"\n  1스레드 실시간: {'✓' if g['cpu_realtime'] else '✗'}"
           f"\n  → {'교체 (' + new + ')' if rep['replace'] else old + ' 유지'}")
+
+
+def print_image_report(rep: dict, tag: str) -> None:
+    ex = f", {'·'.join(rep['excluded_countries'])} 제외" if rep["excluded_countries"] else ""
+    for cls in RDD_CLASSES:
+        b, i = rep[cls]["box_iou50"], rep[cls]["image"]
+        print(f"  {tag} {cls:8s} conf {i['conf']:.2f} ({rep['images']}장{ex}) | 박스 P {_pct(b['P'])} R {_pct(b['R'])} | "
+              f"사진 P {_pct(i['precision'])} R {_pct(i['recall'])} (정답 사진 {i['gt_images']}, 경보 사진 {i['alert_images']}) | "
+              f"겹침 조건 P {_pct(i['precision_overlap'])} R {_pct(i['recall_overlap'])}")
 
 
 def _pairs(items: Sequence[str]) -> dict[str, Path]:
@@ -188,6 +252,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     c = sub.add_parser("conf", help="conf_thresholds.json → v3 규칙 클래스별 기준 파일 ({class_conf: ...})")
     c.add_argument("thresholds", type=Path)
     c.add_argument("--out", type=Path, required=True)
+    im = sub.add_parser("image", help="RDD test 사진 단위 지표 (박스 단위와 나란히) — 모델 하나씩, judge 전에도 쓸 수 있다")
+    im.add_argument("--preds", type=Path, required=True, help="rdd_figs preds.json")
+    im.add_argument("--conf", type=Path, required=True, help="class_conf 파일 (모델 카드 또는 model_gate conf 결과)")
+    im.add_argument("--exclude", default="United_States", help="따로 한 번 더 잴 때 뺄 나라 (쉼표). 전체 값은 항상 같이")
+    im.add_argument("--out", type=Path)
     j = sub.add_parser("judge", help="v3 vs 새 모델 비교 표 + 교체 기준 판정")
     j.add_argument("--old", default="v3")
     j.add_argument("--new", default="v4")
@@ -206,6 +275,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                                      "rule": "pothole·guardrail·sign 정밀도 ≥ 0.7, crack 정밀도 ≥ 0.8 (v3 와 같은 규칙, handoff 16·21장)"},
                                     ensure_ascii=False, indent=1), encoding="utf-8")
         print(conf)
+        return 0
+
+    if a.cmd == "image":
+        from daboyeo_ai.inference import load_class_conf
+
+        conf = load_class_conf(a.conf)
+        images = _load(a.preds)["images"]
+        ex = [c for c in a.exclude.split(",") if c]
+        rep = {"preds": str(a.preds), "conf_file": str(a.conf), "class_conf": {c: conf[c] for c in RDD_CLASSES},
+               "definitions": IMAGE_DEFINITIONS, "all": image_report(images, conf)}
+        if ex:
+            rep["excluding"] = image_report(images, conf, ex)
+        for k in ("all", "excluding"):
+            if k in rep:
+                print_image_report(rep[k], _load(a.preds).get("model", ""))
+        if a.out:
+            a.out.parent.mkdir(parents=True, exist_ok=True)
+            a.out.write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
+            print(f"저장: {a.out}", file=sys.stderr)
         return 0
 
     rdd, demo = _pairs(a.rdd), _pairs(a.demo)

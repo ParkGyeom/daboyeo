@@ -24,3 +24,9 @@ def build_payload(defect: dict, user_name: str, now: datetime) -> dict:
         "first_seen_at": defect["first_seen_at"].astimezone(rules.KST).isoformat(timespec="seconds"),
         "reward_eligible_road": defect["reward_eligible_road"],
     }
+
+
+def count_for(conn, user_id) -> int:
+    """그 시민(사람)이 다보여로 낸 신고 수. 차량이 여러 대여도 사람 기준이라 reports.user_id 로 센다.
+    포상 기준(분기 몇 건)은 서울시 공지마다 달라서 안내하지 않고, 누적 수만 보여 준다 (PRD F8)."""
+    return conn.execute("SELECT count(*) AS n FROM reports WHERE user_id = %s", (user_id,)).fetchone()["n"]

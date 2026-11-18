@@ -29,7 +29,7 @@ def _inbox() -> None:
             for m in items:
                 with st.container(border=True):
                     st.caption(f"{api.clock(m['created_at'])}" + (" · 열어 봄" if m["opened_at"] else ""))
-                    st.write(m["body"].split(" 확인하고 신고하기:")[0])
+                    st.markdown(api.sms_markdown(m["body"], m["url"]))
                     st.link_button("링크 열기", m["url"], width="stretch")
 
 

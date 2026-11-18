@@ -53,8 +53,6 @@ CONFIDENCE_VISIBLE_BY_TYPE.update(load_type_conf())
 
 def theta(defect_type: str) -> float:
     return CONFIDENCE_VISIBLE_BY_TYPE.get(defect_type, CONFIDENCE_VISIBLE)
-REWARD_TARGET = 5
-
 # 001_init.sql 의 defect_status / finding_response
 UNREPORTED, REPORTED, UNDER_REPAIR = "unreported", "reported", "under_repair"
 STATUSES = (UNREPORTED, REPORTED, UNDER_REPAIR)
@@ -101,23 +99,8 @@ def can_transition(old: str, new: str) -> bool:
     return (old, new) in _TRANSITIONS
 
 
-def quarter_start(now: datetime) -> datetime:
-    """now 가 속한 분기의 시작 시각 (한국 시간 기준)."""
-    now = now.astimezone(KST)
-    first_month = 3 * ((now.month - 1) // 3) + 1
-    return now.replace(month=first_month, day=1, hour=0, minute=0, second=0, microsecond=0)
-
-
 def quarter_label(now: datetime) -> str:
-    """reports.quarter 값. 예: 2026-Q4 (한국 시간 기준)."""
+    """reports.quarter 값. 예: 2026-Q4 (한국 시간 기준). 화면에는 쓰지 않고 DB 에만 남긴다."""
     now = now.astimezone(KST)
     return f"{now.year}-Q{(now.month - 1) // 3 + 1}"
-
-
-def reward_progress(valid_reports_this_quarter: int) -> dict:
-    return {
-        "count": valid_reports_this_quarter,
-        "target": REWARD_TARGET,
-        "remaining": max(0, REWARD_TARGET - valid_reports_this_quarter),
-    }
 

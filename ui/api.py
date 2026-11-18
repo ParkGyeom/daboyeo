@@ -7,6 +7,7 @@ risk_level 은 서버·신고서 데이터에는 남아 있지만 화면에는 �
 from __future__ import annotations
 
 import os
+import re
 from datetime import date, datetime, timedelta, timezone
 
 import httpx
@@ -48,24 +49,9 @@ def _users() -> list[dict]:
     return _call("GET", "/users")
 
 
-def users() -> dict[str, str]:
-    """시민 id → '시민 A (12가 3456)'. 번호가 없는 차량은 기기 이름(bb-01)."""
-    return {u["id"]: f"{u['name']} ({u.get('vehicle_plate') or u['vehicle_label']})" for u in _users()}
-
-
 def plates() -> list[str]:
     """등록된 차량 번호 (관리자 지도의 차량 고르기)."""
     return sorted({u["vehicle_plate"] for u in _users() if u.get("vehicle_plate")})
-
-
-def pick_user(key: str = "user_id") -> str:
-    """시민 선택 상자. 서버에 닿지 않으면 화면을 멈춘다."""
-    try:
-        us = users()
-    except ApiError as e:
-        st.error(e.detail)
-        st.stop()
-    return st.selectbox("시민", list(us), format_func=us.get, key=key)
 
 
 def clock(iso: str) -> str:
@@ -85,29 +71,18 @@ def short_when(iso: str) -> str:
     return f"{datetime.fromisoformat(iso).astimezone(KST):%m/%d %H:%M}"
 
 
-def findings(user_id: str) -> list[dict]:
-    return _call("GET", f"/users/{user_id}/findings")
-
-
-def notices(user_id: str) -> list[dict]:
-    """끝난 주행 중 아직 답하지 않은 항목이 남은 것. 최근 것부터."""
-    return _call("GET", f"/users/{user_id}/notices")
-
-
-def report(defect_id: str, user_id: str) -> dict:
-    return _call("POST", f"/defects/{defect_id}/report", json={"user_id": user_id})
-
-
-def skip(defect_id: str, user_id: str) -> dict:
-    return _call("POST", f"/defects/{defect_id}/skip", json={"user_id": user_id})
-
-
 def get_report(report_id: str) -> dict:
     return _call("GET", f"/reports/{report_id}")
 
 
-def user_reports(user_id: str) -> list[dict]:
-    return _call("GET", f"/users/{user_id}/reports")
+def reports() -> list[dict]:
+    """관리자 신고 내역: 모든 신고서 (누가·어느 결함·지금 상태). 최근 것부터."""
+    return _call("GET", "/reports")
+
+
+def reporters() -> list[dict]:
+    """시민(사람)별 신고 누적 수 (이름·차량 번호). 많이 낸 순."""
+    return _call("GET", "/reporters")
 
 
 def defects(type: str | None = None, status: str | None = None, region1: str | None = None,
@@ -122,10 +97,6 @@ def defects(type: str | None = None, status: str | None = None, region1: str | N
 
 def set_status(defect_id: str, status: str) -> dict:
     return _call("PATCH", f"/defects/{defect_id}/status", json={"status": status})
-
-
-def reward(user_id: str) -> dict:
-    return _call("GET", f"/users/{user_id}/reward")
 
 
 def short(uuid_str: str) -> str:
@@ -158,7 +129,7 @@ def snapshot_bytes(name: str | None) -> bytes | None:
 # ---------- 문자 링크 (가입·로그인 없이 토큰으로) ----------
 
 def link_findings(token: str) -> dict:
-    """{'user_name', 'expires_at', 'findings': [...]}. 없는 링크는 ApiError(404), 만료는 ApiError(410)."""
+    """{'user_name', 'expires_at', 'findings': [...], 'report_count'}. 없는 링크는 ApiError(404), 만료는 ApiError(410)."""
     return _call("GET", f"/m/{token}/findings")
 
 
@@ -177,3 +148,26 @@ def link_get_report(token: str, report_id: str) -> dict:
 def inbox() -> list[dict]:
     """모의 문자 목록 (시연용 메시지함). 최근 것부터."""
     return _call("GET", "/notifications")
+
+
+_MD_SPECIAL = re.compile(r"([\\`*_{}\[\]()<>#+\-.!|~$])")
+
+
+def _md_escape(text: str) -> str:
+    return _MD_SPECIAL.sub(r"\\\1", text)
+
+
+def sms_markdown(body: str, url: str) -> str:
+    """모의 문자 본문을 줄을 지켜 보여 줄 마크다운으로 (메시지함). 본문 속 링크 주소는 누를 수 있는 링크로 바꾼다.
+
+    본문 문구가 바뀌어도 깨지지 않게 문구로 자르지 않는다: 링크는 서버가 토큰으로 만든 url 그대로 찾는다.
+    마크다운 기호(~ · [ 등)는 글자 그대로 보이게 막는다 ("12:54~12:58" 이 취소선이 되지 않게).
+    """
+    lines = []
+    for line in body.splitlines():
+        head, found, tail = line.partition(url)
+        out = _md_escape(head)
+        if found:
+            out += f"[{_md_escape(url)}]({url})" + _md_escape(tail)
+        lines.append(out)
+    return "  \n".join(lines)

@@ -13,18 +13,15 @@ if st.query_params.get("t"):
     st.navigation([st.Page("views/link_confirm.py", title="확인·신고", icon="📱")], position="hidden").run()
     st.stop()
 
+# 시민이 받는 것은 문자 하나와 그 링크뿐이라 시민 메뉴는 없다. 시연에서는 메시지함(모의)에서 링크를 누른다
 pages = st.navigation(
     {
-        "시민": [
-            st.Page("views/confirm.py", title="확인·신고", icon="📱", default=True),
-            st.Page("views/report.py", title="신고서", icon="📄"),
-            st.Page("views/reward.py", title="포상 현황", icon="🏅"),
-        ],
         "시연": [
-            st.Page("views/inbox.py", title="메시지함 (모의)", icon="💬"),
+            st.Page("views/inbox.py", title="메시지함 (모의)", icon="💬", default=True),
         ],
         "관리자": [
             st.Page("views/dashboard.py", title="지도 대시보드", icon="🗺️"),
+            st.Page("views/reports.py", title="신고 내역", icon="📄"),
             st.Page("views/blackbox.py", title="블랙박스 화면", icon="🎥"),
         ],
     }

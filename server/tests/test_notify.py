@@ -40,10 +40,10 @@ def test_trip_end_creates_one_mock_sms_with_link(client):
     assert "1건" in msg["body"] and msg["url"] in msg["body"] and "/?t=" in msg["url"]
     lines = msg["body"].splitlines()
     assert lines[0] == "[다보여] 도로 결함 확인 요청"
-    assert lines[1].startswith("시민 A님, ") and "도로 결함 1건을 찾았어요" in lines[1]
+    assert lines[1] == "" and lines[2] == "시민 A님, 주행 중 블랙박스가 도로 결함 1건을 찾았어요."
     assert "· 포트홀 1건 — 위치 확인 중" in lines  # 테스트는 주소를 받지 않는다
-    assert "아직 다보여로 신고한 결함은 없어요." in lines
-    assert f"확인·신고: {msg['url']}" in lines
+    assert "■ 지금까지 내 신고: 아직 없음" in lines
+    assert lines[lines.index("▶ 확인·신고하기") + 1] == msg["url"]
 
 
 def test_sms_counts_reports_so_far(client):
@@ -56,7 +56,7 @@ def test_sms_counts_reports_so_far(client):
     observe(client, t, lat=37.5100)
     end(client, t)
     newest = _inbox(client)[0]
-    assert "지금까지 다보여로 1건 신고했어요." in newest["body"].splitlines()
+    assert "■ 지금까지 내 신고: 1건" in newest["body"].splitlines()
 
 
 KST_NOON = datetime(2026, 11, 18, 3, 54, tzinfo=timezone.utc)  # 한국 오후 12:54
@@ -69,13 +69,24 @@ def test_compose_long_body():
                           "http://localhost:8501/?t=abc", 72)
     assert body.splitlines() == [
         "[다보여] 도로 결함 확인 요청",
-        "정현우님, 11월 18일 오후 12:54~12:58 주행 중 블랙박스가 도로 결함 5건을 찾았어요.",
+        "",
+        "정현우님, 주행 중 블랙박스가 도로 결함 5건을 찾았어요.",
+        "",
+        "■ 주행: 11월 18일 오후 12:54~12:58",
+        "■ 찾은 결함 5건",
         "· 균열 3건 — 서울 강남구 봉은사로 102 부근",
         "· 균열 2건 — 서울 강남구 강남대로 396 부근",
-        "사진을 보고 신고할지 직접 정할 수 있어요. 신고하면 본인 명의로 서울시에 접수돼요 (시연에서는 모의 접수).",
-        "지금까지 다보여로 3건 신고했어요.",
-        "확인·신고: http://localhost:8501/?t=abc",
-        "링크는 72시간 동안 열려요. 신고하지 않으려면 이 문자를 무시하세요.",
+        "■ 지금까지 내 신고: 3건",
+        "",
+        "사진을 보고 신고할지 직접 정해 주세요.",
+        "신고하면 본인 명의로 서울시에 접수돼요.",
+        "(시연에서는 모의 접수)",
+        "",
+        "▶ 확인·신고하기",
+        "http://localhost:8501/?t=abc",
+        "",
+        "링크는 72시간 동안 열려요.",
+        "신고하지 않으려면 이 문자를 무시하세요.",
     ]
 
 

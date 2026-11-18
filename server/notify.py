@@ -79,20 +79,35 @@ def place_lines(items: list[dict], limit: int = MAX_PLACE_LINES) -> list[str]:
 
 
 def count_line(report_count: int) -> str:
-    return f"지금까지 다보여로 {report_count}건 신고했어요." if report_count else "아직 다보여로 신고한 결함은 없어요."
+    """신고 누적 한 줄 (사람 기준). 포상 기준·남은 건수는 넣지 않는다 (PRD F8)."""
+    return f"■ 지금까지 내 신고: {report_count}건" if report_count else "■ 지금까지 내 신고: 아직 없음"
 
 
 def compose(user_name: str, started_at: datetime, ended_at: datetime, items: list[dict], report_count: int,
             url: str, ttl_hours: int) -> str:
-    """문자 본문. items 는 그 주행의 확인 목록 결함(defect_type, address)."""
+    """문자 본문. items 는 그 주행의 확인 목록 결함(defect_type, address).
+
+    실제 안내 문자처럼 제목 / 인사 / ■ 항목 / 안내 / ▶ 링크 / 끝 안내를 빈 줄로 나눈다. 한 줄이 길면 휴대폰이 알아서 접는다.
+    """
     return "\n".join([
         "[다보여] 도로 결함 확인 요청",
-        f"{user_name}님, {drive_span(started_at, ended_at)} 주행 중 블랙박스가 도로 결함 {len(items)}건을 찾았어요.",
+        "",
+        f"{user_name}님, 주행 중 블랙박스가 도로 결함 {len(items)}건을 찾았어요.",
+        "",
+        f"■ 주행: {drive_span(started_at, ended_at)}",
+        f"■ 찾은 결함 {len(items)}건",
         *place_lines(items),
-        "사진을 보고 신고할지 직접 정할 수 있어요. 신고하면 본인 명의로 서울시에 접수돼요 (시연에서는 모의 접수).",
         count_line(report_count),
-        f"확인·신고: {url}",
-        f"링크는 {ttl_hours}시간 동안 열려요. 신고하지 않으려면 이 문자를 무시하세요.",
+        "",
+        "사진을 보고 신고할지 직접 정해 주세요.",
+        "신고하면 본인 명의로 서울시에 접수돼요.",
+        "(시연에서는 모의 접수)",
+        "",
+        "▶ 확인·신고하기",
+        url,
+        "",
+        f"링크는 {ttl_hours}시간 동안 열려요.",
+        "신고하지 않으려면 이 문자를 무시하세요.",
     ])
 
 

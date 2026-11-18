@@ -1,0 +1,11 @@
+{
+ "class_conf": {
+  "pothole": 0.28,
+  "crack": 0.4,
+  "guardrail": 0.15,
+  "sign": 0.16
+ },
+ "model": "detector_v4.onnx",
+ "source": "experiments/conf_thresholds_v4.json",
+ "rule": "pothole·guardrail·sign 정밀도 ≥ 0.7, crack 정밀도 ≥ 0.8 (v3 와 같은 규칙, handoff 16·21장)"
+}

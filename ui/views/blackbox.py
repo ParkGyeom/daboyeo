@@ -12,10 +12,9 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from edge.blackbox.live import COLORS, LIVE_DIR  # noqa: E402
+from edge.blackbox.live import COLORS, LABELS, LIVE_DIR  # noqa: E402
 
 STALE_S = 5  # 이 시간 동안 새 프레임이 없으면 멈춘 것으로 본다
-LABELS = {"pothole": "포트홀", "crack": "균열", "lane_wear": "차선 마모", "guardrail": "가드레일", "sign": "표지판"}
 
 st.markdown("<style>.block-container{max-width:1400px}</style>", unsafe_allow_html=True)
 st.title("블랙박스 화면")

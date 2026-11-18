@@ -2,8 +2,9 @@
 
 import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
-from server import db
+from server import db, notify
 from server.tests.conftest import USER, end, needs_db, observe, start
 
 pytestmark = needs_db
@@ -37,6 +38,69 @@ def test_trip_end_creates_one_mock_sms_with_link(client):
     (msg,) = _inbox(client)
     assert msg["user_name"] == "시민 A"
     assert "1건" in msg["body"] and msg["url"] in msg["body"] and "/?t=" in msg["url"]
+    lines = msg["body"].splitlines()
+    assert lines[0] == "[다보여] 도로 결함 확인 요청"
+    assert lines[1].startswith("시민 A님, ") and "도로 결함 1건을 찾았어요" in lines[1]
+    assert "· 포트홀 1건 — 위치 확인 중" in lines  # 테스트는 주소를 받지 않는다
+    assert "아직 다보여로 신고한 결함은 없어요." in lines
+    assert f"확인·신고: {msg['url']}" in lines
+
+
+def test_sms_counts_reports_so_far(client):
+    """두 번째 주행 문자에는 첫 주행에서 낸 신고가 누적으로 들어간다. 링크 화면에도 같은 수."""
+    did, token = _setup_one(client)
+    assert client.get(f"/api/v1/m/{token}/findings").json()["report_count"] == 0
+    assert client.post(f"/api/v1/m/{token}/defects/{did}/report").status_code == 200
+    assert client.get(f"/api/v1/m/{token}/findings").json()["report_count"] == 1  # 신고하면 바로 +1
+    t = start(client, "bb-01")
+    observe(client, t, lat=37.5100)
+    end(client, t)
+    newest = _inbox(client)[0]
+    assert "지금까지 다보여로 1건 신고했어요." in newest["body"].splitlines()
+
+
+KST_NOON = datetime(2026, 11, 18, 3, 54, tzinfo=timezone.utc)  # 한국 오후 12:54
+
+
+def test_compose_long_body():
+    items = ([{"defect_type": "crack", "address": "서울 강남구 봉은사로 102"}] * 3
+             + [{"defect_type": "crack", "address": "서울 강남구 강남대로 396"}] * 2)
+    body = notify.compose("정현우", KST_NOON, KST_NOON.replace(minute=58), items, 3,
+                          "http://localhost:8501/?t=abc", 72)
+    assert body.splitlines() == [
+        "[다보여] 도로 결함 확인 요청",
+        "정현우님, 11월 18일 오후 12:54~12:58 주행 중 블랙박스가 도로 결함 5건을 찾았어요.",
+        "· 균열 3건 — 서울 강남구 봉은사로 102 부근",
+        "· 균열 2건 — 서울 강남구 강남대로 396 부근",
+        "사진을 보고 신고할지 직접 정할 수 있어요. 신고하면 본인 명의로 서울시에 접수돼요 (시연에서는 모의 접수).",
+        "지금까지 다보여로 3건 신고했어요.",
+        "확인·신고: http://localhost:8501/?t=abc",
+        "링크는 72시간 동안 열려요. 신고하지 않으려면 이 문자를 무시하세요.",
+    ]
+
+
+def test_place_lines_group_and_cut():
+    items = ([{"defect_type": "pothole", "address": None}]
+             + [{"defect_type": "crack", "address": "A로 1"}] * 2
+             + [{"defect_type": "sign_damage", "address": ""}]
+             + [{"defect_type": "crack", "address": "B로 2"}] * 3
+             + [{"defect_type": "pothole", "address": "A로 1"}] * 2)
+    assert notify.place_lines(items) == [
+        "· 균열 3건 — B로 2 부근",
+        "· 균열 2건 — A로 1 부근",
+        "· 포트홀 2건 — A로 1 부근",
+        "· 외 2건",  # 위치 확인 중 포트홀 1 + 주소 없는 곳 표지판 1
+    ]
+    assert notify.place_lines(items[:1]) == ["· 포트홀 1건 — 위치 확인 중"]
+
+
+def test_drive_span_crosses_midnight_in_kst():
+    a = datetime(2026, 11, 18, 14, 50, tzinfo=timezone.utc)  # 한국 오후 11:50
+    b = datetime(2026, 11, 18, 15, 10, tzinfo=timezone.utc)  # 한국 19일 오전 12:10
+    assert notify.drive_span(a, b) == "11월 18일 오후 11:50~11월 19일 오전 12:10"
+    noon = datetime(2026, 11, 18, 2, 50, tzinfo=timezone.utc)  # 한국 오전 11:50
+    assert notify.drive_span(noon, KST_NOON) == "11월 18일 오전 11:50~오후 12:54"
+    assert notify.drive_span(KST_NOON, KST_NOON.replace(second=40)) == "11월 18일 오후 12:54"
 
 
 def test_no_findings_no_sms(client):

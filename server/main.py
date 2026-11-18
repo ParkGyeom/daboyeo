@@ -317,7 +317,9 @@ def link_findings(token: str):
         n = _token(conn, token)
         conn.execute("UPDATE notifications SET opened_at = coalesce(opened_at, now()) WHERE id = %s", (n["id"],))
         items = [_view(d) for d in findings.pending(conn, n["user_id"], n["trip_id"])]
-    return {"user_name": n["name"], "expires_at": n["expires_at"], "findings": items}
+        count = report.count_for(conn, n["user_id"])
+    # report_count: 이 시민이 지금까지 낸 신고 수 (사람 기준, 링크 화면의 "지금까지 N건 신고했어요")
+    return {"user_name": n["name"], "expires_at": n["expires_at"], "findings": items, "report_count": count}
 
 
 @app.post(f"{API}/m/{{token}}/defects/{{defect_id}}/report")
@@ -364,6 +366,36 @@ def notifications():
         return notify.recent(conn)
 
 
+@app.get(f"{API}/reports")
+def list_reports():
+    """관리자 신고 내역: 모든 신고서, 최근 것부터. 누가(이름·그 결함을 본 신고자의 차량 번호)·어느 결함(유형·주소·지금 상태).
+    차량 번호가 없는 차량은 기기 이름(bb-01)."""
+    with db.connect() as conn:
+        return conn.execute(
+            """SELECT r.id, r.defect_id, r.user_id, u.name AS user_name, r.created_at, r.submission_status,
+                      d.defect_type, d.status, d.address,
+                      ARRAY(SELECT DISTINCT coalesce(v.plate, v.label) FROM observations o
+                            JOIN vehicles v ON v.id = o.vehicle_id
+                            WHERE o.defect_id = r.defect_id AND v.owner_user_id = r.user_id ORDER BY 1) AS plates
+               FROM reports r JOIN users u ON u.id = r.user_id JOIN defects d ON d.id = r.defect_id
+               ORDER BY r.created_at DESC, r.id"""
+        ).fetchall()
+
+
+@app.get(f"{API}/reporters")
+def reporters():
+    """시민(사람)별 신고 누적 수. 한 사람이 차를 여러 대 가질 수 있어 차량이 아니라 reports.user_id 로 센다.
+    신고가 없는 시민도 0 으로 넣는다. 많이 낸 순."""
+    with db.connect() as conn:
+        return conn.execute(
+            """SELECT u.id AS user_id, u.name AS user_name,
+                      ARRAY(SELECT coalesce(v.plate, v.label) FROM vehicles v
+                            WHERE v.owner_user_id = u.id ORDER BY 1) AS plates,
+                      (SELECT count(*) FROM reports r WHERE r.user_id = u.id) AS report_count
+               FROM users u ORDER BY report_count DESC, u.name"""
+        ).fetchall()
+
+
 @app.get(f"{API}/reports/{{report_id}}")
 def get_report(report_id: UUID):
     with db.connect() as conn:
@@ -386,20 +418,6 @@ def user_reports(user_id: UUID):
             "SELECT id, defect_id, quarter, payload, created_at FROM reports WHERE user_id = %s ORDER BY created_at DESC",
             (user_id,),
         ).fetchall()
-
-
-@app.get(f"{API}/users/{{user_id}}/reward")
-def reward(user_id: UUID):
-    """이번 분기(한국 시간)에 그 시민이 낸 포상 대상 신고 수와 5건까지 남은 수."""
-    now = datetime.now(rules.KST)
-    with db.connect() as conn:
-        _user(conn, user_id)
-        n = conn.execute(
-            "SELECT count(*) AS n FROM reports WHERE user_id = %s AND reward_valid AND quarter = %s",
-            (user_id, rules.quarter_label(now)),
-        ).fetchone()["n"]
-    return {**rules.reward_progress(n), "quarter": rules.quarter_label(now),
-            "since": rules.quarter_start(now).isoformat()}
 
 
 # ---------- 관리자 ----------

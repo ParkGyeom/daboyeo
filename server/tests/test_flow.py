@@ -1,4 +1,4 @@
-"""주행 후 확인 목록, 노출 기준, 신고·중복 신고 거절, 넘기기, 상태 전환, 포상 (PRD F5~F8). DB가 필요하다."""
+"""주행 후 확인 목록, 노출 기준, 신고·중복 신고 거절, 넘기기, 상태 전환, 신고 누적 (PRD F5~F8). DB가 필요하다."""
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -116,15 +116,23 @@ def test_status_transitions(client):
     assert patch("reported") == 409
 
 
-def test_reward_counts_only_eligible_reports(client):
+def test_report_count_is_per_person_and_admin_list(client):
+    """신고 누적은 사람 기준이라 포상 대상 도로 여부·분기와 상관없이 모두 센다. 관리자 신고 내역에 누가·어느 결함."""
     t = start(client)
     seoul = observe(client, t)["defect_id"]
     outside = observe(client, t, type="crack", lat=36.78, lon=127.17)["defect_id"]
     end(client, t)
     for did in (seoul, outside):
         assert client.post(f"/api/v1/defects/{did}/report", json={"user_id": A}).status_code == 200
-    r = client.get(f"/api/v1/users/{A}/reward").json()
-    assert (r["count"], r["remaining"]) == (1, 4)
+    people = {p["user_name"]: p for p in client.get("/api/v1/reporters").json()}
+    assert people["시민 A"]["report_count"] == 2 and people["시민 A"]["plates"] == ["12가 3456"]
+    assert people["시민 B"]["report_count"] == 0  # 신고가 없는 시민도 0 으로 나온다
+    assert client.get("/api/v1/reporters").json()[0]["user_name"] == "시민 A"  # 많이 낸 순
+    reps = client.get("/api/v1/reports").json()
+    assert {r["defect_id"] for r in reps} == {seoul, outside}
+    assert all(r["user_name"] == "시민 A" and r["plates"] == ["12가 3456"] and r["status"] == "reported" for r in reps)
+    assert {r["defect_type"] for r in reps} == {"pothole", "crack"}
+    assert client.get(f"/api/v1/users/{A}/reward").status_code == 404  # 포상 현황 API 는 없앴다
 
 
 def test_list_filters_and_jurisdiction(client):

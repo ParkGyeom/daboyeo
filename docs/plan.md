@@ -51,7 +51,7 @@
 | F5 중복 정리·신고 상태 | P0 | 정현우 | `PRD.md:288-300` |
 | F6 주행 후 확인·신고 | P0 | 정현우 | `PRD.md:304-317` |
 | F7 오신고 방지 (노출 기준) | P0 | 정현우 (+박겸 임계값) | `PRD.md:321-330` |
-| F8 포상 현황 | P1 | 정현우 | `PRD.md:334-345` |
+| F8 신고 누적 안내 (v0.8, 포상 현황 대신) | P1 | 정현우 | `PRD.md:334-345` |
 | F9 관리자 지도 | P0 | 정현우 | `PRD.md:349-359` |
 | 주행 영상·GPS 확보 (8.5) | P0 (선행 조건) | 정현우 (+박겸 라벨) | `PRD.md:423-447` |
 
@@ -253,8 +253,8 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | 3.1 | 정현우 | `exposure.py` — `conf ≥ θ OR vehicle_count ≥ k`, 시설물 의심은 `vehicle_count ≥ k`만 | 기준 미달 결함이 목록에 없음 |
 | 3.2 | 정현우 | `/trips/{id}/findings`, `/defects/{id}/report`, `/skip` | API 테스트 |
 | 3.3 | 정현우 | `reporting.py` — `INSERT … ON CONFLICT (defect_id) DO NOTHING RETURNING id` | 동시 요청 20개 → 1건 |
-| 3.4 | 정현우 | `reward.py` + `reward_roads.geojson` | 포상 도로 결함 신고 → 유효 건수 +1 |
-| 3.5 | 정현우 | 시민 화면 (캡처·유형·위치·위험도·신뢰도·차량 수·포상 도로, [신고]/[넘기기]) | 시연 5~6단계 |
+| 3.4 | 정현우 | ~~`reward.py` + `reward_roads.geojson`~~ → **11/18 신고 누적 안내로 바꿈** (`server/report.py` `count_for`, 문자·링크 화면·관리자 신고 내역) | 링크에서 신고 → 누적 +1, 다음 문자에 반영 |
+| 3.5 | 정현우 | 시민 화면 = **문자 링크 화면 하나** (캡처·유형·위치·신뢰도·차량 수, [신고]/[넘기기], 신고 누적) | 시연 5~6단계 |
 | 3.6 | 정현우 | 관리자 지도 (상태별 마커, 상세, '보수 중' 변경) | 신고 후 마커 '신고됨' |
 | 3.7 | 정현우 | `--detector replay` 모드 | CPU 추론 없이도 시연 흐름 동작 |
 | 4.1 | 박겸 | `eval_detector.py` — 공개 테스트셋 / **선정 공개 영상** 분리 평가 (`PRD.md:579`) | 12장 표 탐지 행 |
@@ -304,7 +304,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | AC-7 | 같은 결함 동시 신고 20건 → `reports` 1행, 나머지 `already_reported` | `test_report_concurrency.py` |
 | AC-8 | 노출 기준 미달 결함은 `/findings`에 없음 | `test_exposure.py` |
 | AC-9 | 신고서 payload에 사진·위치·유형·신뢰도·관측 차량 수·신고자 | `test_reporting.py` |
-| AC-10 | 포상 도로 결함 신고 → `quarter_valid_count` +1, 비대상 도로는 변화 없음 | `test_reward.py` |
+| AC-10 | (11/18 바꿈) 신고 → 시민(사람)의 신고 누적 +1, 링크 화면·다음 문자·관리자 신고 내역에 반영 | `server/tests/test_notify.py::test_sms_counts_reports_so_far`, `test_flow.py::test_report_count_is_per_person_and_admin_list` |
 | AC-11 | 시민 신고 직후 지도 마커 '신고됨' | 리허설 체크리스트 |
 | AC-12 | 두 번째 차량 시민에게 이미 신고된 결함이 안 보임 (시연 8단계) | `test_findings.py` |
 | AC-13 | 재구성 GPS의 hold-out 오차가 영상별로 기록되어 있음 | `experiments/gps_error.csv` |
@@ -458,6 +458,7 @@ scripts/demo.sh reset      # 시연용 DB 로 쟀다면
 
 ## 변경 이력
 
+- **r3.23 (2026-11-18)** — PRD v0.8: F8 '포상 현황 안내' → '신고 누적 안내' (정현우, 공동 파일 PRD·plan 변경). 포상 기준이 서울시 공지마다 달라(분기 5건 / 반기 10건, 2026-08 도로부속물 공지는 분기 5건) 기준을 채우고도 못 받으면 억울하므로 화면에서 포상 기준·남은 건수·'포상 대상' 표시를 뺐다 (DB `reward_eligible_road`·`reward_valid`·`quarter` 는 그대로, 스키마·contracts 변경 없음). 시민이 받는 것은 문자 하나와 링크뿐이라 시민 메뉴(확인·신고·신고서·포상 현황)를 없애고, 신고서는 관리자 > 신고 내역(`GET /api/v1/reports`, 시민별 누적 `GET /api/v1/reporters`)으로 옮겼다. 누적은 사람 기준(`reports.user_id`). 모의 문자는 한 줄 → 여러 줄(언제 주행·유형별 건수와 주소·본인 명의 접수 안내·누적·링크·유효 시간, `server/notify.py` `compose`). 바꾼 PRD 곳: 2.1장·4장 시민 접점·US-05·3.2 F8 행·FR-6.2·F8 전체·10장 API·13장 6단계·15.1 M3·15.3 컷 라인 4·오픈 이슈 #7·부록 용어. PRD 줄 수는 부록 끝에 한 줄('신고 누적')만 늘어 이 문서의 `PRD.md:줄번호` 인용은 바뀌지 않음. 3.4·3.5·AC-10 도 같이 바꿈.
 - **r3.22 (2026-11-18)** — PRD v0.7: 12장 AI 행 실측값 (박겸, 공동 파일 PRD·plan 변경). 탐지(v3 공개 테스트셋·RDD2022 test·시연 클립 이벤트 단위, handoff 18·19장), 파손 분류(기준 미달 → 위치 탐지까지만), 차선 마모(시연 클립 헛것 93% → 84%, 시연에서 끔), 처리 속도 v3 다시 잼 (4.2): `experiments/bench_cpu_v3.{csv,json}` — 시연 클립 gn_b 프레임 182장 × 3회, M4 Pro, **시연 클립이 60 fps 라 영상 1분 = 3,600 프레임**으로 계산 (v2 `bench_cpu.csv` 는 30 fps 가정). 탐지 1스레드 21.4 ms · 2스레드 16.5 ms, 영상 1분당 매 프레임 77.2 · 59.6 초 → 10 프레임마다 7.7 · 6.0 초. 분석 간격 (4.3): `experiments/interval_sweep_v3/` (v3, 시연 클립 2개, amb 뺀 정답, 차선 마모 끔) — 균열 누락 1 프레임 5/10 · 10 프레임 6/10 · 30 프레임 7/10. 목표 처리 속도 `(제안)` = 실시간 · CPU 1스레드, 탐지 주기 10 프레임(8.3), FR-1.3 차선 마모 기준 채움. PRD 줄 수는 그대로라 이 문서의 `PRD.md:줄번호` 인용은 바뀌지 않음.
 - **r3.21 (2026-11-17)** — BDD100K 실제 GPS 변환 도구 (4.6, P2). `tools/gps/bdd_to_csv.py`: info JSON(영상 1개당 1파일)의 `gps` 목록(없으면 `locations`) → GPS CSV `t_s,lat,lon,speed_kmh`, 파일 이름은 info 의 `filename` 영상 이름(`<영상 id>.gps.csv`, 영상 옆에 두면 `run.py` 가 `--gps` 없이 찾음). t_s = GPS 시각 − `startTime`, 영상 시작 전·끝 뒤 점도 남김(t=0 보간용), 좌표 없음·(0,0)·범위 밖·시각이 거꾸로/같은 점은 버림, `speed` m/s → km/h(음수 = 모름). 테스트 `tools/gps/tests/test_bdd_to_csv.py`(합성 JSON 6개, testpaths 에 `tools/gps/tests` 추가). 형식 근거: 키 `gps`·`latitude`·`longitude` 는 공식 코드 `bdd100k/vis/trajectory.py`, `filename`·`startTime`·`endTime` 은 bdd100k GitHub discussions #340, GPS 1 Hz·영상 29.97 fps 는 bdd100k-discuss. **실제 파일로 확인 못 한 가정**: 시각이 epoch 밀리초(초면 자동 인식), `speed` 단위 m/s, `startTime` = 영상 첫 프레임. **실제 데이터 확인은 미룸**: 공식 받기 서버 `dl.cv.ethz.ch` DNS 안 풀림, 포털 `bdd-data.berkeley.edu` 인증서 만료(로그인·라이선스 동의 필요), 클립 단위로 못 받고 `bdd100k_info.zip` 3.9GB + 영상 묶음 1개 약 18GB(전체 1.8TB/100), Hugging Face 사본엔 GPS 기록 없음. 라이선스는 UC Berkeley — 교육·연구·비영리 사용 허용, 저작권 고지 유지. 받게 되면: 클립 1~3개 CSV 변환 → `run.py --dry-run` → 경로를 지도로 영상과 비교하고 위 가정 3개 확인. `reconstruct.py` 와 공통 함수는 아직 나누지 않음(겹치면 합침).
 - **r3.20 (2026-11-17)** — 오픈 이슈 #2·#3 닫음 (정현우, #3 은 박겸 제안). #2 묶기 반경 20 → **30 m** (`server/rules.py` 기본, 차선 마모 30 → 40 m): 재구성 GPS hold-out 오차가 7 m 이상 (11-3 기준). 시연 정답 라벨에서는 20·30 m 결과가 같다. #3 노출 기준 θ 를 **유형별** 로: 서버가 모델 카드 JSON 을 직접 읽어 (`daboyeo_ai` 를 부르지 않음) 포트홀 0.31 · 균열 0.42 · 가드레일·표지판(파손 유형) 0.21, 그 밖은 0.6. k = 2 는 그대로. PRD v0.6.

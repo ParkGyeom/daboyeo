@@ -29,6 +29,9 @@ if msg := st.session_state.pop("link_flash", None):
     (st.success if msg[0] == "ok" else st.warning)(msg[1])
 
 st.caption(f"{data['user_name']}님의 주행 결과")
+# 신고 누적 (사람 기준). 포상 기준·남은 건수는 서울시 공지마다 달라 안내하지 않는다 (PRD F8)
+st.info(f"🙌 지금까지 다보여로 **{data['report_count']}건** 신고했어요." if data["report_count"]
+        else "아직 다보여로 신고한 결함은 없어요.")
 
 # 방금 낸 신고서 요약 (원터치 신고의 결과). 새로 고침하면 이 화면에서는 사라지지만 신고서는 남아 있다
 for rid in st.session_state.get("link_reports", []):
@@ -43,8 +46,7 @@ for rid in st.session_state.get("link_reports", []):
                  or f"위치 {b['location']['lat']:.5f}, {b['location']['lon']:.5f}")
         st.caption(
             f"{api.TYPE_KO.get(b['defect_type'], b['defect_type'])} · {where} · {b['location']['jurisdiction']}  \n"
-            f"신고자 {b['reporter']} · {api.when(b['reported_at'])}  \n"
-            f"포상 {'대상' if r['reward_valid'] else '대상 아님'}"
+            f"신고자 {b['reporter']} · {api.when(b['reported_at'])}"
         )
 
 items = data["findings"]
@@ -63,8 +65,7 @@ for d in items:
         naver_map.mini(d["lat"], d["lon"], d["defect_type"])
         st.caption(
             f"관할 {d['jurisdiction']}  \n"
-            f"AI 신뢰도 {d['confidence']:.2f} · 관측 차량 {d['vehicle_count']}대 · "
-            f"포상 {'대상' if d['reward_eligible_road'] else '대상 아님'}"
+            f"AI 신뢰도 {d['confidence']:.2f} · 관측 차량 {d['vehicle_count']}대"
         )
         c1, c2 = st.columns(2)
         if c1.button("신고", key=f"report-{d['id']}", type="primary", width="stretch"):

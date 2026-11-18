@@ -38,14 +38,11 @@ def test_seoul_reward_and_jurisdiction():
     assert r.jurisdiction(36.78, 127.17) == r.OUTSIDE_SEOUL
 
 
-def test_quarter_and_progress():
+def test_quarter_label():
     now = datetime(2026, 11, 15, 1, 0, tzinfo=KST)
     assert r.quarter_label(now) == "2026-Q4"
-    assert r.quarter_start(now) == datetime(2026, 10, 1, tzinfo=KST)
     # UTC 로 9월 30일 16시 = 한국 10월 1일 1시 → 4분기
     assert r.quarter_label(datetime(2026, 9, 30, 16, 0, tzinfo=timezone.utc)) == "2026-Q4"
-    assert r.reward_progress(3) == {"count": 3, "target": 5, "remaining": 2}
-    assert r.reward_progress(7)["remaining"] == 0
 
 
 def test_theta_is_per_type_from_model_card():

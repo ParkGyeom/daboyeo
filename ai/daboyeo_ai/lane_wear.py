@@ -109,6 +109,10 @@ class LaneWearMeter:
         bottom_reach: float = 0.3,  # 선분을 맨 아래까지 늘인 x 가 화면 밖으로 이 비율 넘게 나가면 차선 아님
         vp_tol_deg: float = 3.0,  # 선분 방향과 (선분 → 소실점) 방향의 허용 각도 차
         max_flank_diff: float = 0.25,  # 양옆 노면 밝기 차가 밝은 쪽의 이 비율을 넘으면 차선 아님
+        # 아래 셋은 `measure(..., lane_mask=)` 로 차선 분할 마스크를 줄 때만 쓴다 (handoff 21장, 실험). 안 주면 지금과 같다.
+        lane_mask_min: float = 0.5,  # 선분 화소 중 (넓힌) 마스크 안 비율이 이보다 낮으면 차선 아님
+        lane_mask_grow: float = 4.0,  # 마스크를 이만큼(폭 640 기준 화소) 넓혀서 쓴다 — 분할 경계가 페인트보다 좁을 때 대비
+        mask_rel_delta: float | None = None,  # 마스크 안에서만 쓸 rel_delta (젖은 노면용으로 낮춤). None 이면 rel_delta
     ):
         if threshold <= 0:
             raise ValueError("threshold 는 0보다 커야 한다")
@@ -129,18 +133,24 @@ class LaneWearMeter:
         self.bottom_reach = bottom_reach
         self.vp_tol_deg = vp_tol_deg
         self.max_flank_diff = max_flank_diff
+        self.lane_mask_min = lane_mask_min
+        self.lane_mask_grow = lane_mask_grow
+        self.mask_rel_delta = mask_rel_delta
         self._mask_cache: dict[tuple[int, int], tuple[np.ndarray, tuple[int, int, int, int]]] = {}
 
     # ---- 공개 API ----------------------------------------------------------------
 
-    def measure(self, frame_bgr: np.ndarray) -> LaneWearResult:
-        return self.measure_debug(frame_bgr)[0]
+    def measure(self, frame_bgr: np.ndarray, lane_mask: np.ndarray | None = None) -> LaneWearResult:
+        """lane_mask: (선택) 차선 분할 마스크 H×W (0 이 아니면 차선, 프레임과 같은 크기 또는 같은 비율).
+        주면 그 안의 줄무늬만 차선 후보로 본다 — 횡단보도·노면 글자·화살표를 빼려는 것 (handoff 21장, 실험)."""
+        return self.measure_debug(frame_bgr, lane_mask)[0]
 
-    def measure_debug(self, frame_bgr: np.ndarray) -> tuple[LaneWearResult, list[tuple[int, int, int, int]]]:
+    def measure_debug(self, frame_bgr: np.ndarray, lane_mask: np.ndarray | None = None
+                      ) -> tuple[LaneWearResult, list[tuple[int, int, int, int]]]:
         """measure + 채택된 선분 (원본 프레임 픽셀 좌표 x1,y1,x2,y2). 보정 도구의 오버레이용."""
-        return self._finish(self._segments(frame_bgr))
+        return self._finish(self._segments(frame_bgr, lane_mask))
 
-    def _segments(self, frame_bgr: np.ndarray) -> dict:
+    def _segments(self, frame_bgr: np.ndarray, lane_mask: np.ndarray | None = None) -> dict:
         """1~3단계: 후보 마스크와 기하 조건·소실점 투표를 통과한 선분 (작업 해상도·ROI 좌표) 과 선분별 표본.
         `_finish` 가 4~6단계(길이 조건·대비·페인트 양)를 한다. 평가 도구가 선분을 더 거른 뒤 `_finish` 를 부를 수 있게 나눴다."""
         _check_frame(frame_bgr)
@@ -178,10 +188,18 @@ class LaneWearMeter:
         side = np.maximum(left, right)
         ridge = light - side
         need = np.maximum(self.min_delta, self.rel_delta * side)
+        in_lane = None
+        if lane_mask is not None:
+            in_lane = self._lane_region(lane_mask, sw, sh, (x0, y0, x1, y1), u)
+            if self.mask_rel_delta is not None:
+                need = np.where(in_lane, np.maximum(self.min_delta, self.mask_rel_delta * side), need)
         bright = ridge >= need
         hue, sat = hls[:, :, 0], hls[:, :, 2]
         yellow = (hue >= 15) & (hue <= 35) & (sat >= 70) & (ridge >= self.min_delta)
-        cand = ((bright | yellow) & roi_mask).astype(np.uint8) * 255
+        cand_b = (bright | yellow) & roi_mask
+        if in_lane is not None:
+            cand_b &= in_lane
+        cand = cand_b.astype(np.uint8) * 255
 
         lines = cv2.HoughLinesP(cand, 1, np.pi / 180, threshold=max(8, round(20 * u)),
                                 minLineLength=max(8, round(18 * u)), maxLineGap=max(3, round(8 * u)))
@@ -212,6 +230,8 @@ class LaneWearMeter:
             if not (-self.bottom_reach * sw <= x_at_bottom <= (1 + self.bottom_reach) * sw):
                 continue
             if _coverage(cand, xa, ya, xb, yb) < self.min_coverage:
+                continue
+            if in_lane is not None and _coverage(in_lane.view(np.uint8), xa, ya, xb, yb) < self.lane_mask_min:
                 continue
             lv, rv = _stripe_samples(light, d_row, xa, ya, xb, yb)
             if lv.size < 3:
@@ -282,6 +302,21 @@ class LaneWearMeter:
         ), segs_px
 
     # ---- 내부 ----------------------------------------------------------------------
+
+    def _lane_region(self, lane_mask: np.ndarray, sw: int, sh: int, box: tuple[int, int, int, int],
+                     u: float) -> np.ndarray:
+        """분할 마스크 → 작업 해상도·ROI 상자 크기의 bool (lane_mask_grow 만큼 넓힘)."""
+        m = np.asarray(lane_mask)
+        if m.ndim != 2:
+            raise ValueError(f"lane_mask 는 2차원이어야 한다 (받은 모양 {m.shape})")
+        m = (m > 0).astype(np.uint8)
+        if m.shape != (sh, sw):
+            m = cv2.resize(m, (sw, sh), interpolation=cv2.INTER_NEAREST)
+        g = max(0, round(self.lane_mask_grow * u))
+        if g:
+            m = cv2.dilate(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * g + 1, 2 * g + 1)))
+        x0, y0, x1, y1 = box
+        return m[y0:y1, x0:x1] > 0
 
     def roi_polygon_px(self, w: int, h: int) -> np.ndarray:
         return np.array([[round(x * (w - 1)), round(y * (h - 1))] for x, y in self.roi], np.int32)

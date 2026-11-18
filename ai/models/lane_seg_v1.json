@@ -1,0 +1,56 @@
+{
+ "version": "lane_seg_v1",
+ "file": "lane_seg_v1.onnx",
+ "task": "segment",
+ "classes": [
+  "lane",
+  "marking"
+ ],
+ "input_size": 640,
+ "recommended_conf": 0.25,
+ "base_model": "yolo11n-seg.pt",
+ "data": "AI Hub 087 VS4/VL4 (lane_seg.zip)",
+ "train_counts": {
+  "train": {
+   "images": 2882,
+   "lane": 13036,
+   "marking": 8449
+  },
+  "val": {
+   "images": 399,
+   "lane": 1574,
+   "marking": 810
+  }
+ },
+ "epochs_trained": 80,
+ "metrics_val": {
+  "lane": {
+   "mask_P": 0.903,
+   "mask_R": 0.787,
+   "mask_mAP50": 0.837,
+   "box_mAP50": 0.882
+  },
+  "marking": {
+   "mask_P": 0.875,
+   "mask_R": 0.693,
+   "mask_mAP50": 0.797,
+   "box_mAP50": 0.844
+  },
+  "all": {
+   "mask_P": 0.889,
+   "mask_R": 0.74,
+   "mask_mAP50": 0.817,
+   "box_mAP50": 0.863
+  }
+ },
+ "onnx_parity": {
+  "images": 10,
+  "mean_iou": 0.864,
+  "min_iou": 0.828
+ },
+ "colab_cpu_speed": {
+  "1thread_ms": 165.9,
+  "2thread_ms": 260.6
+ },
+ "created": "2026-11-18T06:00:15"
+}

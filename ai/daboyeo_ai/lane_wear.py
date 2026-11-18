@@ -109,7 +109,7 @@ class LaneWearMeter:
         bottom_reach: float = 0.3,  # 선분을 맨 아래까지 늘인 x 가 화면 밖으로 이 비율 넘게 나가면 차선 아님
         vp_tol_deg: float = 3.0,  # 선분 방향과 (선분 → 소실점) 방향의 허용 각도 차
         max_flank_diff: float = 0.25,  # 양옆 노면 밝기 차가 밝은 쪽의 이 비율을 넘으면 차선 아님
-        # 아래 셋은 `measure(..., lane_mask=)` 로 차선 분할 마스크를 줄 때만 쓴다 (handoff 21장, 실험). 안 주면 지금과 같다.
+        # 아래 셋은 `measure(..., lane_mask=)` 로 차선 분할 마스크를 줄 때만 쓴다 (handoff 23장, 실험). 안 주면 지금과 같다.
         lane_mask_min: float = 0.5,  # 선분 화소 중 (넓힌) 마스크 안 비율이 이보다 낮으면 차선 아님
         lane_mask_grow: float = 4.0,  # 마스크를 이만큼(폭 640 기준 화소) 넓혀서 쓴다 — 분할 경계가 페인트보다 좁을 때 대비
         mask_rel_delta: float | None = None,  # 마스크 안에서만 쓸 rel_delta (젖은 노면용으로 낮춤). None 이면 rel_delta
@@ -142,7 +142,7 @@ class LaneWearMeter:
 
     def measure(self, frame_bgr: np.ndarray, lane_mask: np.ndarray | None = None) -> LaneWearResult:
         """lane_mask: (선택) 차선 분할 마스크 H×W (0 이 아니면 차선, 프레임과 같은 크기 또는 같은 비율).
-        주면 그 안의 줄무늬만 차선 후보로 본다 — 횡단보도·노면 글자·화살표를 빼려는 것 (handoff 21장, 실험)."""
+        주면 그 안의 줄무늬만 차선 후보로 본다 — 횡단보도·노면 글자·화살표를 빼려는 것 (handoff 23장, 실험)."""
         return self.measure_debug(frame_bgr, lane_mask)[0]
 
     def measure_debug(self, frame_bgr: np.ndarray, lane_mask: np.ndarray | None = None

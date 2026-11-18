@@ -47,7 +47,7 @@ if fresh:
         st.markdown("#### 🚗 주행이 끝났어요")
         st.markdown(f"이번 주행에서 도로 결함 **{latest['pending_count']}건**을 발견했어요.  \n"
                     "확인하고 버튼 한 번으로 신고할 수 있어요.")
-        st.caption(f"주행 종료 {api.clock(latest['ended_at'])}")
+        st.caption(f"주행 종료 {api.when(latest['ended_at'])}")
         if st.button("확인하기", type="primary", width="stretch", key="notice-ok"):
             seen.update(n["trip_id"] for n in fresh)
             st.rerun()
@@ -61,11 +61,10 @@ for d in items:
         photo = api.snapshot_bytes(d["snapshot_path"])
         if photo:
             st.image(photo, width="stretch")
-        badge = "🔴" if d["risk_level"] == "urgent" else "🟡"
-        st.markdown(f"**{api.TYPE_KO.get(d['defect_type'], d['defect_type'])}** · {badge} {api.RISK_KO[d['risk_level']]}")
+        st.markdown(f"**{api.TYPE_KO.get(d['defect_type'], d['defect_type'])}**")
         if addr := naver_map.place(d.get("address")):
             st.markdown(f"📍 {addr}")
-        naver_map.mini(d["lat"], d["lon"], d["risk_level"], defect_type=d["defect_type"])
+        naver_map.mini(d["lat"], d["lon"], d["defect_type"])
         st.caption(
             f"관할 {d['jurisdiction']}  \n"
             f"AI 신뢰도 {d['confidence']:.2f} · 관측 차량 {d['vehicle_count']}대 · "

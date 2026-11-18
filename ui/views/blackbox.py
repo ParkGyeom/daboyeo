@@ -56,7 +56,7 @@ def view() -> None:
     devices = read_devices()
     if not devices:
         st.info("돌고 있는 블랙박스가 없습니다. 예: "
-                "`uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --model ai/models/detector_v2.onnx`")
+                "`uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --model ai/models/detector_v3.onnx`")
         return
     cols = st.columns(min(3, len(devices)))
     now = time.time()

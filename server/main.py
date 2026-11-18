@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
 import psycopg
@@ -72,10 +72,10 @@ def _view(d: dict) -> dict:
 
 @app.get(f"{API}/users")
 def list_users():
-    """시민과 그 차량. 시연용 시민은 3명 (차량 bb-01~03)."""
+    """시민과 그 차량. 시연용 시민은 3명 (차량 bb-01~03, 번호 12가 3456 …)."""
     with db.connect() as conn:
         return conn.execute(
-            """SELECT u.id, u.name, v.id AS vehicle_id, v.label AS vehicle_label
+            """SELECT u.id, u.name, v.id AS vehicle_id, v.label AS vehicle_label, v.plate AS vehicle_plate
                FROM users u LEFT JOIN vehicles v ON v.owner_user_id = u.id ORDER BY v.label NULLS LAST, u.name"""
         ).fetchall()
 
@@ -408,23 +408,60 @@ class StatusBody(BaseModel):
     status: str
 
 
+def _day_start(d: date) -> datetime:
+    """한국 날짜의 0시 (기간 필터는 한국 날짜로 받는다)."""
+    return datetime.combine(d, time(0), rules.KST)
+
+
+# 차량·기간 필터: 그 차량이 그 기간에 남긴 관측이 있는 결함
+_OBS_FILTER = """
+    AND EXISTS (
+      SELECT 1 FROM observations o JOIN vehicles v ON v.id = o.vehicle_id
+      WHERE o.defect_id = d.id
+        AND (%(veh)s::text IS NULL OR v.plate = %(veh)s OR v.label = %(veh)s OR v.id::text = %(veh)s)
+        AND (%(since)s::timestamptz IS NULL OR o.observed_at >= %(since)s)
+        AND (%(until)s::timestamptz IS NULL OR o.observed_at < %(until)s))
+"""
+
+
 @app.get(f"{API}/defects")
-def list_defects(bg: BackgroundTasks, type: str | None = None, status: str | None = None):
+def list_defects(bg: BackgroundTasks, type: str | None = None, status: str | None = None,
+                 region1: str | None = None, region2: str | None = None, region3: str | None = None,
+                 vehicle: str | None = None, date_from: date | None = None, date_to: date | None = None):
+    """관리자 지도의 결함 목록. 주는 조건은 모두 함께 걸린다.
+
+    region1~3: 시·도/시·군·구/읍·면·동 이름 (server/geocode.py 가 저장한 값). region3 를 빈 값으로 주면 동이 없는 결함.
+    vehicle: 차량 번호("12가 3456"), 차량 id, 기기 이름(bb-01) 중 하나. 그 차량이 관측한 결함만.
+    date_from, date_to: 한국 날짜(YYYY-MM-DD, 양 끝 포함). 그 기간에 관측(vehicle 을 주면 그 차량의 관측)이 있는 결함만.
+    """
     if type is not None and type not in {t.value for t in DefectType}:
         raise HTTPException(422, "type 이 올바르지 않다")
     if status is not None and status not in rules.STATUSES:
         raise HTTPException(422, "status 가 올바르지 않다")
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(422, "date_from 이 date_to 보다 늦다")
+    p = {
+        "type": type, "status": status, "r1": region1, "r2": region2, "r3": region3, "veh": vehicle,
+        "since": _day_start(date_from) if date_from else None,
+        "until": _day_start(date_to + timedelta(days=1)) if date_to else None,
+    }
+    by_obs = vehicle is not None or date_from is not None or date_to is not None
     with db.connect() as conn:
         rows = conn.execute(
             f"""
             SELECT {db.DEFECT_COLS} FROM defects d
-            WHERE (%s::text IS NULL OR d.defect_type::text = %s) AND (%s::text IS NULL OR d.status::text = %s)
+            WHERE (%(type)s::text IS NULL OR d.defect_type::text = %(type)s)
+              AND (%(status)s::text IS NULL OR d.status::text = %(status)s)
+              AND (%(r1)s::text IS NULL OR d.region1 = %(r1)s)
+              AND (%(r2)s::text IS NULL OR d.region2 = %(r2)s)
+              AND (%(r3)s::text IS NULL OR coalesce(d.region3, '') = %(r3)s)
+              {_OBS_FILTER if by_obs else ""}
             ORDER BY d.first_seen_at, d.id
             """,
-            (type, type, status, status),
+            p,
         ).fetchall()
-    if any(d["address"] is None for d in rows):
-        bg.add_task(geocode.fill_missing)  # 주소를 못 받은 결함은 관리자 지도가 새로 고칠 때 다시 시도한다
+    if any(d["address"] is None or (d["address"] and d["region1"] is None) for d in rows):
+        bg.add_task(geocode.fill_missing)  # 주소·지역을 못 받은 결함은 관리자 지도가 새로 고칠 때 다시 시도한다
     return [_view(d) for d in rows]
 
 

@@ -23,6 +23,8 @@ EXTRA_SQL = sorted(p for p in SCHEMA_SQL.parent.glob("0*.sql") if p != SCHEMA_SQ
 DEMO = [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
 # 기기 초기 설정 때 등록했다고 가정하는 가짜 연락처 (모의 문자의 받는 번호)
 DEMO_PHONE = {"bb-01": "010-0000-0001", "bb-02": "010-0000-0002", "bb-03": "010-0000-0003"}
+# 시연 차량의 가짜 차량 번호. 관리자 지도에서 차량을 이 번호로 구분한다 (server/sql/004_region_plate.sql)
+DEMO_PLATE = {"bb-01": "12가 3456", "bb-02": "34나 5678", "bb-03": "56다 7890"}
 _NS = uuid.UUID("6f1d3c52-6b8e-4a35-9d1e-2b8f6c0a9d41")
 
 
@@ -73,8 +75,9 @@ def seed_demo(conn: psycopg.Connection) -> None:
             (uid, name, DEMO_PHONE[label]),
         )
         conn.execute(
-            "INSERT INTO vehicles (id, owner_user_id, label) VALUES (%s, %s, %s) ON CONFLICT (id) DO NOTHING",
-            (vid, uid, label),
+            "INSERT INTO vehicles (id, owner_user_id, label, plate) VALUES (%s, %s, %s, %s)"
+            " ON CONFLICT (id) DO UPDATE SET plate = EXCLUDED.plate",
+            (vid, uid, label, DEMO_PLATE[label]),
         )
 
 
@@ -96,11 +99,14 @@ def reset_db() -> None:
         seed_demo(conn)
 
 
-# 결함 한 건을 읽을 때 쓰는 열. 위치는 위도·경도로 풀고, 대표 사진은 신뢰도가 가장 높은 관측의 사진이다
+# 결함 한 건을 읽을 때 쓰는 열. 위치는 위도·경도로 풀고, 대표 사진은 신뢰도가 가장 높은 관측의 사진이다.
+# plates 는 그 결함을 관측한 차량의 번호 (번호가 없는 차량은 빼고, 가나다순)
 DEFECT_COLS = """
     d.id, d.defect_type, ST_Y(d.location::geometry) AS lat, ST_X(d.location::geometry) AS lon,
     d.risk_level, d.status, d.observation_count, d.vehicle_count, d.confidence, d.is_suspected,
-    d.reward_eligible_road, d.first_seen_at, d.last_seen_at, d.address,
+    d.reward_eligible_road, d.first_seen_at, d.last_seen_at, d.address, d.region1, d.region2, d.region3,
+    ARRAY(SELECT DISTINCT v.plate FROM observations o JOIN vehicles v ON v.id = o.vehicle_id
+          WHERE o.defect_id = d.id AND v.plate IS NOT NULL ORDER BY 1) AS plates,
     (SELECT o.snapshot_path FROM observations o
       WHERE o.defect_id = d.id AND o.snapshot_path IS NOT NULL
       ORDER BY o.confidence DESC, o.observed_at LIMIT 1) AS snapshot_path

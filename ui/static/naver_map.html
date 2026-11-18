@@ -3,10 +3,11 @@
   관리자 지도(네이버 지도). ui/naver_map.py 가 iframe 으로 띄운다.
   Streamlit 정적 파일(/app/static/)로 localhost:8501 주소에서 열려야 네이버 인증(Web 서비스 URL)이 통과한다.
     ?key=<NAVER_MAP_KEY_ID>   네이버 클라우드 플랫폼 Maps Client ID
-    #<base64(JSON)>           결함 목록. 바뀌면 지도를 다시 만들지 않고 점만 다시 찍는다(확대·위치 유지)
+    #<base64(JSON)>           {fit, items}: items = 결함 목록. 바뀌면 지도를 다시 만들지 않고 점만 다시 찍는다(확대·위치 유지)
+                              fit = 대시보드 필터를 나타내는 글자. 바뀌면 걸러진 결함이 다 보이게 옮긴다("" 이면 전국)
                               읽은 뒤 주소에서 지운다(긴 주소는 네이버 인증 실패)
   처음 화면은 대한민국 전체. 결함마다 깜빡이는 신호, 새로 생긴 결함(d.fresh)은 크고 빠르게 깜빡인다.
-  핀 색 = 유형(d.type_color, 블랙박스 화면 상자 색과 같다), 모양 = 상태, 빨간 테두리 = 빠른 보수(d.urgent).
+  핀 색 = 유형(d.type_color, 블랙박스 화면 상자 색과 같다), 모양 = 상태. risk_level 은 쓰지 않는다.
   핀을 누르면 사진 말풍선(꼬리 끝이 핀 위), 빈 곳을 누르면 닫힌다. 다른 핀을 누르면 그 핀의 말풍선만 남는다.
   확대가 CLUSTER_UNTIL 보다 작으면 화면에서 가까운 점들을 숫자 묶음으로 보이고, 누르면 그 묶음으로 확대한다.
 -->
@@ -16,7 +17,7 @@
   #map { width: 100%; height: 100%; }  /* 네이버 지도가 position 을 relative 로 바꾸므로 inset 이 아니라 크기로 준다 */
   #err { display: none; position: absolute; inset: 0; z-index: 10; padding: 16px; background: #fff;
          color: #b00020; font-size: 14px; }
-  /* 신호: 가운데 핀(색=유형, 모양=상태, 빨간 테두리=빠른 보수) + 퍼지는 고리(색=유형) */
+  /* 신호: 가운데 핀(색=유형, 모양=상태) + 퍼지는 고리(색=유형) */
   .sig { position: relative; width: 18px; height: 18px; }
   .sig .ring { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
                border-radius: 50%; opacity: 0; animation: pulse 2s ease-out infinite; }
@@ -27,10 +28,8 @@
   @keyframes pulse-fresh { 0% { transform: scale(.6); opacity: .95; } 100% { transform: scale(4.2); opacity: 0; } }
   .pin { width: 16px; height: 16px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); box-sizing: border-box; }
   .pin.c { border-radius: 50%; }
-  .pin.u { box-shadow: 0 0 0 2px #d62728, 0 0 0 3px rgba(0,0,0,.35); }
   .tri { width: 0; height: 0; margin-left: -1px; border-left: 9px solid transparent; border-right: 9px solid transparent;
          border-bottom-width: 16px; border-bottom-style: solid; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
-  .tri.u { filter: drop-shadow(0 0 1px #d62728) drop-shadow(0 0 1px #d62728) drop-shadow(0 0 1px #d62728); }
   .new-tag { position: absolute; left: 14px; top: -16px; background: #111; color: #fff; font-size: 11px;
              font-weight: 700; padding: 1px 5px; border-radius: 8px; white-space: nowrap; }
   /* 묶음: 숫자 원 + 퍼지는 고리 */
@@ -56,8 +55,6 @@
   .legend .it { display: inline-block; white-space: nowrap; margin-right: 10px; }
   .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px;
                  box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
-  .legend .urg { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: -1px;
-                 background: #fff; box-shadow: 0 0 0 2px #d62728; }
   @media (max-width: 520px) { .legend { font-size: 11px; padding: 4px 8px; } .legend .hint { display: none; } }
 </style></head>
 <body>
@@ -66,7 +63,7 @@
 <!-- 유형 색은 ui/naver_map.py TYPE_COLOR 와 같다 -->
 <div class="legend">
   <div class="row"><span class="it"><span class="dot" style="background:#e62828"></span>포트홀</span><span class="it"><span class="dot" style="background:#ff9600"></span>균열</span><span class="it"><span class="dot" style="background:#ffdc00"></span>차선 마모</span><span class="it"><span class="dot" style="background:#28a0e6"></span>가드레일</span><span class="it"><span class="dot" style="background:#50c850"></span>표지판</span></div>
-  <div class="row"><span class="it">● 미신고 ■ 신고됨 ▲ 보수 중</span><span class="it"><span class="urg"></span>빨간 테두리 = 빠른 보수</span><span class="it hint">숫자 = 결함 묶음(누르면 확대)</span></div>
+  <div class="row"><span class="it">● 미신고 ■ 신고됨 ▲ 보수 중</span><span class="it hint">숫자 = 결함 묶음(누르면 확대)</span></div>
 </div>
 <script>
   var KOREA = { lat: 36.3, lon: 127.8, zoom: 7 };  // 처음 화면: 대한민국 전체
@@ -88,20 +85,21 @@
   }
   // 읽은 # 은 주소에서 지운다. 네이버 인증이 페이지 주소 전체를 보내는데, 결함이 많아 주소가 길면
   // (16건에 7KB) 인증이 실패한다(11/15 확인). 다음 목록은 Streamlit 이 iframe 주소를 바꿀 때 hashchange 로 온다
-  var lastData = [];
+  var lastData = [], fitKey = '';
   function readData() {
     var h = location.hash.slice(1);
     if (!h) return lastData;
     var bin = atob(h.replace(/-/g, '+').replace(/_/g, '/'));
     var bytes = Uint8Array.from(bin, function (c) { return c.charCodeAt(0); });
-    lastData = JSON.parse(new TextDecoder().decode(bytes));
+    var obj = JSON.parse(new TextDecoder().decode(bytes));
+    lastData = obj.items || [];
+    fitKey = obj.fit || '';
     history.replaceState(null, '', location.pathname + location.search);
     return lastData;
   }
   function coreHtml(d) {
-    var u = d.urgent ? ' u' : '';
-    if (d.status === '보수 중') return '<div class="tri' + u + '" style="border-bottom-color:' + esc(d.type_color) + '"></div>';
-    return '<div class="pin' + (d.status === '미신고' ? ' c' : '') + u + '" style="background:' + esc(d.type_color) + '"></div>';
+    if (d.status === '보수 중') return '<div class="tri" style="border-bottom-color:' + esc(d.type_color) + '"></div>';
+    return '<div class="pin' + (d.status === '미신고' ? ' c' : '') + '" style="background:' + esc(d.type_color) + '"></div>';
   }
   function sigHtml(d) {
     var ring = '<div class="ring" style="background:' + esc(d.type_color) + '"></div>';
@@ -110,9 +108,8 @@
       '<div class="core">' + coreHtml(d) + '</div></div>';
   }
   function clusterHtml(g) {
-    // 묶음 색: 빠른 보수가 하나라도 있으면 빨강, 아니면 회색 (유형 색과 헷갈리지 않게)
-    var urgent = g.some(function (d) { return d.urgent; });
-    var c = urgent ? '#d62728' : '#5f6368';
+    // 묶음 색: 모두 같은 유형이면 그 유형 색, 섞여 있으면 회색
+    var c = g.every(function (d) { return d.type_color === g[0].type_color; }) ? g[0].type_color : '#5f6368';
     var fresh = g.some(function (d) { return d.fresh; });
     return '<div class="cl' + (fresh ? ' fresh' : '') + '"><div class="ring" style="background:' + c + '"></div>' +
       '<div class="num" style="background:' + c + '">' + g.length + '</div></div>';
@@ -121,12 +118,14 @@
     return '<div class="iw">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : '') +
       '<div class="t"><i style="background:' + esc(d.type_color) + '"></i>' + esc(d.title) +
       (d.fresh ? ' <span style="color:#d62728">새 결함</span>' : '') + '</div>' +
-      '<span style="color:' + esc(d.color) + ';font-weight:700">' + esc(d.severity) + '</span> · <b>' + esc(d.status) + '</b><br>' +
-      '<div class="sub">' + (d.address ? esc(d.address) + '<br>' : '') + esc(d.jurisdiction) + '<br>' +
-      '관측 ' + d.obs + '건 · 차량 ' + d.vehicles + '대 · 신뢰도 ' + Number(d.conf).toFixed(2) + '</div></div>';
+      '<b>' + esc(d.status) + '</b>' + (d.region ? ' · ' + esc(d.region) : '') + '<br>' +
+      '<div class="sub">' + (d.address ? esc(d.address) + '<br>' : '') +
+      (d.plates ? '차량 ' + esc(d.plates) + '<br>' : '') +
+      '관측 ' + d.obs + '건 · 차량 ' + d.vehicles + '대 · 신뢰도 ' + Number(d.conf).toFixed(2) + '<br>' +
+      '처음 ' + esc(d.first) + (d.last !== d.first ? '<br>마지막 ' + esc(d.last) : '') + '</div></div>';
   }
 
-  var map = null, data = [], markers = [], openId = null, iw = null;
+  var map = null, data = [], markers = [], openId = null, iw = null, fitted = '';
   var PIN_TOP = 9;  // 핀 가운데에서 위 끝(흰 테두리 바깥 그림자)까지(px). 말풍선 꼬리 끝을 여기에 붙인다
 
   // 말풍선은 마커가 아니라 '핀 위 끝' 좌표에 연다. 마커에 열면 네이버가 HTML 아이콘의 크기('새 결함' 표시 포함)로
@@ -203,6 +202,21 @@
     else closeInfo();
   }
 
+  // 필터가 바뀌면(fitKey) 걸러진 결함이 다 보이게 옮긴다. 필터가 없으면 전국. 결함이 없으면 그대로 둔다
+  function fit() {
+    if (fitKey === fitted) return;
+    if (fitKey && !data.length) return;  // 걸러진 결함이 아직 없으면 생길 때 옮긴다
+    fitted = fitKey;
+    if (!fitKey) { map.morph(new naver.maps.LatLng(KOREA.lat, KOREA.lon), KOREA.zoom); return; }
+    if (data.length === 1) { map.morph(new naver.maps.LatLng(data[0].lat, data[0].lon), 16); return; }
+    var b = new naver.maps.LatLngBounds(
+      new naver.maps.LatLng(Math.min.apply(null, data.map(function (d) { return d.lat; })),
+                            Math.min.apply(null, data.map(function (d) { return d.lon; }))),
+      new naver.maps.LatLng(Math.max.apply(null, data.map(function (d) { return d.lat; })),
+                            Math.max.apply(null, data.map(function (d) { return d.lon; }))));
+    map.fitBounds(b, { top: 60, right: 60, bottom: 90, left: 60, maxZoom: 17 });
+  }
+
   function draw() {
     data = readData();
     if (!map) {
@@ -221,9 +235,9 @@
         if (el.clientWidth && el.clientHeight) map.setSize(new naver.maps.Size(el.clientWidth, el.clientHeight));
       }).observe(el);
       naver.maps.Event.addListener(map, 'zoom_changed', function () { if (data.length) render(); });
-      naver.maps.Event.once(map, 'init', function () { render(); });
+      naver.maps.Event.once(map, 'init', function () { fit(); render(); });
     }
-    if (map.getProjection()) render();
+    if (map.getProjection()) { fit(); render(); }
   }
 
   readData();  // 네이버 스크립트를 부르기 전에 # 을 지운다

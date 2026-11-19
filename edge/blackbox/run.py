@@ -22,9 +22,9 @@
 --no-merge 면 예전처럼 탐지마다 보낸다 (합치기 전후 비교용).
 탐지 신뢰도: 기본은 시연 모델 v3 의 클래스별 기준(--conf-json ai/models/detector_v3.json: 포트홀 0.31 · 균열 0.42 ·
 가드레일 0.21 · 표지판 0.21, handoff 16장). --conf 를 주면 숫자 하나로 모든 클래스에 쓴다.
-도로 조각 추론(handoff 26장, 기본 끔): --road-tiles 2 --tiles-bottom 0.8 --tile-classes crack 이면 프레임 전체에 더해
+도로 조각 추론(handoff 26장): 시연에서 켜기로 확정(11/20)해 기본이 --road-tiles 2 --tiles-bottom 0.8 --tile-classes crack 이다. 프레임 전체에 더해
 도로 부분(높이 0.45~0.8)을 가로 2조각으로 한 번씩 더 돌려 작은 균열을 찾는다 (gn_b 균열 정답 9곳 중 3 → 7곳).
-모델을 3번 돌려 탐지 시간이 약 3배다. 앞유리 반사가 심한 영상에서는 헛것이 생기니 끈다. 기록(--record) 머리 줄에 설정이 남는다.
+모델을 3번 돌려 탐지 시간이 약 3배다 (M5 1스레드 22 → 60 ms). 앞유리 반사가 심한 영상(부산 H900 등)에서는 헛것이 생기니 --road-tiles 0 으로 끈다. 기록(--record) 머리 줄에 설정이 남는다.
 차선 마모: 기본은 끈다 (--lane-every 0). 시연 클립 gn_b 에서 확정 58건 중 54건이 헛것(25건은 신호 대기 중
 횡단보도), gn_a 는 젖은 노면이라 차선을 2.8% 프레임에서만 찾았다 (docs/ai-handoff.md 17장). 개선(정지 판정·횡단보도
 거르기)을 해도 헛것 84% 라 시연에서는 끈다 (확정, handoff 17-6). 실험용으로 켤 때는 --lane-every 3. 켜면 --lane-every 프레임마다 daboyeo_ai 의 LaneWearMeter 로 재고
@@ -127,9 +127,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--conf-json", default="ai/models/detector_v3.json",
                     help="클래스별 탐지 신뢰도 기준 파일 (class_conf 또는 class_conf_draft 키). 기본은 시연 모델 v3")
     ap.add_argument("--threads", type=int, default=1, help="ONNX Runtime 스레드 수 (PRD: CPU 1~2코어)")
-    ap.add_argument("--road-tiles", type=int, default=0,
+    ap.add_argument("--road-tiles", type=int, default=2,
                     help="도로 조각 추론: 도로 부분을 가로 N 조각으로 더 돌려 작은 균열을 찾는다 (handoff 26장). "
-                         "기본 0 = 끔. 시연 후보 2 (프레임 전체 + 2조각 = 모델 3번, 그만큼 느려진다)")
+                         "기본 2 = 시연 설정 (프레임 전체 + 2조각 = 모델 3번, 그만큼 느려진다). 0 = 끔 (앞유리 반사가 심한 영상)")
     ap.add_argument("--tiles-bottom", type=float, default=0.8,
                     help="조각의 아래 끝 (프레임 높이 비율). 0.8 이면 보닛·앞유리 아래쪽은 뺀다")
     ap.add_argument("--tile-classes", type=lambda s: [c for c in s.split(",") if c], default=["crack"],

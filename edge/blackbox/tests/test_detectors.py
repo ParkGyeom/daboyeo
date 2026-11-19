@@ -151,7 +151,8 @@ def test_record_then_replay_gives_same_observations(video, tmp_path, monkeypatch
     assert r1["sent"] > 0 and len(sent_onnx) == r1["sent"]
 
     head, *lines = [json.loads(ln) for ln in rec.read_text().splitlines()]
-    assert head["model"] == "detector_v2.onnx" and head["video"] == "v1.mp4" and head["detect_every"] == 4
+    assert head["model"] == "detector_v2.onnx+tiles2" and head["video"] == "v1.mp4" and head["detect_every"] == 4
+    assert head["tiles"] == {"cols": 2, "bottom": 0.8, "classes": ["crack"]}  # 시연 기본: 조각 추론 켬
     assert len(lines) == r1["detected_frames"]
 
     monkeypatch.setattr(detectors, "Detector", None)  # replay 는 모델을 부르지 않는다
@@ -253,10 +254,12 @@ def test_fake_skips_amb_labels_unless_asked(tmp_path):
     assert len(FakeDetector(p, include_amb=True).events) == 3
 
 
-def test_road_tiles_off_by_default():
-    """조각 추론은 기본 끔 — 시연 동작이 그대로다 (handoff 26장)."""
+def test_road_tiles_on_by_default_and_can_be_turned_off():
+    """시연에서 켜기로 확정 (11/20): 기본 = 전체 + 도로 2조각, 균열만. 앞유리 반사 영상은 --road-tiles 0 으로 끈다."""
     args = run.parse_args(["--video", "a.mp4", "--model", "m.onnx"])
-    assert args.road_tiles == 0 and detectors.tiles_from_args(args) is None
+    assert detectors.tiles_from_args(args) == {"cols": 2, "bottom": 0.8, "classes": ["crack"]}
+    off = run.parse_args(["--video", "a.mp4", "--model", "m.onnx", "--road-tiles", "0"])
+    assert detectors.tiles_from_args(off) is None
 
 
 def test_road_tiles_args():

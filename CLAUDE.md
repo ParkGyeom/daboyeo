@@ -21,6 +21,7 @@ uv run python -m server.fake --defects 5 --devices 3 --gps-noise 7 --end-drive  
 # 가상 블랙박스: 영상 + GPS CSV(t_s,lat,lon). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
 # 차선 마모는 시연에서 끈다(확정, --lane-every 0, handoff 17-6). 실험용으로만 --lane-every 3
 # 탐지 기준 기본은 시연 모델 v3 카드(--conf-json ai/models/detector_v3.json: 포트홀 0.31·균열 0.42·가드레일 0.21·표지판 0.21)
+# 도로 조각 추론(균열만 도로 2조각으로 한 번 더, handoff 26장)은 시연에서 켬이 기본 (--road-tiles 2). 앞유리 반사가 심한 영상은 --road-tiles 0. replay 는 조각 켠 기록 data/replay/gn_b_3320-3620.v3tiles.jsonl
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --detect-every 10 --speed 4
 uv run python -m edge.blackbox.variants --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv --model ai/models/detector_v3.onnx --devices 3
 scripts/demo.sh drive ai/models/detector_v3.onnx 3  # 로드마크 구간으로 3대 (data/roadmark/VS4 필요)

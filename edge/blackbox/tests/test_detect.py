@@ -27,7 +27,9 @@ def test_detector_passes_class_conf(monkeypatch):
     monkeypatch.setattr(detect, "OnnxDetector", FakeOnnx)
     conf = {"pothole": 0.27, "crack": 0.29}
     detect.Detector("x.onnx", conf=conf, threads=2)
-    assert FakeOnnx.kwargs == {"threads": 2, "conf": conf}
+    assert FakeOnnx.kwargs == {"threads": 2, "conf": conf, "windows": None, "tile_classes": None}  # 조각 추론 끔 (기본)
+    detect.Detector("x.onnx", conf=conf, windows=[(0, 0, 1, 1)], tile_classes=("crack",))
+    assert FakeOnnx.kwargs["windows"] == [(0, 0, 1, 1)] and FakeOnnx.kwargs["tile_classes"] == ("crack",)
 
 
 class FakeMeter:

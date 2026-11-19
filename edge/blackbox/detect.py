@@ -27,9 +27,11 @@ class Detection:
 
 
 class Detector:
-    def __init__(self, model_path: str, conf: float | Mapping[str, float] = 0.25, threads: int = 1):
-        """conf: 숫자 하나 또는 클래스별 dict (daboyeo_ai.inference.load_class_conf 로 읽은 것)."""
-        self._det = OnnxDetector(model_path, threads=threads, conf=conf)
+    def __init__(self, model_path: str, conf: float | Mapping[str, float] = 0.25, threads: int = 1,
+                 windows=None, tile_classes=None):
+        """conf: 숫자 하나 또는 클래스별 dict (daboyeo_ai.inference.load_class_conf 로 읽은 것).
+        windows·tile_classes: 도로 조각 추론 (daboyeo_ai.inference.road_tiles, handoff 26장). 기본 None = 프레임 전체 한 번."""
+        self._det = OnnxDetector(model_path, threads=threads, conf=conf, windows=windows, tile_classes=tile_classes)
 
     def detect(self, image: np.ndarray) -> list[Detection]:
         """프레임 한 장(BGR)에서 4클래스를 모두 찾는다. 신뢰도 높은 순. 보낼지는 SENT_TYPES 로 고른다."""

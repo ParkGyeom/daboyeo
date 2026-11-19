@@ -251,3 +251,45 @@ def test_fake_skips_amb_labels_unless_asked(tmp_path):
     assert fake.skipped_amb == 1 and len(fake.events) == 2
     assert sorted(d.type for d in fake.detect(img, "a", 1.0)) == ["crack", "pothole"]  # amb 균열 C2 는 안 냄
     assert len(FakeDetector(p, include_amb=True).events) == 3
+
+
+def test_road_tiles_off_by_default():
+    """조각 추론은 기본 끔 — 시연 동작이 그대로다 (handoff 26장)."""
+    args = run.parse_args(["--video", "a.mp4", "--model", "m.onnx"])
+    assert args.road_tiles == 0 and detectors.tiles_from_args(args) is None
+
+
+def test_road_tiles_args():
+    args = run.parse_args(["--video", "a.mp4", "--model", "m.onnx",
+                           "--road-tiles", "2", "--tiles-bottom", "0.8", "--tile-classes", "crack"])
+    assert detectors.tiles_from_args(args) == {"cols": 2, "bottom": 0.8, "classes": ["crack"]}
+    for bad in (["--tile-classes", "lane"], ["--tiles-bottom", "0.3"], ["--road-tiles", "-1"]):
+        with pytest.raises(SystemExit):
+            run.parse_args(["--video", "a.mp4", "--road-tiles", "2", *bad])
+
+
+def test_onnx_mode_passes_road_tiles_and_records_them(tmp_path, monkeypatch):
+    """--road-tiles 2 → 프레임 전체 + 도로 2조각 창, 조각에서는 균열만. 기록 머리 줄에 설정이 남는다."""
+    seen = {}
+
+    class FakeDet:
+        def __init__(self, model, conf, threads, windows=None, tile_classes=None):
+            seen.update(windows=windows, tile_classes=tile_classes)
+
+        def detect(self, image):
+            return []
+
+    monkeypatch.setattr(detectors, "Detector", FakeDet)
+    tiles = {"cols": 2, "bottom": 0.8, "classes": ["crack"]}
+    mode = detectors.OnnxMode("ai/models/detector_v3.onnx", conf=V3_CONF, tiles=tiles)
+    assert mode.name == "detector_v3.onnx+tiles2"
+    assert len(seen["windows"]) == 3 and seen["windows"][0] == (0.0, 0.0, 1.0, 1.0)
+    assert all(w[3] == 0.8 for w in seen["windows"][1:]) and seen["tile_classes"] == ("crack",)
+
+    rec = detectors.Recorder(mode, tmp_path / "r.jsonl", "v1.mp4", 5)
+    rec.close()
+    head = json.loads((tmp_path / "r.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert head["tiles"] == tiles and head["model"] == "detector_v3.onnx+tiles2"
+
+    detectors.OnnxMode("m.onnx", conf=V3_CONF)
+    assert seen["windows"] is None and seen["tile_classes"] is None  # 끔이면 지금과 같다

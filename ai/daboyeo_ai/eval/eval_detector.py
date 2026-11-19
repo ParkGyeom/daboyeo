@@ -151,6 +151,9 @@ def main(argv: Sequence[str] | None = None, detector_factory=None) -> int:
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--road-tiles", type=int, default=0,
                     help="0 = 프레임 전체만 (기본). N 이면 전체 + 도로 영역 N 조각 (OnnxDetector(windows=road_tiles(N)), handoff 14장)")
+    ap.add_argument("--tiles-bottom", type=float, default=1.0,
+                    help="도로 조각의 아래 끝 (0~1, 기본 1.0). 0.8 이면 보닛·앞유리 반사 띠를 뺀다")
+    ap.add_argument("--tile-classes", nargs="+", help="조각에서 받을 클래스 (예: crack). 기본 = 전부. 전체 프레임은 늘 전부")
     ap.add_argument("--cache-dir", type=Path, help="프레임별 탐지 캐시 폴더 (예: data/eval_cache)")
     ap.add_argument("--out", type=Path, default=Path("experiments/eval_detector"))
     a = ap.parse_args(argv)
@@ -168,9 +171,13 @@ def main(argv: Sequence[str] | None = None, detector_factory=None) -> int:
         def detector_factory(conf: float):
             from daboyeo_ai.inference import OnnxDetector, road_tiles
 
-            return OnnxDetector(a.model, threads=a.threads, conf=conf, windows=road_tiles(a.road_tiles) if a.road_tiles else None)
+            win = road_tiles(a.road_tiles, bottom=a.tiles_bottom) if a.road_tiles else None
+            return OnnxDetector(a.model, threads=a.threads, conf=conf, windows=win, tile_classes=a.tile_classes)
 
-    model_tag = a.model.name + (f"+road_tiles{a.road_tiles}" if a.road_tiles else "")  # 캐시가 섞이지 않게
+    model_tag = a.model.name  # 캐시가 섞이지 않게
+    if a.road_tiles:
+        model_tag += f"+road_tiles{a.road_tiles}" + (f"_b{a.tiles_bottom:g}" if a.tiles_bottom != 1.0 else "")
+        model_tag += f"_only_{'-'.join(a.tile_classes)}" if a.tile_classes else ""
 
     videos, gts = [], {}
     for v in a.videos:

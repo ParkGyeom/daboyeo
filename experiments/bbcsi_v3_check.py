@@ -111,8 +111,8 @@ def _thr(card: Path) -> list[float]:
 def cmd_run(args) -> int:
     from daboyeo_ai.inference import OnnxDetector, road_tiles
 
-    windows = road_tiles(args.road_tiles) if args.road_tiles else None
-    det = OnnxDetector(args.model, threads=args.threads, conf=args.low_conf, windows=windows)
+    windows = road_tiles(args.road_tiles, bottom=args.tiles_bottom) if args.road_tiles else None
+    det = OnnxDetector(args.model, threads=args.threads, conf=args.low_conf, windows=windows, tile_classes=args.tile_classes)
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     full, crop = {}, {}
@@ -126,7 +126,8 @@ def cmd_run(args) -> int:
         for d in ds:
             d[0] = int(d[0])
     data = {"video": str(args.video), "model": str(args.model), "every_s": args.every_s, "low_conf": args.low_conf,
-            "frame_wh": [w, h], "crop_bottom": args.crop_bottom, "road_tiles": args.road_tiles, "full": full, "crop": crop}
+            "frame_wh": [w, h], "crop_bottom": args.crop_bottom, "road_tiles": args.road_tiles, "tiles_bottom": args.tiles_bottom,
+            "tile_classes": args.tile_classes, "full": full, "crop": crop}
     (out / "dets.json").write_text(json.dumps(data), encoding="utf-8")
     print(f"{len(full)} frames → {out / 'dets.json'}")
     return 0
@@ -269,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--low-conf", type=float, default=0.1)
     r.add_argument("--crop-bottom", type=int, default=0, help="아래에서 잘라 낼 px (0 이면 비교 안 함)")
     r.add_argument("--road-tiles", type=int, default=0, help="N 이면 전체 + 도로 N 조각 (OnnxDetector windows=road_tiles(N))")
+    r.add_argument("--tiles-bottom", type=float, default=1.0, help="조각 아래 끝 (0.8 = 보닛·반사 띠 빼기)")
+    r.add_argument("--tile-classes", nargs="+", help="조각에서 받을 클래스 (기본 전부)")
     r.add_argument("--threads", type=int, default=4)
     for name in ("summary", "draw"):
         q = sub.add_parser(name)

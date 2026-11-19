@@ -170,3 +170,17 @@ def test_windows_map_boxes_back_to_frame(monkeypatch):
     assert centers == [pytest.approx((480, 783), abs=1), pytest.approx((1440, 783), abs=1)]
     with pytest.raises(ValueError):
         _fake_detector(monkeypatch, windows=[(0.5, 0, 0.4, 1)])
+
+
+def test_tile_classes_filters_only_tile_windows(monkeypatch):
+    from daboyeo_ai.inference import road_tiles
+
+    frame = np.zeros((1080, 1920, 3), np.uint8)
+    win = road_tiles(cols=2, overlap=0.0)  # 전체 + 조각 2개. 가짜 세션은 늘 class 0(pothole) 하나를 낸다
+    assert len(_fake_detector(monkeypatch, windows=win).raw(frame)) == 3
+    only_full = _fake_detector(monkeypatch, windows=win, tile_classes=("crack",)).raw(frame)
+    assert len(only_full) == 1 and (only_full[0][2] + only_full[0][4]) / 2 == pytest.approx(960)
+    assert len(_fake_detector(monkeypatch, windows=win, tile_classes=("pothole",)).raw(frame)) == 3
+    assert road_tiles(2, bottom=0.8)[1][3] == 0.8  # 조각 아래 끝을 보닛 위로 올리기
+    with pytest.raises(ValueError):
+        _fake_detector(monkeypatch, windows=win, tile_classes=("cat",))

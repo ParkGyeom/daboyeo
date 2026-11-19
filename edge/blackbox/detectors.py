@@ -65,10 +65,18 @@ class FrameDetector(Protocol):
 
 
 class OnnxMode:
-    def __init__(self, model: str, conf, threads: int = 1):
-        self.name = Path(model).name
+    def __init__(self, model: str, conf, threads: int = 1, tiles: dict | None = None):
+        """tiles: 도로 조각 추론 설정 {"cols", "bottom", "classes"} (run.py --road-tiles). None = 끔 (기본)."""
+        self.name = Path(model).name + (f"+tiles{tiles['cols']}" if tiles else "")
         self.conf = conf  # 기록 머리 줄에 남긴다 (replay 가 같은 기준인지 확인)
-        self._det = Detector(model, conf=conf, threads=threads)
+        self.tiles = tiles  # 기록 머리 줄에 남긴다 (어떤 설정으로 뜬 기록인지)
+        windows = tile_classes = None
+        if tiles:
+            from daboyeo_ai.inference import road_tiles
+
+            windows = road_tiles(tiles["cols"], bottom=tiles["bottom"])
+            tile_classes = tuple(tiles["classes"])
+        self._det = Detector(model, conf=conf, threads=threads, windows=windows, tile_classes=tile_classes)
 
     def detect(self, image: np.ndarray, frame: str, t: float) -> list[Detection]:
         return self._det.detect(image)
@@ -138,6 +146,7 @@ class Recorder:
         self._write({
             "kind": RECORD_KIND, "version": RECORD_VERSION, "model": inner.name, "video": source,
             "detect_every": detect_every, "conf": getattr(inner, "conf", None),
+            "tiles": getattr(inner, "tiles", None),
             "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         })
 
@@ -228,6 +237,14 @@ def _conf_from_args(args):
     return load_class_conf(args.conf_json)
 
 
+def tiles_from_args(args) -> dict | None:
+    """run.py 의 --road-tiles·--tiles-bottom·--tile-classes → OnnxMode 의 tiles. --road-tiles 0 (기본) 이면 None."""
+    cols = getattr(args, "road_tiles", 0) or 0
+    if cols <= 0:
+        return None
+    return {"cols": cols, "bottom": args.tiles_bottom, "classes": list(args.tile_classes)}
+
+
 def make_detector(args) -> FrameDetector:
     """run.py 의 인자로 탐지기를 만든다. 파일이 없거나 기록이 맞지 않으면 FileNotFoundError·ValueError."""
     kind = getattr(args, "detector", "onnx")
@@ -246,7 +263,7 @@ def make_detector(args) -> FrameDetector:
             raise ValueError("--detector onnx 는 --model <파일.onnx> 이 필요하다")
         if not Path(args.model).exists():
             raise FileNotFoundError(f"모델 파일이 없다: {args.model} (Drive daboyeo_data/models/ 에서 받는다)")
-        det = OnnxMode(args.model, conf=_conf_from_args(args), threads=args.threads)
+        det = OnnxMode(args.model, conf=_conf_from_args(args), threads=args.threads, tiles=tiles_from_args(args))
     else:
         raise ValueError(f"모르는 탐지기 {kind!r} (쓸 수 있는 값: {', '.join(DETECTORS)})")
     if record:

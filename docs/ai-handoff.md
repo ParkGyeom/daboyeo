@@ -1462,3 +1462,66 @@ uv run --with onnxruntime python experiments/sign_damage_v2_fpr5.py --krid-cls d
 
 - 박겸: 할 것 없음 (Colab 재학습 불필요). 발표에 넣을지만 정한다 (25-5). 다시 해 보고 싶으면 노트북 03 을 열고 Drive `daboyeo_data/parts/` 에 `sign_rf.zip` 을 올린 뒤 위에서부터 실행 (설정 셀 `VERSION="v2"` 그대로).
 - 정현우: 바뀌는 것 없음.
+
+## 26. 도로 조각 추론을 균열에만 쓰기 — `road_tiles(2, bottom=0.8)` + `tile_classes=("crack",)` (11/19, 결과: **gn_b 균열 3→7/9 · 눈으로 분명한 오탐 +0 · 1스레드 64 ms · gn_a 변화 없음 · 부산 H900 영상은 앞유리 반사 오탐으로 끔 → 기본은 끔, 반사 없는 시연 영상에서만 켜 볼 만함**)
+
+14장의 `road_tiles(2)`(전체 + 도로 2조각)는 작은 균열을 더 찾지만 포트홀 헛것과 보닛·반사 오탐이 같이 늘었다. 그래서 조각을 도로 높이 45–80%로 줄이고(보닛·앞유리 반사 띠 제외), 조각에서는 **균열만** 받는 변형을 쟀다. 포트홀·가드레일·표지판은 전체 프레임 패스 결과만 쓴다.
+
+### 26-1. 바뀐 코드 (기본 동작은 그대로)
+
+- `OnnxDetector(..., tile_classes=None)`: 전체 프레임(`FULL_FRAME`)이 아닌 창에서 받을 클래스 이름. None 이면 지금과 같다. 테스트는 `ai/tests/test_onnx_detector.py::test_tile_classes_filters_only_tile_windows`.
+- `eval_detector --road-tiles 2 --tiles-bottom 0.8 --tile-classes crack`. 캐시 태그에 조건이 들어가서 다른 변형과 섞이지 않는다.
+- `experiments/bbcsi_v3_check.py`: 정답 없는 새 영상을 빠르게 보는 스크립트다.
+  - `run`(프레임별 박스 저장, `--crop-bottom`·`--road-tiles`·`--tiles-bottom`·`--tile-classes`), `summary`, `draw`(박스 그린 프레임)
+  - `compare`(base와 조각 방식 비교. 정답 CSV가 있으면 `video_events` 규칙으로 이벤트 단위 평가. 조각에서만 나온 탐지의 크롭 모음)
+- 숫자: `experiments/road_tiles_crack.json`
+
+### 26-2. 결과 (v3, 기준 0.31/0.42/0.21/0.21, 0.5초, strict 정답, 18-3과 같은 방식)
+
+| 영상 | 지표 | base (지금) | `road_tiles(2)` (14장) | **b0.8 + 균열만** |
+|---|---|---|---|---|
+| gn_b (182초) | 균열 정답 찾음 | 3/9 | 6/9 | **7/9** (+B_C01·C03·C04·C11) |
+| | 균열 예측 이벤트 (맞음/헛것) | 6 (4/2) | 12 (7/5) | 11 (7/4) |
+| | 포트홀 찾음 / 헛것 | 0/1 · 0 | 1/1 · 2 | 0/1 · 0 |
+| gn_a (262초, 젖은 노면) | 균열 찾음 / 예측 이벤트 | 0/1 · 0 | — | 0/1 · 0 (늘어난 탐지 0) |
+| 부산 NSUEkDQl3m4 (307초) | 균열 탐지 프레임 | 7 | 190 | 271 |
+| 속도 (M4 Pro, 1080p) | 1스레드 / 2스레드 | 21 / 17 ms | 63 / 51 ms | **64 / 51 ms** |
+
+- **gn_b의 새 헛것 2개**는 직접 봤다. 16.5–17초는 차로 가운데 세로 균열로, 실제 균열인데 정답에서 빠진 것이다. 117초는 amb 정답 B_C09 바로 앞의 작은 자국이라 애매로 분류했다. **눈으로 분명한 오탐 증가는 0이다.** 14장 방식에서 생겼던 횡단보도 페인트·포트홀 얼룩·복공판 오탐은 사라졌다.
+- 잃은 것은 B_P01 포트홀(99초)이다. 조각에서 포트홀을 받아야만 잡힌다.
+- **gn_a**에서는 두 방식 모두 균열 0이다. 고정 오탐이 없고, 자막(동 이름) 영역에서도 결함 탐지가 0이다. 해는 없지만 이득도 없다.
+- **부산 영상(H900 4K 블랙박스)**: 왼쪽 대시보드 반사 오탐(14장 방식 40건)은 3건으로 줄었다. 대신 앞유리 반사 가장자리의 같은 자리(1080p 기준 x 540–650, y 700–860)에서 **고정 오탐이 41프레임** 나온다. 조각에서만 나온 탐지 79묶음을 직접 본 결과는 맞음 약 12, 애매 약 10, 오탐 약 57이다. 이 영상에서는 끈다.
+  - 출처: YouTube **@bbcsi** (블랙박스 수사대), NSUEkDQl3m4 "[루카스 H900 4K] 여름 흐린날 주행영상 / 부산 사상구·부산진구"
+  - **표준 라이선스이므로 녹화 시연에만 쓰고, 공개 게시하지 않으며, 출처를 표기한다.** 영상·프레임은 레포 밖(`data/videos/bbcsi/`, `data/presentation/bbcsi/`)에만 둔다.
+  - v3 base로만 보면 이 영상은 시연용 결함 영상으로 약하다 (균열 7프레임 중 맞음 4, 포트홀 0). 화면 아래 OSD 줄과 "ITI" 워터마크, HUD에서는 오탐이 없어서 자를 필요가 없다.
+
+### 26-3. 켜는 방법 (기본은 끔)
+
+```python
+from daboyeo_ai.inference import OnnxDetector, road_tiles, load_class_conf
+det = OnnxDetector("ai/models/detector_v3.onnx", threads=1, conf=load_class_conf("ai/models/detector_v3.json"),
+                   windows=road_tiles(2, bottom=0.8), tile_classes=("crack",))
+```
+
+```bash
+# 시연 영상을 바꾸면 켜기 전에 한 번 확인 (조각에서만 나온 균열 크롭을 눈으로 보고 같은 자리 반복 오탐이 없는지)
+uv run python experiments/bbcsi_v3_check.py run --video <영상> --model ai/models/detector_v3.onnx --out-dir <out>/base
+uv run python experiments/bbcsi_v3_check.py run --video <영상> --model ai/models/detector_v3.onnx --out-dir <out>/b08 \
+    --road-tiles 2 --tiles-bottom 0.8 --tile-classes crack
+uv run python experiments/bbcsi_v3_check.py compare --base <out>/base/dets.json --tiles <out>/b08/dets.json --out-dir <out>/cmp \
+    [--gt experiments/gt_events/<영상 이름>.csv]
+```
+
+### 26-4. 한계
+
+- 정답이 있는 영상은 gn_a·gn_b 두 개(7.4분, 한 도로)뿐이다. 균열 정답 9개 중 +4는 불확실성이 크다.
+- 반사 오탐은 차량과 촬영 방식에 따라 달라진다. 앞유리 반사가 있는 블랙박스에서는 조각의 아래 끝을 더 올리거나 꺼야 한다.
+- 속도는 Mac(M4 Pro)에서 잰 값이다. 분석 한 번에 1스레드 기준 약 3배 느려진다.
+
+### 26-5. 박겸이 할 것 · 정현우에게 전할 것
+
+- 박겸: 시연 영상이 gn_b로 확정되면 켤지 정한다. 발표에서는 "조각 추론으로 균열 재현율 3→7/9" 실험 장면으로 쓸 수 있다.
+- **[ ] 정현우** (켜기로 할 때만):
+  - 블랙박스 CLI 플래그(예: `--road-tiles 2 --tiles-bottom 0.8 --tile-classes crack`)를 `edge/blackbox`에 추가하고, 탐지기를 26-3처럼 만든다. **기본값은 끔**으로 둔다.
+  - **시연 노트북에서 속도를 다시 잰다.** Mac 기준으로 분석 한 번에 1스레드 약 64 ms다.
+  - 시연 영상을 바꾸면 26-3의 확인 명령을 한 번 돌린다.

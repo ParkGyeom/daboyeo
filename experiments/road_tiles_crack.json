@@ -1,0 +1,32 @@
+{
+ "date": "2026-11-19",
+ "model": "ai/models/detector_v3.onnx",
+ "class_conf": {"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21},
+ "method": "eval_detector strict (amb 행 제외), 0.5초 간격 (--every 30), 정답 창 ±0.5초, 1초 안 hit 는 한 이벤트, --no-lane",
+ "variants": {
+  "base": "전체 프레임 640 1번 (지금)",
+  "tiles": "road_tiles(2) — 전체 + 도로 45-100% 좌우 2조각, 모든 클래스",
+  "b08_crack": "road_tiles(2, bottom=0.8) + tile_classes=('crack',) — 조각은 도로 45-80%, 조각에서는 균열만"
+ },
+ "gn_b_3320-3620": {
+  "crack": {"n_gt": 9,
+   "base": {"found": 3, "events": 6, "ok": 4, "false": 2, "false_times": [4.0, 140.0]},
+   "tiles": {"found": 6, "events": 12, "ok": 7, "false": 5},
+   "b08_crack": {"found": 7, "events": 11, "ok": 7, "false": 4, "false_times": [4.0, 16.5, 117.0, 140.0],
+                 "new_false_review": {"16.5": "실제 균열 (정답 누락)", "117.0": "애매 (amb 정답 B_C09 앞)"}}},
+  "pothole": {"n_gt": 1, "base": {"found": 0, "false": 0}, "tiles": {"found": 1, "false": 2}, "b08_crack": {"found": 0, "false": 0}},
+  "facilities": "가드레일·표지판은 세 방식 모두 같음"
+ },
+ "gn_a_2050-2510": {
+  "crack": {"n_gt": 1, "base": {"found": 0, "events": 0}, "b08_crack": {"found": 0, "events": 0}},
+  "note": "새 변형에서 늘어난 탐지 0, 고정 오탐 없음, 자막 영역(위 20%) 결함 탐지 0"
+ },
+ "NSUEkDQl3m4_bbcsi_H900": {
+  "crack_frames": {"base": 7, "tiles": 190, "b08_crack": 271},
+  "tiles_only_review_groups": {"tiles": {"real": 12, "amb": 14, "fp": 25, "dash_reflection_fp_dets": 40},
+                               "b08_crack": {"real": 12, "amb": 10, "fp": 57, "fixed_reflection_edge_fp_frames": 41}},
+  "note": "앞유리 반사 가장자리(x540-650, y700-860, 1080p)에 고정 오탐 → 이 영상에서는 끔"
+ },
+ "speed_ms_m4pro_1080p": {"base": {"1": 21.0, "2": 16.6}, "tiles": {"1": 63.3, "2": 50.6}, "b08_crack": {"1": 64.0, "2": 50.8}},
+ "decision": "기본은 끔. gn_b 처럼 앞유리 반사가 없는 시연 영상에서만 켜 볼 만함 (gn_b 균열 3→7/9, 분명한 오탐 +0, 1스레드 64 ms)"
+}

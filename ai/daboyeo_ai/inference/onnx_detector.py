@@ -157,6 +157,8 @@ class OnnxDetector:
     conf: 숫자 하나(모든 클래스) 또는 `{"pothole": 0.3, ...}` 클래스별 기준 (빠진 클래스는 0.25).
     windows: 프레임의 어느 부분들을 모델에 넣을지 (0~1 비율 창 목록, 예: `road_tiles(cols=2)`). 기본 None = 프레임 전체 한 번
     (지금까지와 같음). 창마다 640 letterbox 로 돌리고 결과를 프레임 좌표로 옮겨 클래스별 NMS 로 합친다 → 창 수만큼 느려진다.
+    tile_classes: 전체 프레임(FULL_FRAME)이 아닌 창에서 받을 클래스 이름 (예: `("crack",)`). None = 모든 클래스 (지금과 같음).
+    전체 프레임 창의 결과는 늘 모든 클래스를 받는다 — 조각은 작은 균열만 더 찾고, 시설물·포트홀은 전체 패스 그대로 쓰고 싶을 때.
     `self.class_conf` 는 class_id 순서 리스트, `self.conf` 는 그 최솟값 (예전 코드 호환).
     """
 
@@ -168,6 +170,7 @@ class OnnxDetector:
         iou: float = 0.45,
         damage_model: str | Path | DamageClassifier | None = None,
         windows: Sequence[Window] | None = None,
+        tile_classes: Sequence[str] | None = None,
     ):
         import onnxruntime as ort  # 학습 환경 등 추론이 필요 없는 곳에서는 import 하지 않도록
 
@@ -188,6 +191,10 @@ class OnnxDetector:
         for x1, y1, x2, y2 in self.windows or ():
             if not (0 <= x1 < x2 <= 1 and 0 <= y1 < y2 <= 1):
                 raise ValueError(f"window must be 0~1 (x1<x2, y1<y2): {(x1, y1, x2, y2)}")
+        unknown = set(tile_classes or ()) - set(CLASS_NAMES)
+        if unknown:
+            raise ValueError(f"unknown tile_classes {sorted(unknown)}, expected some of {CLASS_NAMES}")
+        self.tile_class_ids = None if tile_classes is None else frozenset(CLASS_NAMES.index(c) for c in tile_classes)
         # 파손 분류기: 경로면 같은 threads 로 연다. 탐지 → 분류가 차례로 돌아서 코어를 더 쓰지 않는다
         if damage_model is None or not isinstance(damage_model, (str, Path)):
             self.damage = damage_model
@@ -203,8 +210,10 @@ class OnnxDetector:
         dets = []
         for win in self.windows:
             x1, y1, x2, y2 = window_pixels(win, w, h)
+            keep = None if win == FULL_FRAME else self.tile_class_ids
             for c, s, a, b, cc, d in self._run(frame_bgr[y1:y2, x1:x2]):
-                dets.append((c, s, a + x1, b + y1, cc + x1, d + y1))
+                if keep is None or c in keep:
+                    dets.append((c, s, a + x1, b + y1, cc + x1, d + y1))
         return merge_nms(dets, self.iou)
 
     def _run(self, frame_bgr: np.ndarray) -> list[tuple[int, float, float, float, float, float]]:

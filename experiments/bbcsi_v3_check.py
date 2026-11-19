@@ -109,9 +109,10 @@ def _thr(card: Path) -> list[float]:
 
 
 def cmd_run(args) -> int:
-    from daboyeo_ai.inference import OnnxDetector
+    from daboyeo_ai.inference import OnnxDetector, road_tiles
 
-    det = OnnxDetector(args.model, threads=args.threads, conf=args.low_conf)
+    windows = road_tiles(args.road_tiles) if args.road_tiles else None
+    det = OnnxDetector(args.model, threads=args.threads, conf=args.low_conf, windows=windows)
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     full, crop = {}, {}
@@ -125,7 +126,7 @@ def cmd_run(args) -> int:
         for d in ds:
             d[0] = int(d[0])
     data = {"video": str(args.video), "model": str(args.model), "every_s": args.every_s, "low_conf": args.low_conf,
-            "frame_wh": [w, h], "crop_bottom": args.crop_bottom, "full": full, "crop": crop}
+            "frame_wh": [w, h], "crop_bottom": args.crop_bottom, "road_tiles": args.road_tiles, "full": full, "crop": crop}
     (out / "dets.json").write_text(json.dumps(data), encoding="utf-8")
     print(f"{len(full)} frames → {out / 'dets.json'}")
     return 0
@@ -191,6 +192,72 @@ def cmd_draw(args) -> int:
     return 0
 
 
+def _events(frames: dict[str, list], thr: list[float], gt: list, video_id: str, tol_s: float, merge_gap_s: float,
+            minutes: float) -> dict:
+    """유형별 예측 이벤트 (video_events 규칙 그대로) + 정답이 있으면 맞음/헛것과 찾은 정답."""
+    from daboyeo_contracts import DETECTOR_TO_DEFECT
+
+    from daboyeo_ai.eval.video_events import group_events, in_window, match
+
+    out = {}
+    for c, name in enumerate(CLASS_NAMES):
+        dtype = DETECTOR_TO_DEFECT[name].value
+        hits = [(float(t), d[1]) for t, ds in frames.items() for d in above(ds, thr) if d[0] == c]
+        preds = group_events(video_id, dtype, hits, merge_gap_s)
+        row = {"frames": len({t for t, _ in hits}), "events": len(preds)}
+        if gt is not None:
+            g = [e for e in gt if e.defect_type == dtype]
+            tc = match(gt, preds, dtype, tol_s, minutes)
+            row |= {"n_gt": tc.n_gt, "found": tc.n_gt_found, "pred_ok": tc.n_pred_ok, "false_events": tc.n_pred - tc.n_pred_ok,
+                    "precision": None if tc.precision is None else round(tc.precision, 3), "missed": tc.missed,
+                    "false_event_times": [[round(e.t_start, 1), round(e.t_end, 1)] for e in preds
+                                          if not any(in_window(t, x, tol_s) for t in e.hits for x in g)]}
+        out[name] = row
+    return out
+
+
+def cmd_compare(args) -> int:
+    """base 와 tiles dets.json 비교: 유형별 탐지 프레임·이벤트(정답이 있으면 맞음/헛것), tiles 에만 있는 결함 크롭 모음."""
+    from daboyeo_ai.eval.demo_clip import crop_tile, sheet
+    from daboyeo_ai.eval.recall_res import new_vs_base
+    from daboyeo_ai.eval.video_events import load_gt
+
+    thr = _thr(Path(args.card))
+    base = json.loads(Path(args.base).read_text(encoding="utf-8"))
+    tiles = json.loads(Path(args.tiles).read_text(encoding="utf-8"))
+    vid = Path(base["video"]).stem
+    gt = load_gt(args.gt, vid) if args.gt else None
+    dur = max(map(float, base["full"])) + base["every_s"]
+    res = {"video": vid, "class_conf": dict(zip(CLASS_NAMES, thr)), "gt": args.gt, "tol_s": args.tol, "merge_gap_s": args.merge_gap}
+    for key, data in (("base", base), ("tiles", tiles)):
+        res[key] = _events(data["full"], thr, gt, vid, args.tol, args.merge_gap, dur / 60)
+    want = {CLASS_NAMES.index(n) for n in args.classes}
+    new = []
+    for t, ds in tiles["full"].items():
+        for d in new_vs_base(above(ds, thr), above(base["full"].get(t, []), thr)):
+            if d[0] in want:
+                new.append((float(t), d))
+    res["tiles_only"] = [{"id": i, "t": t, "class": CLASS_NAMES[d[0]], "conf": round(d[1], 3), "box": [round(v) for v in d[2:]]}
+                         for i, (t, d) in enumerate(sorted(new, key=lambda x: x[0]))]
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    by_t: dict[float, list] = {}
+    for r in res["tiles_only"]:
+        by_t.setdefault(r["t"], []).append(r)
+    crops = []
+    for t, f in read_frames(Path(base["video"]), base["every_s"]):
+        for r in by_t.get(t, []):
+            d = (CLASS_NAMES.index(r["class"]), r["conf"], *r["box"])
+            crops.append(crop_tile(f, d, f"{r['id']} t{t} {r['class'][:4]} {r['conf']:.2f}"))
+    for k in range(0, len(crops), 24):
+        cv2.imwrite(str(out / f"tiles_only_{k // 24}.jpg"), sheet(crops[k:k + 24], 6), [cv2.IMWRITE_JPEG_QUALITY, 85])
+    (out / "compare.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
+    for key in ("base", "tiles"):
+        print(key, {n: {k: v for k, v in r.items() if k not in ("false_event_times", "missed")} for n, r in res[key].items()})
+    print("tiles_only", len(res["tiles_only"]), "→", out)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -201,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--every-s", type=float, default=0.5)
     r.add_argument("--low-conf", type=float, default=0.1)
     r.add_argument("--crop-bottom", type=int, default=0, help="아래에서 잘라 낼 px (0 이면 비교 안 함)")
+    r.add_argument("--road-tiles", type=int, default=0, help="N 이면 전체 + 도로 N 조각 (OnnxDetector windows=road_tiles(N))")
     r.add_argument("--threads", type=int, default=4)
     for name in ("summary", "draw"):
         q = sub.add_parser(name)
@@ -210,8 +278,17 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--t", type=float, nargs="+", required=True)
     d.add_argument("--sub", default="frames")
     d.add_argument("--use-crop", action="store_true")
+    c = sub.add_parser("compare", help="base vs tiles dets.json (+ 정답 CSV 가 있으면 이벤트 단위)")
+    c.add_argument("--base", required=True)
+    c.add_argument("--tiles", required=True)
+    c.add_argument("--gt", help="12장 형식 정답 CSV (strict 면 amb 행을 뺀 것)")
+    c.add_argument("--out-dir", required=True)
+    c.add_argument("--card", default="ai/models/detector_v3.json")
+    c.add_argument("--classes", nargs="+", default=["crack", "pothole"], help="tiles 에만 있는 탐지 크롭을 모을 클래스")
+    c.add_argument("--tol", type=float, default=0.5)
+    c.add_argument("--merge-gap", type=float, default=1.0)
     args = p.parse_args(argv)
-    return {"run": cmd_run, "summary": cmd_summary, "draw": cmd_draw}[args.cmd](args)
+    return {"run": cmd_run, "summary": cmd_summary, "draw": cmd_draw, "compare": cmd_compare}[args.cmd](args)
 
 
 if __name__ == "__main__":

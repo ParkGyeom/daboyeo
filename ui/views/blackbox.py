@@ -1,7 +1,8 @@
 """블랙박스 화면 (관리자·시연용). 가상 블랙박스가 지금 보고 있는 프레임과 탐지 박스.
 
 가상 블랙박스(edge/blackbox/live.py)가 server_data/live/ 에 쓰는 파일을 0.5초마다 다시 읽는다.
-기기 여러 대를 나란히 보여준다.
+기기 여러 대를 나란히 보여준다. '크게 볼 차량'에서 한 대를 고르면 그 차량만 화면 폭 가득 보여준다
+(녹화에서 관리자 지도와 나란히 둘 때). 주소에 ?bb=bb-01 을 붙이면 처음부터 그 차량만 보인다.
 """
 
 import json
@@ -55,6 +56,24 @@ def read_devices() -> list[tuple[dict, bytes | None]]:
     return out
 
 
+ALL = "모두"
+
+
+def pick(devices: list[tuple[dict, bytes | None]]) -> list[tuple[dict, bytes | None]]:
+    """'크게 볼 차량'으로 고른 차량만. '모두'이거나 고른 차량이 지금 없으면 모두."""
+    if "bb_focus" not in st.session_state:
+        st.session_state.bb_focus = st.query_params.get("bb", ALL)
+    focus = st.session_state.bb_focus
+    ids = [s["device_id"] for s, _ in devices]
+    if len(ids) < 2 and focus in (ALL, None):
+        return devices  # 고를 것이 없다
+    # 고른 차량이 잠깐 화면에서 빠져도(주행을 다시 켜는 사이) 고른 것은 남긴다
+    options = [ALL, *ids, *([focus] if focus not in (ALL, None, *ids) else [])]
+    choice = st.segmented_control("크게 볼 차량", options, key="bb_focus",
+                                  format_func=lambda d: d if d == ALL else api.plate_of(d))
+    return [d for d in devices if d[0]["device_id"] == choice] or devices
+
+
 @st.fragment(run_every=0.5)
 def view() -> None:
     devices = read_devices()
@@ -62,6 +81,7 @@ def view() -> None:
         st.info("돌고 있는 블랙박스가 없습니다. 예: "
                 "`uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --model ai/models/detector_v3.onnx`")
         return
+    devices = pick(devices)
     cols = st.columns(min(3, len(devices)))
     now = time.time()
     for col, (s, img) in zip(cols * (len(devices) // len(cols) + 1), devices):

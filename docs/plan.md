@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 기반 | [PRD.md](../PRD.md) **v0.9** (v0.4 이후 부록 끝 한 줄 말고는 줄 수가 그대로라 아래 인용 줄 번호는 v0.4 와 같음) |
-| 계획 버전 | r3.24 (2026-11-20) — r1은 PRD v0.2, r2는 v0.3 기준 |
+| 계획 버전 | r3.25 (2026-11-20) — r1은 PRD v0.2, r2는 v0.3 기준 |
 | 완성 기한 | 2026-11-27 (금), D-14 |
 | 상태 | 팀 검토 중 — 0.1(레포·`contracts/`)은 완료 |
 
@@ -272,7 +272,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | 날짜 | 작업 | 완료 확인 |
 |---|---|---|
 | 11/25 | 기능 동결, 버그 수정, 12장 표 채우기 | 12장 표에 TBD 없음 |
-| 11/26 | 리허설: `scripts/demo.sh up` → `scripts/demo.sh reset` (reset 은 DB 가 떠 있어야 함) → gn_b 3대 운전, 1배속 (실시간 `uv run python -m edge.blackbox.variants --video data/videos/gn_b_3320-3620.mp4 --model ai/models/detector_v3.onnx --devices 3 --detect-every 10 --speed 1`, replay `scripts/demo.sh replay data/replay/gn_b_3320-3620.v3tiles.jsonl data/videos/gn_b_3320-3620.mp4 3 1`. `scripts/demo.sh drive` 는 gn_b 가 아니라 로드마크 구간 `data/roadmark/VS4` 를 돌고, drive·replay 는 배속을 안 주면 4배) → 시민 화면 → 지도. 실시간·replay 두 경로. 발표 자료에 **영상 출처 표기**와 "GPS는 재구성했고 오차는 X m" 명시 (`PRD.md:438`, `PRD.md:447`) | 끊김 없는 시연 2회 이상 (`PRD.md:633`) |
+| 11/26 | 리허설: `scripts/demo.sh up` → `scripts/demo.sh reset` (reset 은 DB 가 떠 있어야 함) → gn_b 3대 운전, 1배속 (실시간 `scripts/demo.sh drive ai/models/detector_v3.onnx 3 data/videos/gn_b_3320-3620.mp4 1`, replay `scripts/demo.sh replay data/replay/gn_b_3320-3620.v3tiles.jsonl data/videos/gn_b_3320-3620.mp4 3 1`. drive 의 셋째 인자를 빼면 gn_b 가 아니라 로드마크 구간 `data/roadmark/VS4` 를 돌고, drive·replay 는 배속을 안 주면 4배). 녹화는 블랙박스 화면에서 '크게 볼 차량'으로 1대만 크게(주소 `?bb=bb-01`) + 관리자 지도 나란히 → 시민 화면 → 지도. 실시간·replay 두 경로. 발표 자료에 **영상 출처 표기**와 "GPS는 재구성했고 오차는 X m" 명시 (`PRD.md:438`, `PRD.md:447`) | 끊김 없는 시연 2회 이상 (`PRD.md:633`) |
 | 11/27 | 완성 | — |
 
 **시연 기본 설정 (11/16)**: 차선 마모는 끈다 (`edge/blackbox/run.py` 기본 `--lane-every 0`). 시연 클립 gn_b 에서 확정 58건 중 54건이 헛것(25건은 신호 대기 중 횡단보도), gn_a 는 젖은 노면이라 차선을 2.8% 프레임에서만 찾았다 (`docs/ai-handoff.md` 17장). 개선(정지 판정·횡단보도 거르기)을 해도 헛것 84% 라 **시연에서 끔 (11/17 확정, handoff 17-6)**. 발표에서는 "실험 기능"으로만 언급한다.
@@ -461,6 +461,7 @@ scripts/demo.sh reset      # 시연용 DB 로 쟀다면
 
 ## 변경 이력
 
+- **r3.25 (2026-11-20)** — `scripts/demo.sh drive` 셋째 인자에 영상 파일을 받음 (영상이면 `--video` + 탐지 10 프레임마다, 구간 이름이면 예전처럼 로드마크). 11/26 리허설 실시간 줄을 `scripts/demo.sh drive ai/models/detector_v3.onnx 3 data/videos/gn_b_3320-3620.mp4 1` 로 줄임. 블랙박스 화면에 '크게 볼 차량'(1대만 화면 폭 가득, 주소 `?bb=bb-01`) — 녹화에서 관리자 지도와 나란히 (정현우).
 - **r3.24 (2026-11-20)** — PRD v0.9: TBD 정리 (박겸, 공동 파일 PRD·plan 변경, 정현우 리뷰). PRD: 12장 통신량·중복 정리 행에 11장 잠정 측정값(가짜 탐지·가짜 GPS 조건 명시), FR-1.5 클립 = 결함 전후 2초(`edge/blackbox/clipper.py`), F2 수용 기준 가상 블랙박스 대수 = 시연 3대 · `scripts/e2e_smoke.py` 6대(관측 75 = 저장 75), 9장 `size_metric` = 이번 버전 미사용(contracts 기본값 `None`), 18장 오픈 이슈 #1·4·6·7·8·9·10·11·12·13 닫음. FR-4.3·#5(위험도 크기 반영)는 11/21 Go/No-go 뒤라 그대로. plan: `run_fleet.py`·`reset_demo.py` 는 만들지 않았으므로 `scripts/demo.sh` `reset`·`drive`·`replay` 로 바꿈(3장 트리·1.2·11/26 리허설·0-A·7장), 3장 트리에 `scripts/demo.sh`·`e2e_smoke.py`·`tests/`. PRD 줄 수는 그대로라 `PRD.md:줄번호` 인용은 바뀌지 않음. 정현우 리뷰 반영: 11/26 리허설 순서 up → reset, gn_b 실시간은 `edge.blackbox.variants --video …` (drive 는 로드마크 구간), 배속 1 을 명시.
 - **r3.23 (2026-11-18)** — PRD v0.8: F8 '포상 현황 안내' → '신고 누적 안내' (정현우, 공동 파일 PRD·plan 변경). 포상 기준이 서울시 공지마다 달라(분기 5건 / 반기 10건, 2026-08 도로부속물 공지는 분기 5건) 기준을 채우고도 못 받으면 억울하므로 화면에서 포상 기준·남은 건수·'포상 대상' 표시를 뺐다 (DB `reward_eligible_road`·`reward_valid`·`quarter` 는 그대로, 스키마·contracts 변경 없음). 시민이 받는 것은 문자 하나와 링크뿐이라 시민 메뉴(확인·신고·신고서·포상 현황)를 없애고, 신고서는 관리자 > 신고 내역(`GET /api/v1/reports`, 시민별 누적 `GET /api/v1/reporters`)으로 옮겼다. 누적은 사람 기준(`reports.user_id`). 모의 문자는 한 줄 → 여러 줄(언제 주행·유형별 건수와 주소·본인 명의 접수 안내·누적·링크·유효 시간, `server/notify.py` `compose`). 바꾼 PRD 곳: 2.1장·4장 시민 접점·US-05·3.2 F8 행·FR-6.2·F8 전체·10장 API·13장 6단계·15.1 M3·15.3 컷 라인 4·오픈 이슈 #7·부록 용어. PRD 줄 수는 부록 끝에 한 줄('신고 누적')만 늘어 이 문서의 `PRD.md:줄번호` 인용은 바뀌지 않음. 3.4·3.5·AC-10 도 같이 바꿈.
 - **r3.22 (2026-11-18)** — PRD v0.7: 12장 AI 행 실측값 (박겸, 공동 파일 PRD·plan 변경). 탐지(v3 공개 테스트셋·RDD2022 test·시연 클립 이벤트 단위, handoff 18·19장), 파손 분류(기준 미달 → 위치 탐지까지만), 차선 마모(시연 클립 헛것 93% → 84%, 시연에서 끔), 처리 속도 v3 다시 잼 (4.2): `experiments/bench_cpu_v3.{csv,json}` — 시연 클립 gn_b 프레임 182장 × 3회, M4 Pro, **시연 클립이 60 fps 라 영상 1분 = 3,600 프레임**으로 계산 (v2 `bench_cpu.csv` 는 30 fps 가정). 탐지 1스레드 21.4 ms · 2스레드 16.5 ms, 영상 1분당 매 프레임 77.2 · 59.6 초 → 10 프레임마다 7.7 · 6.0 초. 분석 간격 (4.3): `experiments/interval_sweep_v3/` (v3, 시연 클립 2개, amb 뺀 정답, 차선 마모 끔) — 균열 누락 1 프레임 5/10 · 10 프레임 6/10 · 30 프레임 7/10. 목표 처리 속도 `(제안)` = 실시간 · CPU 1스레드, 탐지 주기 10 프레임(8.3), FR-1.3 차선 마모 기준 채움. PRD 줄 수는 그대로라 이 문서의 `PRD.md:줄번호` 인용은 바뀌지 않음.

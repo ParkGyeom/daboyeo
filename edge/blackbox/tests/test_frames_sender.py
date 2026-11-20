@@ -83,3 +83,39 @@ def test_pacer_does_not_wait_twice_for_missing_gps():
     assert p.next(1.0) == 3.0   # 자정을 넘긴 경우도 간격으로 친다(상한 3초)
     q = Pacer()
     assert q.next(None) == 0.0  # 첫 프레임은 기다리지 않는다
+
+
+def test_realtime_clock_subtracts_processing_time():
+    import pytest
+
+    from edge.blackbox.run import RealtimeClock
+
+    now = [100.0]
+    c = RealtimeClock(speed=1.0, now=lambda: now[0])
+    assert c.sleep_for(0.0) == 0.0  # 첫 프레임: 기준을 잡는다
+    now[0] += 0.06  # 탐지에 60 ms
+    assert c.sleep_for(0.1) == pytest.approx(0.04)  # 0.1초 간격에서 처리한 0.06초를 뺀다
+    now[0] += 0.04
+    now[0] += 0.3  # 0.1초 간격인데 0.3초 걸림: 0.2초 늦음 → 자지 않고 따라잡는다
+    assert c.sleep_for(0.1) == 0.0
+    now[0] += 0.01
+    assert c.sleep_for(0.3) == pytest.approx(0.09)  # 밀린 0.2초를 뺀 만큼만 잔다
+    assert c.resyncs == 0
+
+    fast = RealtimeClock(speed=4.0, now=lambda: now[0])
+    fast.sleep_for(0.0)
+    assert fast.sleep_for(1.0) == pytest.approx(0.25)  # 배속 4: 영상 1초 = 실제 0.25초
+
+
+def test_realtime_clock_resyncs_instead_of_fast_forwarding():
+    import pytest
+
+    from edge.blackbox.run import RealtimeClock
+
+    now = [0.0]
+    c = RealtimeClock(speed=1.0, now=lambda: now[0])
+    c.sleep_for(0.0)
+    now[0] += 5.0  # 영상 0.1초 동안 5초 멈춤 (서버가 느림 등)
+    assert c.sleep_for(0.1) == 0.0
+    assert c.resyncs == 1
+    assert c.sleep_for(0.1) == pytest.approx(0.1)  # 기준을 다시 잡았으니 다음 간격은 그대로 기다린다

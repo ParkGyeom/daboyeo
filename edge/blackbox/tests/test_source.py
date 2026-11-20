@@ -43,6 +43,23 @@ def test_video_source_times_and_interpolated_gps(video):
     assert f10.fix.lat == pytest.approx(37.501)  # 0초와 2초 사이 중간
     assert frames[20].fix is not None and frames[21].fix is None  # 2.0초까지만 위치가 있다
     assert f10.name == "v1@1.00s"
+    # 위치가 없어도 영상 시각은 있다 (실제 시간 맞추기가 프레임마다 1초씩 기다리지 않게)
+    assert frames[21].time_s == pytest.approx(2.1) and frames[10].time_s == pytest.approx(1.0)
+
+
+def test_drive_realtime_does_not_wait_a_second_per_frame_without_gps(video, monkeypatch, tmp_path):
+    """GPS 밖 프레임 4장(2.1~2.4초)이 1초씩(예전 4초) 기다리지 않고 영상 간격만큼만. 배속 2: 2.5초 영상 ≈ 1.25초 (예전 방식이면 1.05 + 4×0.5 ≈ 3초)."""
+    import time
+
+    monkeypatch.setattr(detectors, "Detector", FakeDetector)
+    model = tmp_path / "m.onnx"
+    model.write_bytes(b"")
+    args = run.parse_args(["--video", str(video), "--model", str(model), "--speed", "2", "--dry-run",
+                           "--no-clip", "--keep-dir", "", "--no-quality", "--live-fps", "0"])
+    t0 = time.monotonic()
+    r = run.drive(args)
+    assert r["skipped_no_gps"] == 4
+    assert 1.0 < time.monotonic() - t0 < 2.0
 
 
 def test_video_source_load_reads_current_frame(video):

@@ -27,6 +27,9 @@ class SourceFrame:
     name: str
     fix: GpsFix | None  # time_s: 영상은 영상 시작 기준 초, 로드마크는 그날 0시 기준 초
     load: Callable[[], np.ndarray]  # BGR 이미지
+    # 영상 시각(영상 시작 기준 초). GPS 경로 밖이라 fix 가 없어도 있다 — 그런 프레임도 실제 간격만큼만 기다리게.
+    # 로드마크는 None (프레임 시각이 GPS 에만 있다)
+    time_s: float | None = None
 
 
 def default_gps_path(video: str | Path) -> Path:
@@ -77,7 +80,7 @@ class VideoSource:
                             raise OSError(f"{self.video} 프레임 {i} 을 읽지 못했다")
                         return img
 
-                    yield SourceFrame(f"{self.video.stem}@{t:.2f}s", video_fix(self.track, t), load)
+                    yield SourceFrame(f"{self.video.stem}@{t:.2f}s", video_fix(self.track, t), load, time_s=t)
                 i += 1
         finally:
             cap.release()

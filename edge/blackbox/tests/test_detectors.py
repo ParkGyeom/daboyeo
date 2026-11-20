@@ -81,6 +81,14 @@ def test_fake_sends_one_observation_per_sent_label(video, labels, tmp_path, monk
     assert sorted(t for t, *_ in Captured.log) == ["crack", "lane_wear", "pothole"]
     lane = [o for o in Captured.log if o[0] == "lane_wear"]
     assert lane[0][2] is None  # 차선 마모는 박스 없이
+    assert r["unsent_tracks"] == {"guardrail": 1, "sign": 1}  # 보내지 않은 시설물은 트랙 수로만 센다
+
+
+def test_unsent_line_format(video, labels, tmp_path, capsys):
+    """scripts/e2e_smoke.py 가 이 줄을 읽는다. 바꾸면 e2e_smoke 도 함께 바꾼다."""
+    drive(video, tmp_path, "--detector", "fake", "--labels", str(labels), "--detect-every", "3")
+    out = capsys.readouterr().out
+    assert "[bb-01] 보내지 않은 탐지 guardrail 1 · sign 1 (트랙, 합치기 1초)" in out
 
 
 def test_fake_default_labels_path():

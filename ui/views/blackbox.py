@@ -12,7 +12,7 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from edge.blackbox.live import COLORS, LABELS, LIVE_DIR  # noqa: E402
+from edge.blackbox.live import COLORS, LABELS, LIVE_DIR, is_current  # noqa: E402
 import api  # noqa: E402
 
 STALE_S = 5  # 이 시간 동안 새 프레임이 없으면 멈춘 것으로 본다
@@ -38,11 +38,14 @@ st.markdown(legend(), unsafe_allow_html=True)
 
 def read_devices() -> list[tuple[dict, bytes | None]]:
     out = []
+    now = time.time()
     for js in sorted(LIVE_DIR.glob("*.json")):
         try:
             status = json.loads(js.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue  # 쓰는 중
+        if not is_current(status, now):
+            continue  # 지난 주행이 남긴 화면 (강제로 끈 주행 등)
         jpg = js.with_suffix(".jpg")
         try:
             img = jpg.read_bytes()

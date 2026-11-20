@@ -52,6 +52,8 @@ cmd_up() {
     [[ -x $PY ]] || die ".venv 가 없다. CLAUDE.md 의 환경 설정을 먼저 한다"
     docker info >/dev/null 2>&1 || die "Docker 가 꺼져 있다. Docker Desktop 을 켠 뒤 다시 실행한다"
 
+    # 지난 주행이 남긴 블랙박스 화면을 지운다 (돌고 있는 블랙박스가 없을 때만)
+    pgrep -f "edge.blackbox.run" >/dev/null 2>&1 || rm -f server_data/live/*.jpg server_data/live/*.json
     say "DB 띄우는 중..."
     docker compose up -d db >/dev/null 2>&1
     for _ in $(seq 1 60); do
@@ -120,7 +122,8 @@ cmd_reset() {
     "$PY" -c "from server import db; db.init_db(); db.reset_db()"
     rm -f server_data/snapshots/*.jpg server_data/clips/*.mp4
     rm -rf server_data/blackbox
-    say "처음 상태로 되돌렸다 (결함·신고·사진·클립, 블랙박스가 남긴 결함 구간 삭제, 시민 3명 다시 넣음)"
+    rm -f server_data/live/*.jpg server_data/live/*.json
+    say "처음 상태로 되돌렸다 (결함·신고·사진·클립, 블랙박스가 남긴 결함 구간·화면 삭제, 시민 3명 다시 넣음)"
 }
 
 cmd_drive() {

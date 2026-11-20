@@ -25,6 +25,9 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 LIVE_DIR = ROOT / "server_data" / "live"
+# 이 시간 넘게 새로 쓰지 않은 기기는 블랙박스 화면에서 뺀다. 강제로 끈 주행은 '주행 끝'을 남기지 못하므로
+# 지난 주행의 마지막 프레임이 다음 날 화면을 켜자마자 뜨지 않게 한다. 막 끝난 주행은 이 시간 동안 보인다
+HIDE_AFTER_S = 600
 
 # BGR. 서버로 보내지 않는 시설물(guardrail·sign)도 화면에는 그린다
 COLORS = {
@@ -82,6 +85,12 @@ def _paste(out: np.ndarray, patch: np.ndarray, x: int, y: int) -> None:
     x0, y0, x1, y1 = max(x, 0), max(y, 0), min(x + w, W), min(y + h, H)
     if x0 < x1 and y0 < y1:
         out[y0:y1, x0:x1] = patch[y0 - y:y1 - y, x0 - x:x1 - x]
+
+
+def is_current(status: dict, now: float, hide_after_s: float = HIDE_AFTER_S) -> bool:
+    """블랙박스 화면에 보일 기기인가: 최근 hide_after_s 초 안에 상태를 쓴 기기만."""
+    updated = status.get("updated_at")
+    return isinstance(updated, (int, float)) and now - updated <= hide_after_s
 
 
 def _write_atomic(path: Path, data: bytes) -> None:

@@ -60,3 +60,11 @@ def test_paste_clips_outside_frame():
     out = np.zeros((10, 10, 3), np.uint8)
     live._paste(out, np.full((4, 6, 3), 7, np.uint8), 7, -2)
     assert (out[0:2, 7:10] == 7).all() and out[2:].sum() == 0 and out[:, :7].sum() == 0
+
+
+def test_is_current_hides_old_or_unknown_devices():
+    now = 1_000_000.0
+    assert live.is_current({"updated_at": now - 3}, now)
+    assert live.is_current({"updated_at": now - live.HIDE_AFTER_S}, now)
+    assert not live.is_current({"updated_at": now - live.HIDE_AFTER_S - 1}, now)  # 지난 주행이 남긴 화면
+    assert not live.is_current({}, now)

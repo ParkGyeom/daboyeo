@@ -146,7 +146,7 @@ daboyeo/
 ├── scripts/
 │   ├── demo.sh                   # ★ 구현됨 — up·status·reset·drive·replay·down (run_fleet.py·reset_demo.py 대신)
 │   ├── e2e_smoke.py              # ★ 구현됨 — 영상 2개 × 3대 = 6대 동시 replay → DB 검증 (AC-1·4·6)
-│   └── tests/                    # e2e_smoke 테스트 (pyproject testpaths 밖)
+│   └── tests/                    # e2e_smoke 집계·판정 테스트 (CI 에서 돎, PR #69)
 ├── data/                         # .gitignore — 영상·GPS CSV·클립 (용량 큼)
 └── experiments/                  # 결과 CSV·그래프 (발표 원천)
     └── gt_events/<video_id>.csv  # 수동 라벨 (평가 정답). 형식 제안: docs/ai-handoff.md 12장

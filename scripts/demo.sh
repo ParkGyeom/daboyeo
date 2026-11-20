@@ -4,8 +4,10 @@
 #   scripts/demo.sh up       DB(Docker) → 서버(8000) → 화면(8501) 을 띄운다
 #   scripts/demo.sh status   무엇이 떠 있는지 본다
 #   scripts/demo.sh reset    DB 와 사진을 비워 처음 상태로 (시연용 시민 3명은 다시 넣는다)
-#   scripts/demo.sh drive <모델.onnx> [기기 수] [구간] [배속]
+#   scripts/demo.sh drive <모델.onnx> [기기 수] [구간 또는 영상.mp4] [배속]
 #                            가상 블랙박스를 기기 수만큼 동시에 돌린다 (기본 1대, 서울 우천 구간, 4배속)
+#                            영상을 주면 그 영상을 10 프레임마다 탐지한다 (GPS 는 영상 옆 <영상 이름>.gps.csv)
+#                            예: scripts/demo.sh drive ai/models/detector_v3.onnx 3 data/videos/gn_b_3320-3620.mp4 1
 #                            2대째부터는 GPS 오차·밝기·시작 시점을 달리한다
 #   scripts/demo.sh replay <기록.jsonl> <영상> [기기 수] [배속]
 #                            모델 추론 없이 탐지 기록대로 영상을 운전한다 (모델 파일·빠른 CPU 가 없을 때).
@@ -22,6 +24,7 @@ LOGS=server_data/logs
 SERVER_PORT=${SERVER_PORT:-8000}
 WEB_PORT=${WEB_PORT:-8501}
 DEFAULT_SEGMENT=0401_light_rainy_smooth:03000071-03000182
+VIDEO_DETECT_EVERY=${VIDEO_DETECT_EVERY:-10}  # 영상 입력의 탐지 주기 (시연 설정, 60fps 영상이면 초당 6번)
 mkdir -p "$RUN" "$LOGS"
 
 say() { printf '%s\n' "$*"; }
@@ -127,13 +130,21 @@ cmd_reset() {
 }
 
 cmd_drive() {
-    local model=${1:-}; local devices=${2:-1}; local segment=${3:-$DEFAULT_SEGMENT}; local speed=${4:-4}
-    [[ -n $model && -f $model ]] || die "모델 파일을 준다: scripts/demo.sh drive runs/<모델>.onnx [기기 수] [구간] [배속]"
+    local model=${1:-}; local devices=${2:-1}; local source=${3:-$DEFAULT_SEGMENT}; local speed=${4:-4}
+    [[ -n $model && -f $model ]] || die "모델 파일을 준다: scripts/demo.sh drive runs/<모델>.onnx [기기 수] [구간 또는 영상.mp4] [배속]"
     [[ $devices =~ ^[1-3]$ ]] || die "기기 수는 1~3 (시연용 시민이 3명이다)"
+    # 영상 파일이면 영상, 아니면 로드마크 구간 이름 (구간 이름에는 ':' 가 있다)
+    local input
+    if [[ $source == *:* ]]; then
+        input=(--segment "$source")
+    else
+        [[ -f $source ]] || die "영상이 없다: $source (로드마크 구간이면 <이름>:<시작>-<끝>)"
+        input=(--video "$source" --detect-every "$VIDEO_DETECT_EVERY")
+    fi
     curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null || die "서버가 꺼져 있다. scripts/demo.sh up 을 먼저 한다"
 
     # 기기별 조건(GPS 오차·밝기·시작 시점)은 edge/blackbox/variants.py 한 곳에 있다
-    "$PY" -m edge.blackbox.variants --devices "$devices" --segment "$segment" --model "$model" --speed "$speed" \
+    "$PY" -m edge.blackbox.variants --devices "$devices" "${input[@]}" --model "$model" --speed "$speed" \
         --server "http://localhost:$SERVER_PORT" 2>&1 | tee "$LOGS/blackbox.log"
 }
 
@@ -158,5 +169,5 @@ case ${1:-} in
     reset) cmd_reset ;;
     drive) shift; cmd_drive "$@" ;;
     replay) shift; cmd_replay "$@" ;;
-    *) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

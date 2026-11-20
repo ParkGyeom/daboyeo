@@ -1,7 +1,8 @@
 """가상 블랙박스 (docs/DESIGN.md 5장). 한 프로세스가 차량 한 대다.
 
 주행 영상(시연 메인) 또는 로드마크 구간(보조)의 프레임을 순서대로 읽고, GPS 를 붙이고, 분석 주기에 따라
-추론 모듈을 불러, 결함 주변을 잘라 서버로 보낸다. 프레임 사이에는 실제 시간 간격만큼 기다린다.
+추론 모듈을 불러, 결함 주변을 잘라 서버로 보낸다. 프레임 사이에는 실제 시간 간격만큼 기다린다 (처리에 쓴 시간은 빼서, --speed 1 이 영상 길이와 같은 시간에 끝난다).
+끝날 때 보내지 않는 유형(가드레일·표지판)의 트랙 수를 "보내지 않은 탐지 …" 한 줄로 찍는다.
 
   # 영상 + GPS CSV (t_s,lat,lon[,speed_kmh]). --gps 를 빼면 영상 옆의 <영상 이름>.gps.csv
   uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --gps data/gps/v1.gps.csv \\
@@ -41,6 +42,7 @@ import math
 import random
 import sys
 import time
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -103,6 +105,36 @@ class Pacer:
             wait = max(0.0, min(gap, MAX_INTERVAL_S) - self.waited)
         self.prev, self.waited = time_s, 0.0
         return wait
+
+
+class RealtimeClock:
+    """Pacer 가 정한 영상 간격을 실제 시계에 맞춘다. 처리(디코딩·탐지·전송)에 쓴 시간을 기다림에서 뺀다.
+
+    예전에는 간격만큼 그대로 잤기 때문에 처리 시간이 더해져, --speed 1 에서도 gn_b 클립(182초)이 약 257초 걸렸다
+    (조각 추론 켬, 1대). 이제 시작 시각 + 영상 시간/배속 을 목표로 그때까지만 잔다. 처리가 밀려 목표보다
+    MAX_LAG_S 넘게 늦으면 기준을 지금으로 다시 잡는다 — 밀린 만큼을 빨리 감기로 따라잡지 않게.
+    """
+
+    MAX_LAG_S = 1.0
+
+    def __init__(self, speed: float, now=time.monotonic):
+        self.speed, self.now = speed, now
+        self.anchor: float | None = None  # 영상 시간 0 에 해당하는 실제 시각
+        self.video_s = 0.0
+        self.resyncs = 0
+
+    def sleep_for(self, interval_s: float) -> float:
+        """영상 시간을 interval_s 만큼 진행하고, 지금 잘 시간(초)을 돌려준다."""
+        now = self.now()
+        if self.anchor is None:
+            self.anchor = now
+        self.video_s += interval_s
+        delay = self.anchor + self.video_s / self.speed - now
+        if delay < -self.MAX_LAG_S:
+            self.anchor -= delay  # 늦은 만큼 기준을 뒤로 민다
+            self.resyncs += 1
+            return 0.0
+        return max(0.0, delay)
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -198,6 +230,10 @@ def drive(args: argparse.Namespace) -> dict:
     clipper = ClipCutter(args.video) if args.video and not args.no_clip else None
     first_t: float | None = None
     pacer = Pacer()
+    clock = RealtimeClock(args.speed) if args.speed > 0 else None
+    # 보내지 않는 유형(가드레일·표지판)도 같은 방식으로 트랙을 세어 끝에 한 줄 찍는다 (e2e_smoke AC-1 시설물)
+    unsent = TrackMerger(gap_s=args.merge_gap)
+    unsent_counts: Counter[str] = Counter()
     sched = Scheduler(args.detect_every, args.lane_every, args.quality_every, quality=not args.no_quality)
     merger = None if args.no_merge else TrackMerger(gap_s=args.merge_gap)
     skipped_no_gps = skipped_quality = quality_bad = 0
@@ -245,12 +281,16 @@ def drive(args: argparse.Namespace) -> dict:
             fix = frame.fix
 
             # 실제 시간 간격만큼 기다린다
-            t = fix.time_s if fix else None
+            # 영상은 GPS 경로 밖 프레임(시작·끝)에도 영상 시각이 있다. 없으면 Pacer 가 1초씩 기다려
+            # gn_b 클립에서 위치 없는 318장 × 1초가 더해졌다
+            t = fix.time_s if fix else frame.time_s
             if t is not None and first_t is None:
                 first_t = t
             wait = pacer.next(t)
-            if args.speed > 0 and wait > 0:
-                time.sleep(wait / args.speed)
+            if clock is not None:
+                delay = clock.sleep_for(wait)
+                if delay > 0:
+                    time.sleep(delay)
 
             if fix is None:
                 skipped_no_gps += 1
@@ -284,6 +324,8 @@ def drive(args: argparse.Namespace) -> dict:
                 if live:
                     live.add(dets, ft)
                 sent_dets = [d for d in dets if d.type in SENT_TYPES]
+                unsent_counts.update(tr.type for tr in unsent.update(
+                    [d for d in dets if d.type not in SENT_TYPES], ft))
                 if merger:
                     send_tracks(merger.update(sent_dets, ft, payload=(image, fix, i, frame.name)))
                 else:
@@ -305,6 +347,7 @@ def drive(args: argparse.Namespace) -> dict:
     finally:
         if merger:
             send_tracks(merger.flush())  # 열린 트랙을 모두 내보낸 뒤 주행을 닫는다
+        unsent_counts.update(tr.type for tr in unsent.flush())
         # 주행 중에는 알리지 않고 끝난 뒤에 한 번만 알린다 (주행을 닫으면 시민의 확인 목록이 생긴다)
         end = sender.end_trip()
         if end is not None:
@@ -322,6 +365,12 @@ def drive(args: argparse.Namespace) -> dict:
           f"클립 {sender.clips}개 {sender.bytes_clip / 1024:.1f}), 전송 실패 {sender.failed}, 위치 없음 {skipped_no_gps}, "
           f"품질 나쁨 {quality_bad}프레임 (그중 분석 건너뜀 {skipped_quality}), 탐지 평균 {stages['detect']['ms_avg']:.0f}ms/장")
     print(f"[{args.device_id}] {sched.summary()}")
+    # 한 줄 형식은 scripts/e2e_smoke.py 가 읽는다: "보내지 않은 탐지 <유형> <트랙 수> · ..." (없으면 "없음")
+    unsent_text = " · ".join(f"{k} {v}" for k, v in sorted(unsent_counts.items())) or "없음"
+    print(f"[{args.device_id}] 보내지 않은 탐지 {unsent_text} (트랙, 합치기 {args.merge_gap:g}초)")
+    if clock is not None and clock.resyncs:
+        print(f"[{args.device_id}] 처리가 실제 시간보다 {RealtimeClock.MAX_LAG_S:g}초 넘게 밀려 기준을 다시 잡은 횟수 "
+              f"{clock.resyncs}")
     return {
         "frames": len(frames),
         "trip_id": None if args.dry_run else str(sender.trip_id),
@@ -341,6 +390,8 @@ def drive(args: argparse.Namespace) -> dict:
         "detect_ms_avg": stages["detect"]["ms_avg"],
         "detections": merger.detections if merger else None,
         "tracks": merger.closed if merger else None,
+        "unsent_tracks": dict(unsent_counts),
+        "realtime_resyncs": clock.resyncs if clock is not None else 0,
         "stages": stages,
     }
 

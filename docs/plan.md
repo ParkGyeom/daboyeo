@@ -2,8 +2,8 @@
 
 | 항목 | 내용 |
 |---|---|
-| 기반 | [PRD.md](../PRD.md) **v0.5** (v0.4 + 시설물 파손 판정 대체안 확정, 줄 번호는 v0.4 와 같음) |
-| 계획 버전 | r3.11 (2026-11-15) — r1은 PRD v0.2, r2는 v0.3 기준 |
+| 기반 | [PRD.md](../PRD.md) **v0.9** (v0.4 이후 부록 끝 한 줄 말고는 줄 수가 그대로라 아래 인용 줄 번호는 v0.4 와 같음) |
+| 계획 버전 | r3.24 (2026-11-20) — r1은 PRD v0.2, r2는 v0.3 기준 |
 | 완성 기한 | 2026-11-27 (금), D-14 |
 | 상태 | 팀 검토 중 — 0.1(레포·`contracts/`)은 완료 |
 
@@ -20,7 +20,7 @@
 | **GPS 입력 = `시각, 위도, 경도` CSV 하나** (FR-4.4) | `PRD.md:273` | 계약에 GPS CSV 형식 고정 (`t_s,lat,lon`), 실제 GPS·재구성 경로 모두 같은 파서 |
 | **AI Hub 도로장애물/표면 인지 영상(수도권) 추가** — RDD2022에 한국 도로 없음 | `PRD.md:373` | 박겸: **오늘 KRID와 함께 다운로드 신청**, 국내 도로 포트홀·균열 보강용으로 데이터셋 v2에 합침. r1의 "RDD2022 한국 서브셋" 언급은 잘못이라 삭제 |
 | **BDD100K(실제 GPS) 보조, Mapillary 백업** | `PRD.md:430-431` | GPS 동기화·중복 정리를 실제 GPS로 검증하는 **보조 경로(P2)** 추가 |
-| **다중 차량 = 같은 도로를 지나는 서로 다른 업로더 영상 2개 이상**, 못 구하면 한 영상 + 좌표 노이즈 | `PRD.md:435`, `PRD.md:666` | `run_fleet.py`에 `--gps-noise-m` 옵션, 중복 정리 실험 설계 변경 |
+| **다중 차량 = 같은 도로를 지나는 서로 다른 업로더 영상 2개 이상**, 못 구하면 한 영상 + 좌표 노이즈 | `PRD.md:435`, `PRD.md:666` | 가상 블랙박스 `--gps-noise`(m) 옵션 — 여러 대는 `edge/blackbox/variants.py`·`scripts/demo.sh drive`/`replay` (`run_fleet.py` 는 만들지 않음), 중복 정리 실험 설계 변경 |
 | 중복 묶기 거리 참고: **20 m에서 동일 지점 인식률 90%+** 연구 | `PRD.md:714` | 시작 반경 15 m → **20 m**, 비교 10/20/30 m |
 | 오픈 이슈 #13 주행 영상 출처 (11/14) | `PRD.md:707` | 9장 오픈 이슈 표에 추가 |
 | 수용 기준·지표의 평가 영상 = "공개 영상(8.5)" | `PRD.md:227`, `PRD.md:579-581` | 평가용 수동 라벨을 **선정한 공개 영상**에 붙임 |
@@ -143,7 +143,10 @@ daboyeo/
 │   ├── data/reward_roads.geojson
 │   └── tests/
 ├── ui/{Home.py, pages/1_시민_확인.py, pages/2_관리자_지도.py}
-├── scripts/{run_fleet.py, e2e_smoke.py, reset_demo.py}
+├── scripts/
+│   ├── demo.sh                   # ★ 구현됨 — up·status·reset·drive·replay·down (run_fleet.py·reset_demo.py 대신)
+│   ├── e2e_smoke.py              # ★ 구현됨 — 영상 2개 × 3대 = 6대 동시 replay → DB 검증 (AC-1·4·6)
+│   └── tests/                    # e2e_smoke 테스트 (pyproject testpaths 밖)
 ├── data/                         # .gitignore — 영상·GPS CSV·클립 (용량 큼)
 └── experiments/                  # 결과 CSV·그래프 (발표 원천)
     └── gt_events/<video_id>.csv  # 수동 라벨 (평가 정답). 형식 제안: docs/ai-handoff.md 12장
@@ -222,7 +225,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | # | 담당 | 작업 | 완료 확인 |
 |---|---|---|---|
 | 1.1 | 정현우 | **걷는 골격 (11/16 목표)**: `main.py --detector fake` → 업로드 → DB 저장. 가짜 탐지기는 `gt_events` CSV를 탐지처럼 내보냄 | 영상 1개 실행 후 `observations` 행 = 라벨 수 |
-| 1.2 | 정현우 | `/trips`, `/trips/{id}/end`, 차량별 구분 (FR-2.2), `--gps-noise-m` | `run_fleet.py --n 3` 후 차량별 행 수 일치 |
+| 1.2 | 정현우 | `/trips`, `/trips/{id}/end`, 차량별 구분 (FR-2.2), `--gps-noise-m` | `scripts/demo.sh drive <모델.onnx> 3` (또는 `replay <기록.jsonl> <영상> 3`) 후 차량별 행 수 일치 |
 | 1.3 | 정현우 | `clipper.py`, 전송 바이트 집계 (기준값 2가지, 2장 표). **11/16 구현**: `edge/blackbox/clipper.py`(전후 2초·480p·H.264 30fps, ffmpeg libx264 CRF 28, 없으면 OpenCV), `sender.py` 가 메타·사진·클립 바이트를 따로 세고 `--keep-dir`(기본 `server_data/blackbox/<기기>/<주행>/`)에 남김, 서버가 `clip` 을 받아 `observations.clip_path·clip_bytes` 저장 → `/api/v1/stats` 합계에 포함. 기준값 2가지는 `experiments/bandwidth.py` 가 계산 (11장) | 로그에 원본 크기 vs 전송량 |
 | 1.4 | 박겸 | 탐지 v1 학습 (RDD 2클래스) → 데이터 도착 시 v2 (+AI Hub 도로장애물, +KRID 4클래스). **`02_train_detector.ipynb`** (`VERSION`, `PARTS` 만 바꿈) | val/test 클래스별 mAP@0.5 표, Drive `models/detector_vN.json` |
 | 1.5 | 박겸 | ONNX 변환 + `OnnxDetector` — 같은 노트북 4단계 | val 10장에서 `OnnxDetector` 와 Ultralytics(같은 ONNX) 박스 일치 ≥ 95% |
@@ -269,7 +272,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 | 날짜 | 작업 | 완료 확인 |
 |---|---|---|
 | 11/25 | 기능 동결, 버그 수정, 12장 표 채우기 | 12장 표에 TBD 없음 |
-| 11/26 | 리허설: `reset_demo.py` → `run_fleet.py` → 시민 화면 → 지도. 실시간·replay 두 경로. 발표 자료에 **영상 출처 표기**와 "GPS는 재구성했고 오차는 X m" 명시 (`PRD.md:438`, `PRD.md:447`) | 끊김 없는 시연 2회 이상 (`PRD.md:633`) |
+| 11/26 | 리허설: `scripts/demo.sh reset` → `scripts/demo.sh up` → 3대 운전 (실시간 `scripts/demo.sh drive ai/models/detector_v3.onnx 3`, replay `scripts/demo.sh replay data/replay/gn_b_3320-3620.v3tiles.jsonl data/videos/gn_b_3320-3620.mp4 3`) → 시민 화면 → 지도. 실시간·replay 두 경로. 발표 자료에 **영상 출처 표기**와 "GPS는 재구성했고 오차는 X m" 명시 (`PRD.md:438`, `PRD.md:447`) | 끊김 없는 시연 2회 이상 (`PRD.md:633`) |
 | 11/27 | 완성 | — |
 
 **시연 기본 설정 (11/16)**: 차선 마모는 끈다 (`edge/blackbox/run.py` 기본 `--lane-every 0`). 시연 클립 gn_b 에서 확정 58건 중 54건이 헛것(25건은 신호 대기 중 횡단보도), gn_a 는 젖은 노면이라 차선을 2.8% 프레임에서만 찾았다 (`docs/ai-handoff.md` 17장). 개선(정지 판정·횡단보도 거르기)을 해도 헛것 84% 라 **시연에서 끔 (11/17 확정, handoff 17-6)**. 발표에서는 "실험 기능"으로만 언급한다.
@@ -316,7 +319,7 @@ PRD 15.1(`PRD.md:626-634`)을 따르고, 각 작업에 **완료 확인 방법**�
 
 | 리스크 | 신호 | 대응 |
 |---|---|---|
-| **같은 도로를 지나는 영상 2개를 못 구함** | 11/15까지 후보 1개 | 한 영상을 여러 가상 블랙박스에 넣고 `--gps-noise-m 5~10` (`PRD.md:666`). 발표에서 방식 명시 |
+| **같은 도로를 지나는 영상 2개를 못 구함** | 11/15까지 후보 1개 | 한 영상을 여러 가상 블랙박스에 넣고 `--gps-noise 5~10` (`PRD.md:666`). 발표에서 방식 명시 |
 | **두 영상의 촬영 시점이 달라 결함이 다름** (보수됨·새로 생김) | 공통 라벨 결함 5건 미만 | 공통 결함만으로 중복 정리 비율 계산, 나머지는 "단독 관측"으로 분리 집계 |
 | **재구성 GPS 오차가 큼** | hold-out 평균 오차 > 20 m | 기준점 추가(가로등·건물 입구), 속도 표시 영상은 OCR 누적 거리(`PRD.md:445`), 반경 조정 |
 | **영상 라이선스** | CC 영상 없음 | 업로더에게 허락 요청, 영상은 레포·발표 자료에 원본 배포 안 하고 캡처만 출처와 함께 사용 |
@@ -458,6 +461,7 @@ scripts/demo.sh reset      # 시연용 DB 로 쟀다면
 
 ## 변경 이력
 
+- **r3.24 (2026-11-20)** — PRD v0.9: TBD 정리 (박겸, 공동 파일 PRD·plan 변경, 정현우 리뷰). PRD: 12장 통신량·중복 정리 행에 11장 잠정 측정값(가짜 탐지·가짜 GPS 조건 명시), FR-1.5 클립 = 결함 전후 2초(`edge/blackbox/clipper.py`), F2 수용 기준 가상 블랙박스 대수 = 시연 3대 · `scripts/e2e_smoke.py` 6대(관측 75 = 저장 75), 9장 `size_metric` = 이번 버전 미사용(contracts 기본값 `None`), 18장 오픈 이슈 #1·4·6·7·8·9·10·11·12·13 닫음. FR-4.3·#5(위험도 크기 반영)는 11/21 Go/No-go 뒤라 그대로. plan: `run_fleet.py`·`reset_demo.py` 는 만들지 않았으므로 `scripts/demo.sh` `reset`·`drive`·`replay` 로 바꿈(3장 트리·1.2·11/26 리허설·0-A·7장), 3장 트리에 `scripts/demo.sh`·`e2e_smoke.py`·`tests/`. PRD 줄 수는 그대로라 `PRD.md:줄번호` 인용은 바뀌지 않음.
 - **r3.23 (2026-11-18)** — PRD v0.8: F8 '포상 현황 안내' → '신고 누적 안내' (정현우, 공동 파일 PRD·plan 변경). 포상 기준이 서울시 공지마다 달라(분기 5건 / 반기 10건, 2026-08 도로부속물 공지는 분기 5건) 기준을 채우고도 못 받으면 억울하므로 화면에서 포상 기준·남은 건수·'포상 대상' 표시를 뺐다 (DB `reward_eligible_road`·`reward_valid`·`quarter` 는 그대로, 스키마·contracts 변경 없음). 시민이 받는 것은 문자 하나와 링크뿐이라 시민 메뉴(확인·신고·신고서·포상 현황)를 없애고, 신고서는 관리자 > 신고 내역(`GET /api/v1/reports`, 시민별 누적 `GET /api/v1/reporters`)으로 옮겼다. 누적은 사람 기준(`reports.user_id`). 모의 문자는 한 줄 → 여러 줄(언제 주행·유형별 건수와 주소·본인 명의 접수 안내·누적·링크·유효 시간, `server/notify.py` `compose`). 바꾼 PRD 곳: 2.1장·4장 시민 접점·US-05·3.2 F8 행·FR-6.2·F8 전체·10장 API·13장 6단계·15.1 M3·15.3 컷 라인 4·오픈 이슈 #7·부록 용어. PRD 줄 수는 부록 끝에 한 줄('신고 누적')만 늘어 이 문서의 `PRD.md:줄번호` 인용은 바뀌지 않음. 3.4·3.5·AC-10 도 같이 바꿈.
 - **r3.22 (2026-11-18)** — PRD v0.7: 12장 AI 행 실측값 (박겸, 공동 파일 PRD·plan 변경). 탐지(v3 공개 테스트셋·RDD2022 test·시연 클립 이벤트 단위, handoff 18·19장), 파손 분류(기준 미달 → 위치 탐지까지만), 차선 마모(시연 클립 헛것 93% → 84%, 시연에서 끔), 처리 속도 v3 다시 잼 (4.2): `experiments/bench_cpu_v3.{csv,json}` — 시연 클립 gn_b 프레임 182장 × 3회, M4 Pro, **시연 클립이 60 fps 라 영상 1분 = 3,600 프레임**으로 계산 (v2 `bench_cpu.csv` 는 30 fps 가정). 탐지 1스레드 21.4 ms · 2스레드 16.5 ms, 영상 1분당 매 프레임 77.2 · 59.6 초 → 10 프레임마다 7.7 · 6.0 초. 분석 간격 (4.3): `experiments/interval_sweep_v3/` (v3, 시연 클립 2개, amb 뺀 정답, 차선 마모 끔) — 균열 누락 1 프레임 5/10 · 10 프레임 6/10 · 30 프레임 7/10. 목표 처리 속도 `(제안)` = 실시간 · CPU 1스레드, 탐지 주기 10 프레임(8.3), FR-1.3 차선 마모 기준 채움. PRD 줄 수는 그대로라 이 문서의 `PRD.md:줄번호` 인용은 바뀌지 않음.
 - **r3.21 (2026-11-17)** — BDD100K 실제 GPS 변환 도구 (4.6, P2). `tools/gps/bdd_to_csv.py`: info JSON(영상 1개당 1파일)의 `gps` 목록(없으면 `locations`) → GPS CSV `t_s,lat,lon,speed_kmh`, 파일 이름은 info 의 `filename` 영상 이름(`<영상 id>.gps.csv`, 영상 옆에 두면 `run.py` 가 `--gps` 없이 찾음). t_s = GPS 시각 − `startTime`, 영상 시작 전·끝 뒤 점도 남김(t=0 보간용), 좌표 없음·(0,0)·범위 밖·시각이 거꾸로/같은 점은 버림, `speed` m/s → km/h(음수 = 모름). 테스트 `tools/gps/tests/test_bdd_to_csv.py`(합성 JSON 6개, testpaths 에 `tools/gps/tests` 추가). 형식 근거: 키 `gps`·`latitude`·`longitude` 는 공식 코드 `bdd100k/vis/trajectory.py`, `filename`·`startTime`·`endTime` 은 bdd100k GitHub discussions #340, GPS 1 Hz·영상 29.97 fps 는 bdd100k-discuss. **실제 파일로 확인 못 한 가정**: 시각이 epoch 밀리초(초면 자동 인식), `speed` 단위 m/s, `startTime` = 영상 첫 프레임. **실제 데이터 확인은 미룸**: 공식 받기 서버 `dl.cv.ethz.ch` DNS 안 풀림, 포털 `bdd-data.berkeley.edu` 인증서 만료(로그인·라이선스 동의 필요), 클립 단위로 못 받고 `bdd100k_info.zip` 3.9GB + 영상 묶음 1개 약 18GB(전체 1.8TB/100), Hugging Face 사본엔 GPS 기록 없음. 라이선스는 UC Berkeley — 교육·연구·비영리 사용 허용, 저작권 고지 유지. 받게 되면: 클립 1~3개 CSV 변환 → `run.py --dry-run` → 경로를 지도로 영상과 비교하고 위 가정 3개 확인. `reconstruct.py` 와 공통 함수는 아직 나누지 않음(겹치면 합침).

@@ -19,9 +19,10 @@
 (--data-root 아래) · experiments/gt_events/<이름>.csv (레포).
 
 판정:
-  AC-1 4종 각 1건 이상 (6대 합). 포트홀·균열은 DB 결함 수. 가드레일·표지판은 블랙박스가 서버로 보내지 않는다
-       (edge/blackbox/detect.py 의 SENT_TYPES, 시설물은 대체안대로 화면에만) → 영상별 탐지 기록에서 같은 유형이
-       GAP_S 초 안에 이어지면 1건으로 세어 더한 '블랙박스 탐지 건수'로 판정한다.
+  AC-1 4종 각 1건 이상. 포트홀·균열은 DB 결함 수 (6대 합). 가드레일·표지판은 블랙박스가 서버로 보내지 않는다
+       (edge/blackbox/detect.py 의 SENT_TYPES, 시설물은 대체안대로 화면에만) → run.py 가 끝날 때 찍는
+       '[bb-xx] 보내지 않은 탐지 guardrail N · sign M (트랙, 합치기 1초)' 줄을 영상마다 첫 차량(1대분)에서 읽어 더한다.
+       같은 영상 3대를 다 더하면 같은 시설물을 세 번 세게 되기 때문이다.
   AC-4 블랙박스가 보낸 관측 수(각 기기 '보낸 관측 N건' 줄의 합, 6대) == DB observations 수, 전송 실패 0, 주행 종료 6대.
   AC-6 (같은 영상) 라벨(experiments/gt_events, amb 제외) 중 그 영상 2대 이상이 관측한 '공통 결함'이 DB 결함
        하나로 묶인 비율. 관측은 같은 유형이고 영상 시각(t_s)이 라벨 구간 ±LABEL_TOL_S 안이면 그 라벨로 본다.
@@ -56,7 +57,6 @@ RECORD_SUFFIX = ".v3tiles.jsonl"
 DEFAULT_DB = "daboyeo_e2e"
 DEMO_DB = "daboyeo"
 PER_VIDEO = 3  # 영상마다 기기 수 (variants.py 의 VARIANTS 3가지)
-GAP_S = 1.0  # edge/blackbox/track_merge.py 의 GAP_S 와 같게: 이만큼 안 보이면 다른 탐지
 LABEL_TOL_S = 0.5  # 라벨 구간 앞뒤 여유 (handoff 18장 정답 창 ±0.5초)
 DEDUP_M = 30.0  # server/rules.py 의 노면 결함 묶기 반경 (11/17 확정). 경로가 이만큼 안으로 만나면 '겹친다'
 ROAD_TYPES = ("pothole", "crack")  # 서버로 가는 노면 결함 (lane_wear 는 시연에서 끔)
@@ -69,6 +69,8 @@ RECORD_CMD = ("uv run python -m edge.blackbox.run --video {video} --model ai/mod
 
 _DONE = re.compile(r"^\[(?P<dev>[^\]]+)\] 끝\. .*보낸 관측 (?P<sent>\d+)건 .*전송 실패 (?P<failed>\d+)")
 _ENDED = re.compile(r"^\[(?P<dev>[^\]]+)\] 주행 종료: 시민에게 보여줄 결함 (?P<n>\d+)건")
+# run.py 끝 줄 (PR #67): "[bb-01] 보내지 않은 탐지 guardrail 25 · sign 136 (트랙, 합치기 1초)" 또는 "… 탐지 없음 (…)"
+_UNSENT = re.compile(r"^\[(?P<dev>[^\]]+)\] 보내지 않은 탐지 (?P<body>.+?) \(트랙")
 _SENT = re.compile(r"^\[(?P<dev>[^\]]+)\]\s+\S+: (?P<type>[a-z_]+) [0-9.]+.* → 결함 ")
 
 
@@ -85,35 +87,39 @@ def prefix_line(line: str, device: str) -> str:
 
 
 def parse_blackbox_output(text: str) -> dict[str, dict]:
-    """기기 머리('[bb-01]')가 붙은 run.py 출력 → 기기별 {"sent", "failed", "ended", "findings", "types"}.
+    """기기 머리('[bb-01]')가 붙은 run.py 출력 → 기기별 {"sent", "failed", "ended", "findings", "types", "unsent"}.
 
     sent·failed 는 run.py 가 끝날 때 찍는 '보낸 관측 N건 … 전송 실패 M' (Sender.sent · Sender.failed).
     types 는 서버가 결함 번호를 돌려준 관측 줄('→ 결함 …')을 유형별로 센 것 (sent 와 같아야 한다).
+    unsent 는 '보내지 않은 탐지 …' 줄의 유형별 트랙 수 (run.py 결과 dict 의 unsent_tracks). 줄이 없으면 None.
     """
     out: dict[str, dict] = defaultdict(lambda: {"sent": None, "failed": None, "ended": False, "findings": None,
-                                                "types": Counter()})
+                                                "types": Counter(), "unsent": None})
     for line in text.splitlines():
         if m := _DONE.match(line):
             out[m["dev"]]["sent"], out[m["dev"]]["failed"] = int(m["sent"]), int(m["failed"])
         elif m := _ENDED.match(line):
             out[m["dev"]]["ended"], out[m["dev"]]["findings"] = True, int(m["n"])
+        elif m := _UNSENT.match(line):
+            body = m["body"].strip()
+            out[m["dev"]]["unsent"] = Counter() if body == "없음" else Counter(
+                {k: int(n) for k, n in (part.strip().rsplit(" ", 1) for part in body.split("·"))})
         elif m := _SENT.match(line):
             out[m["dev"]]["types"][m["type"]] += 1
     return dict(out)
 
 
-def record_events(lines: list[str], gap_s: float = GAP_S) -> Counter:
-    """탐지 기록(JSONL, 첫 줄 머리) → 유형별 탐지 건수. 같은 유형이 gap_s 초 안에 다시 나오면 같은 1건."""
-    last: dict[str, float] = {}
-    events: Counter = Counter()
-    rows = sorted((json.loads(ln) for ln in lines[1:] if ln.strip()), key=lambda r: float(r["t"]))
-    for r in rows:
-        t = float(r["t"])
-        for k in {d[0] for d in r["dets"]}:
-            if k not in last or t - last[k] > gap_s:
-                events[k] += 1
-            last[k] = t
-    return events
+def facility_tracks(devices: dict[str, dict], first_devices: list[str]) -> tuple[Counter, list[str]]:
+    """영상마다 첫 차량의 '보내지 않은 탐지' 트랙 수를 더한다. (합, 그 줄이 없는 기기)."""
+    total: Counter = Counter()
+    missing = []
+    for d in first_devices:
+        u = devices.get(d, {}).get("unsent")
+        if u is None:
+            missing.append(d)
+        else:
+            total += u
+    return total, missing
 
 
 @dataclass(frozen=True)
@@ -198,7 +204,8 @@ def min_track_distance_m(a: list[tuple[float, float]], b: list[tuple[float, floa
 
 def judge(devices: dict[str, dict], expected_devices: list[str], db_obs: int, db_by_type: Counter,
           facility_events: Counter, ac6_by_video: dict[str, dict], ac6_min: float,
-          cross: dict[str, dict] | None = None, tracks_overlap: bool = True) -> list[tuple[str, str, str, str, bool]]:
+          cross: dict[str, dict] | None = None, tracks_overlap: bool = True,
+          facility_missing: list[str] | None = None) -> list[tuple[str, str, str, str, bool]]:
     """판정 표의 줄: (기준, 항목, 값, 통과 조건, 통과). 판정하지 않는 줄은 통과 조건 '-' 에 통과 True."""
     rows = []
     for t in ROAD_TYPES:
@@ -206,7 +213,9 @@ def judge(devices: dict[str, dict], expected_devices: list[str], db_obs: int, db
         rows.append(("AC-1", f"{KO[t]} 결함 (DB)", str(n), "≥ 1", n >= 1))
     for t in FACILITY_TYPES:
         n = facility_events.get(t, 0)
-        rows.append(("AC-1", f"{KO[t]} 탐지 (블랙박스, 서버 안 감)", str(n), "≥ 1", n >= 1))
+        rows.append(("AC-1", f"{KO[t]} 탐지 트랙 (보내지 않은 탐지, 영상당 1대)", str(n), "≥ 1", n >= 1))
+    if facility_missing:
+        rows.append(("AC-1", "'보내지 않은 탐지' 줄이 없는 기기", ", ".join(facility_missing), "없음", False))
     leaked = db_by_type.get("guardrail_damage", 0) + db_by_type.get("sign_damage", 0)
     rows.append(("AC-1", "시설물 결함 (DB, SENT_TYPES 확인)", str(leaked), "= 0", leaked == 0))
 
@@ -402,10 +411,10 @@ def main(argv=None) -> int:
                 _say(f"{v} 탐지 기록 만들기 (시연 설정 v3 + 도로 조각):\n  "
                      + RECORD_CMD.format(video=fs["video"], record=fs["record"]))
         return 2
-    heads, recs = {}, {}
+    heads = {}
     for v, fs in files.items():
-        recs[v] = [ln for ln in fs["record"].read_text(encoding="utf-8").splitlines() if ln.strip()]
-        heads[v] = json.loads(recs[v][0])
+        with fs["record"].open(encoding="utf-8") as f:
+            heads[v] = json.loads(f.readline())
 
     url, demo_name = _db_url(a.db)
     if a.db in {DEMO_DB, demo_name} and not confirm_demo_db(a.db, a.yes):
@@ -500,7 +509,7 @@ def main(argv=None) -> int:
 
     devices = parse_blackbox_output(bb_out)
     expected = [d for devs in ids for d in devs]
-    facility = sum((record_events(recs[v]) for v in videos), Counter())
+    facility, facility_missing = facility_tracks(devices, [devs[0] for devs in ids])
     labels = {v: load_labels(files[v]["labels"].read_text(encoding="utf-8")) for v in videos}
     obs_by_video = {v: [o for o in obs_rows if video_of.get(o[0]) == v] for v in videos}
     ac6 = {v: ac6_summary(obs_by_video[v], labels[v]) for v in videos}
@@ -511,7 +520,7 @@ def main(argv=None) -> int:
         gaps = {(x, y): min_track_distance_m(tracks[x], tracks[y]) for i, x in enumerate(videos) for y in videos[i + 1:]}
         overlap = any(g <= DEDUP_M for g in gaps.values())
     rows = judge(devices, expected, db_obs, db_by_type, facility, ac6, a.ac6_min, cross,
-                 overlap if overlap is not None else True)
+                 overlap if overlap is not None else True, facility_missing)
     bad = {d: c for d, c in codes.items() if c != 0}
     if bad:
         rows.append(("-", "블랙박스 종료 코드 0 아님", ", ".join(f"{d} {c}" for d, c in bad.items()), "없음", False))
@@ -529,9 +538,10 @@ def main(argv=None) -> int:
         f"{d} {devices.get(d, {}).get('sent')}/{per_vehicle.get(d, 0)}" for d in expected))
     _say("  유형별 관측 (DB): " + ", ".join(f"{KO.get(t, t)} {n}" for t, n in sorted(obs_types.items())))
     _say("  유형별 결함 (DB): " + ", ".join(f"{KO.get(t, t)} {n}" for t, n in sorted(db_by_type.items())))
-    for v in videos:
-        ev = record_events(recs[v])
-        _say(f"  {v} 탐지 기록 건수 (1대분): " + ", ".join(f"{KO.get(t, t)} {n}" for t, n in sorted(ev.items())))
+    _say("  보내지 않은 탐지 트랙 (기기별): " + " · ".join(
+        f"{d} " + ("-" if devices.get(d, {}).get("unsent") is None else
+                   ", ".join(f"{KO.get(t, t)} {n}" for t, n in sorted(devices[d]["unsent"].items())) or "없음")
+        for d in expected))
     n_def = multi["n"]
     if n_def and db_obs:
         _say(f"  결함 {n_def}건 중 2대 이상이 본 결함 {multi['m']}건 ({multi['m'] / n_def * 100:.0f}%), "

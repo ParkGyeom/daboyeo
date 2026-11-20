@@ -7,13 +7,13 @@ from scripts.e2e_smoke import (
     ac6_summary,
     cross_video_defects,
     device_ids,
+    facility_tracks,
     judge,
     load_labels,
     match_label,
     min_track_distance_m,
     parse_blackbox_output,
     prefix_line,
-    record_events,
 )
 
 LOG = """\
@@ -25,6 +25,8 @@ LOG = """\
 [bb-02] 주행 종료: 시민에게 보여줄 결함 1건
 [bb-01] 끝. 탐지한 프레임 10, 탐지 4회 → 트랙 2개, 보낸 관측 2건 (1.0KB: 메타 0.1 · 사진 0.9 · 클립 0개 0.0), 전송 실패 0, 위치 없음 0
 [bb-02] 끝. 탐지한 프레임 10, 탐지 2회 → 트랙 1개, 보낸 관측 1건 (1.0KB: 메타 0.1 · 사진 0.9 · 클립 0개 0.0), 전송 실패 1, 위치 없음 0
+[bb-01] 보내지 않은 탐지 guardrail 25 · sign 136 (트랙, 합치기 1초)
+[bb-02] 보내지 않은 탐지 없음 (트랙, 합치기 1초)
 """
 
 
@@ -33,17 +35,14 @@ def test_parse_blackbox_output():
     assert d["bb-01"]["sent"] == 2 and d["bb-01"]["failed"] == 0 and d["bb-01"]["ended"]
     assert d["bb-01"]["types"] == Counter({"crack": 1, "pothole": 1})
     assert d["bb-02"]["sent"] == 1 and d["bb-02"]["failed"] == 1 and d["bb-02"]["findings"] == 1
+    assert d["bb-01"]["unsent"] == Counter({"guardrail": 25, "sign": 136})
+    assert d["bb-02"]["unsent"] == Counter()
 
 
-def test_record_events_groups_within_gap():
-    lines = [
-        '{"kind": "daboyeo-detections", "detect_every": 10}',
-        '{"frame": "a", "t": 0.0, "dets": [["sign", 0.5, 0, 0, 1, 1], ["sign", 0.3, 2, 2, 3, 3]]}',
-        '{"frame": "b", "t": 0.5, "dets": [["sign", 0.5, 0, 0, 1, 1]]}',
-        '{"frame": "c", "t": 3.0, "dets": [["sign", 0.5, 0, 0, 1, 1], ["guardrail", 0.4, 0, 0, 1, 1]]}',
-        '{"frame": "d", "t": 3.3, "dets": []}',
-    ]
-    assert record_events(lines, gap_s=1.0) == Counter({"sign": 2, "guardrail": 1})
+def test_facility_tracks_first_device_per_video():
+    d = parse_blackbox_output(LOG + "[bb-04] 보내지 않은 탐지 sign 3 (트랙, 합치기 1초)\n")
+    assert facility_tracks(d, ["bb-01", "bb-04"]) == (Counter({"guardrail": 25, "sign": 139}), [])
+    assert facility_tracks(d, ["bb-01", "bb-05"]) == (Counter({"guardrail": 25, "sign": 136}), ["bb-05"])
 
 
 CSV = """# 주석
@@ -129,3 +128,4 @@ def test_judge_pass_and_failures():
     cross = {"d1": {"a": ["A1"], "b": ["B1"]}}
     assert _ok(judge(_devices(six), exp, 9, road, fac, ac6, 0.5, cross, tracks_overlap=True))  # 겹치면 판정 안 함
     assert not _ok(judge(_devices(six), exp, 9, road, fac, ac6, 0.5, cross, tracks_overlap=False))
+    assert not _ok(judge(_devices(six), exp, 9, road, fac, ac6, 0.5, facility_missing=["bb-04"]))

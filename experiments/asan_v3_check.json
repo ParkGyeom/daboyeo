@@ -1,0 +1,48 @@
+{
+ "note": "handoff 27장. 친구 실제 주행 영상 asan_a (발표 근거 전용, 공개 게시 금지). 영상·크롭은 git 밖 data/videos/own/, data/presentation/asan/. 판정은 Claude 가 크롭을 눈으로 본 것 (real/amb/fp).",
+ "video": {"id": "asan_a", "wh": [1920, 1080], "fps": 30, "duration_s": 162.3, "codec": "h264", "osd": false,
+           "capture": "휴대폰 촬영 추정 (보닛 화면 아래 30~35%, 화각 흔들림·옆보기)",
+           "gps": {"rows": 326, "t_s": [0.0, 162.3], "every_s": 0.5, "speed_kmh_mean": 17.2, "speed_kmh_max": 21.3}},
+ "model": "ai/models/detector_v3.onnx",
+ "class_conf": {"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21},
+ "every_s": 0.5, "frames": 325, "merge_gap_s": 1.0,
+ "conditions": {
+  "base": {"desc": "640 전체 프레임", "ms_1thread_median": 20.3,
+           "pothole": {"frames": 11, "events": 7, "real": 1, "amb": 0, "fp": 6},
+           "crack": {"frames": 6, "events": 5, "real": 2, "amb": 1, "fp": 2},
+           "guardrail": {"frames": 0}, "sign": {"frames": 7}},
+  "tiles": {"desc": "road_tiles(2, bottom=0.8) + tile_classes=(crack,)", "ms_1thread_median": 60.6,
+            "pothole": {"frames": 11, "events": 7, "real": 1, "amb": 0, "fp": 6},
+            "crack": {"frames": 45, "events": 14, "real": 5, "amb": 6, "fp": 3},
+            "guardrail": {"frames": 0}, "sign": {"frames": 7}}
+ },
+ "pothole_events": [
+  {"t": [59.5, 59.5], "conf_max": 0.43, "judge": "fp", "why": "앞유리 얼룩"},
+  {"t": [78.5, 78.5], "conf_max": 0.51, "judge": "fp", "why": "맨홀 (흔들림 번짐)"},
+  {"t": [89.5, 90.5], "conf_max": 0.42, "judge": "fp", "why": "앞유리 얼룩"},
+  {"t": [95.0, 96.5], "conf_max": 0.59, "judge": "fp", "why": "앞유리 얼룩"},
+  {"t": [106.0, 106.0], "conf_max": 0.51, "judge": "fp", "why": "앞유리 얼룩"},
+  {"t": [107.5, 107.5], "conf_max": 0.37, "judge": "fp", "why": "앞유리 얼룩"},
+  {"t": [132.0, 132.0], "conf_max": 0.41, "judge": "real", "why": "보닛 앞 오른쪽 작은 포트홀 (1프레임)"}
+ ],
+ "crack_events_tiles": [
+  {"t": [4.5, 4.5], "judge": "amb", "why": "그늘 속 가로 선"},
+  {"t": [9.5, 14.5], "judge": "real", "why": "차로 왼쪽 긴 세로 균열 (0.47~0.79)"},
+  {"t": [16.5, 20.5], "judge": "real", "why": "같은 세로 균열 이어짐"},
+  {"t": [23.0, 26.0], "judge": "real", "why": "가는 세로 균열, base 24.0 도 잡음"},
+  {"t": [28.5, 28.5], "judge": "amb", "why": "그늘 속 짙은 선 (base 도)"},
+  {"t": [30.0, 31.0], "judge": "amb", "why": "그늘 속 대각 선 + 노란선 가장자리 벗겨짐"},
+  {"t": [32.5, 33.5], "judge": "real", "why": "32.5 가는 균열 (33.5 는 노면표시+보닛 오탐, base 33.5)"},
+  {"t": [35.5, 35.5], "judge": "amb", "why": "가는 선"},
+  {"t": [42.0, 46.0], "judge": "fp", "why": "노란 중앙선 (base 43.0~43.5 도)"},
+  {"t": [47.5, 48.5], "judge": "real", "why": "47.5 갈라진 균열 (base 도). 48.5 는 차선·그림자"},
+  {"t": [51.5, 52.0], "judge": "amb", "why": "노란 중앙선 위 갈라짐"},
+  {"t": [94.5, 94.5], "judge": "fp", "why": "보닛 끝선"},
+  {"t": [104.0, 104.0], "judge": "fp", "why": "보닛 끝선"},
+  {"t": [141.5, 141.5], "judge": "amb", "why": "보수 자국 경계"}
+ ],
+ "fixed_fp": {"class": "pothole", "cause": "앞유리 얼룩", "t_s": [59.0, 113.5], "box_1080p": [1030, 470, 1280, 700],
+              "frames_ge_0.1": 15, "frames_ge_thr": 10, "events": 5},
+ "guardrail_note": "10~18초 가드레일이 크게 보이는데 0.1 이상 탐지 0",
+ "decision": "e2e_smoke 에 넣지 않음 (진짜 포트홀 1프레임, 앞유리 얼룩 오탐 5이벤트). 시연 영상은 gn_b 유지. 발표 근거로만 사용."
+}

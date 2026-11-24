@@ -1,7 +1,8 @@
 """여러 차량 변형 (docs/DESIGN.md 5장, B7). 같은 구간을 기기 여러 대가 지나간 것처럼 동시에 재생한다.
 
 기기마다 GPS 오차, 밝기, 시작 시점을 달리한다. 검증하는 것은 GPS 오차가 있어도 서버가 같은 결함을
-하나로 묶는지다. 시연용 시민이 3명(bb-01~bb-03)이라 3대까지만 둔다.
+하나로 묶는지다. 영상 하나에 3대까지 둔다. 시연용 시민은 6명(bb-01~06)이라 영상 2개째는
+--first-device 4 로 bb-04~06 이 같은 조건(원본 · GPS 오차 7 m · 7 m + 2프레임 늦게)으로 지나간다.
 
   .venv/bin/python -m edge.blackbox.variants --model runs/<모델>.onnx --devices 3 --speed 4
   .venv/bin/python -m edge.blackbox.variants --video data/videos/v1.mp4 --model ai/models/detector_v2.onnx --devices 3
@@ -51,13 +52,16 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--devices", type=int, default=3, choices=range(1, len(VARIANTS) + 1))
     ap.add_argument("--segment", default=DEFAULT_SEGMENT)
+    ap.add_argument("--first-device", type=int, default=1, choices=range(1, 5),
+                    help="첫 기기 번호. 4 면 bb-04 부터 (영상 2개째, scripts/demo.sh both)")
     ap.add_argument("--video", default=None, help="주면 로드마크 구간 대신 이 영상을 재생한다 (--gps 는 그대로 넘긴다)")
     args, rest = ap.parse_known_args(argv)
     source = ["--video", args.video] if args.video else ["--segment", args.segment]
 
     procs = []
     lock = threading.Lock()
-    for v in VARIANTS[: args.devices]:
+    for i, v in enumerate(VARIANTS[: args.devices]):
+        v = {**v, "device_id": f"bb-{args.first_device + i:02d}"}
         cmd = [sys.executable, "-u", "-m", "edge.blackbox.run", *source, *run_args(v), *rest]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         t = threading.Thread(target=_pump, args=(p, lock, v["device_id"]), daemon=True)

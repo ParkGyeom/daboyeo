@@ -10,7 +10,8 @@ pytestmark = needs_db
 
 def test_demo_users_and_vehicles_seeded(client):
     rows = client.get("/api/v1/users").json()
-    assert [(r["name"], r["vehicle_label"]) for r in rows] == [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
+    # 영상 2개 × 3대: bb-01~03 (gn_b), bb-04~06 (asan_a) — scripts/demo.sh both
+    assert [(r["name"], r["vehicle_label"]) for r in rows] == [(f"시민 {c}", f"bb-0{i}") for i, c in enumerate("ABCDEF", 1)]
     assert rows[0]["id"] == str(db.demo_user_id("bb-01"))
 
 

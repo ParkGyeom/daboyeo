@@ -72,7 +72,7 @@ def _view(d: dict) -> dict:
 
 @app.get(f"{API}/users")
 def list_users():
-    """시민과 그 차량. 시연용 시민은 3명 (차량 bb-01~03, 번호 12가 3456 …)."""
+    """시민과 그 차량. 시연용 시민은 6명 (차량 bb-01~06, 번호 12가 3456 …)."""
     with db.connect() as conn:
         return conn.execute(
             """SELECT u.id, u.name, v.id AS vehicle_id, v.label AS vehicle_label, v.plate AS vehicle_plate

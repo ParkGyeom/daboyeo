@@ -33,6 +33,7 @@ uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --detector fake --
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --model ai/models/detector_v3.onnx --detect-every 5 --speed 0 --dry-run --record data/replay/v1.jsonl
 uv run python -m edge.blackbox.run --video data/videos/v1.mp4 --detector replay --record data/replay/v1.jsonl --detect-every 5 --speed 0
 scripts/demo.sh replay data/replay/v1.jsonl data/videos/v1.mp4 3 0   # 기록대로 3대 (주기는 기록에서 읽음, 마지막은 배속)
+scripts/demo.sh both 1                              # 시연: gn_b(bb-01~03) + 아산 0~40초(bb-04~06) = 6대, replay, 1배속. 아산은 블랙박스 화면에 안 나옴(번호판). 실시간은 끝에 ai/models/detector_v3.onnx
 # GPS 없는 유튜브 영상의 경로 재구성 (tools/gps/README.md): routes/<id>.gpx + anchors/<id>.csv → data/videos/<id>.gps.csv
 uv run python -m tools.gps.reconstruct gn_a                 # 클립이면 --clip-start <clip_start_in_source_s> --out data/videos/<클립>.gps.csv
 uv run python -m tools.gps.preview_map gn_a --fetch-roads   # 경로·기준점 HTML (오프라인 도로선). --fetch-roads 는 처음 한 번 (인터넷)

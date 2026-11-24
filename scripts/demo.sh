@@ -140,7 +140,7 @@ cmd_reset() {
 cmd_drive() {
     local model=${1:-}; local devices=${2:-1}; local source=${3:-$DEFAULT_SEGMENT}; local speed=${4:-4}
     [[ -n $model && -f $model ]] || die "모델 파일을 준다: scripts/demo.sh drive runs/<모델>.onnx [기기 수] [구간 또는 영상.mp4] [배속]"
-    [[ $devices =~ ^[1-3]$ ]] || die "기기 수는 1~3 (시연용 시민이 3명이다)"
+    [[ $devices =~ ^[1-3]$ ]] || die "기기 수는 1~3 (영상 하나에 3대까지. 영상 2개 6대는 scripts/demo.sh both)"
     # 영상 파일이면 영상, 아니면 로드마크 구간 이름 (구간 이름에는 ':' 가 있다)
     local input
     if [[ $source == *:* ]]; then
@@ -197,7 +197,7 @@ cmd_replay() {
     local record=${1:-}; local video=${2:-}; local devices=${3:-1}; local speed=${4:-4}
     [[ -n $record && -f $record && -n $video && -f $video ]] \
         || die "기록과 영상을 준다: scripts/demo.sh replay data/replay/<영상>.jsonl data/videos/<영상>.mp4 [기기 수] [배속]"
-    [[ $devices =~ ^[1-3]$ ]] || die "기기 수는 1~3 (시연용 시민이 3명이다)"
+    [[ $devices =~ ^[1-3]$ ]] || die "기기 수는 1~3 (영상 하나에 3대까지. 영상 2개 6대는 scripts/demo.sh both)"
     curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null || die "서버가 꺼져 있다. scripts/demo.sh up 을 먼저 한다"
     local every
     every=$(record_every "$record")

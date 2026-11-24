@@ -13,7 +13,7 @@
 #                            모델 추론 없이 탐지 기록대로 영상을 운전한다 (모델 파일·빠른 CPU 가 없을 때).
 #                            기록은 미리 run 에 --record <기록.jsonl> 을 붙여 onnx 로 한 번 돌려 만든다
 #   scripts/demo.sh both [배속] [모델.onnx]
-#                            시연: 영상 2개를 3대씩 = 6대 동시에 (기본 1배속). gn_b 는 bb-01~03, 아산 클립은 bb-04~06.
+#                            시연: 영상 2개를 3대씩 = 6대 동시에 (기본 1배속). gn_b 88~133초(45초)는 bb-01~03, 아산 0~40초는 bb-04~06.
 #                            6대 모두 블랙박스 화면에 나온다. 모델을 주면 replay 대신 실시간 탐지
 #   scripts/demo.sh down     서버와 화면을 끈다 (DB 는 둔다. DB 까지 끄려면 down --db)
 #
@@ -28,8 +28,8 @@ SERVER_PORT=${SERVER_PORT:-8000}
 WEB_PORT=${WEB_PORT:-8501}
 DEFAULT_SEGMENT=0401_light_rainy_smooth:03000071-03000182
 # both 의 영상 2개 (영상 · replay 기록). 영상 옆에 <영상 이름>.gps.csv 가 있어야 한다
-BOTH_A_VIDEO=${BOTH_A_VIDEO:-data/videos/gn_b_3320-3620.mp4}
-BOTH_A_RECORD=${BOTH_A_RECORD:-data/replay/gn_b_3320-3620.v3tiles.jsonl}
+BOTH_A_VIDEO=${BOTH_A_VIDEO:-data/videos/gn_b_3320-3620_88-133.mp4}
+BOTH_A_RECORD=${BOTH_A_RECORD:-data/replay/gn_b_3320-3620_88-133.v3tiles.jsonl}
 BOTH_B_VIDEO=${BOTH_B_VIDEO:-data/videos/asan_a_0-40.mp4}
 BOTH_B_RECORD=${BOTH_B_RECORD:-data/replay/asan_a_0-40.v3tiles.jsonl}
 VIDEO_DETECT_EVERY=${VIDEO_DETECT_EVERY:-10}  # 영상 입력의 탐지 주기 (시연 설정, 60fps 영상이면 초당 6번)

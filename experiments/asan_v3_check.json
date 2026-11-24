@@ -1,48 +1,362 @@
 {
  "note": "handoff 27장. 친구 실제 주행 영상 asan_a (발표 근거 전용, 공개 게시 금지). 영상·크롭은 git 밖 data/videos/own/, data/presentation/asan/. 판정은 Claude 가 크롭을 눈으로 본 것 (real/amb/fp).",
- "video": {"id": "asan_a", "wh": [1920, 1080], "fps": 30, "duration_s": 162.3, "codec": "h264", "osd": false,
-           "capture": "휴대폰 촬영 추정 (보닛 화면 아래 22~30%, 화각 흔들림·옆보기)",
-           "gps": {"rows": 326, "t_s": [0.0, 162.3], "every_s": 0.5, "speed_kmh_mean": 17.2, "speed_kmh_max": 21.3}},
+ "video": {
+  "id": "asan_a",
+  "wh": [
+   1920,
+   1080
+  ],
+  "fps": 30,
+  "duration_s": 162.3,
+  "codec": "h264",
+  "osd": false,
+  "capture": "휴대폰 촬영 추정 (보닛 화면 아래 22~30%, 화각 흔들림·옆보기)",
+  "gps": {
+   "rows": 326,
+   "t_s": [
+    0.0,
+    162.3
+   ],
+   "every_s": 0.5,
+   "speed_kmh_mean": 17.2,
+   "speed_kmh_max": 21.3
+  }
+ },
  "model": "ai/models/detector_v3.onnx",
- "class_conf": {"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21},
- "every_s": 0.5, "frames": 325, "merge_gap_s": 1.0,
+ "class_conf": {
+  "pothole": 0.31,
+  "crack": 0.42,
+  "guardrail": 0.21,
+  "sign": 0.21
+ },
+ "every_s": 0.5,
+ "frames": 325,
+ "merge_gap_s": 1.0,
  "conditions": {
-  "base": {"desc": "640 전체 프레임", "ms_1thread_median": 20.3,
-           "pothole": {"frames": 11, "events": 7, "real": 1, "amb": 0, "fp": 6},
-           "crack": {"frames": 6, "events": 5, "real": 2, "amb": 1, "fp": 2},
-           "guardrail": {"frames": 0}, "sign": {"frames": 7}},
-  "tiles": {"desc": "road_tiles(2, bottom=0.8) + tile_classes=(crack,)", "ms_1thread_median": 60.6,
-            "pothole": {"frames": 11, "events": 7, "real": 1, "amb": 0, "fp": 6},
-            "crack": {"frames": 45, "events": 14, "real": 5, "amb": 6, "fp": 3},
-            "guardrail": {"frames": 0}, "sign": {"frames": 7}}
+  "base": {
+   "desc": "640 전체 프레임",
+   "ms_1thread_median": 20.3,
+   "pothole": {
+    "frames": 11,
+    "events": 7,
+    "real": 0,
+    "amb": 2,
+    "fp": 5
+   },
+   "crack": {
+    "frames": 6,
+    "events": 5,
+    "real": 3,
+    "amb": 2,
+    "fp": 0
+   },
+   "guardrail": {
+    "frames": 0
+   },
+   "sign": {
+    "frames": 7,
+    "traffic_sign": 5,
+    "building_number_plate": 2
+   }
+  },
+  "tiles": {
+   "desc": "road_tiles(2, bottom=0.8) + tile_classes=(crack,)",
+   "ms_1thread_median": 60.6,
+   "pothole": {
+    "frames": 11,
+    "events": 7,
+    "real": 0,
+    "amb": 2,
+    "fp": 5
+   },
+   "crack": {
+    "frames": 45,
+    "events": 14,
+    "real": 6,
+    "amb": 6,
+    "fp": 2
+   },
+   "guardrail": {
+    "frames": 0
+   },
+   "sign": {
+    "frames": 7,
+    "traffic_sign": 5,
+    "building_number_plate": 2
+   }
+  }
  },
  "pothole_events": [
-  {"t": [59.5, 59.5], "conf_max": 0.43, "judge": "fp", "why": "앞유리 얼룩"},
-  {"t": [78.5, 78.5], "conf_max": 0.51, "judge": "fp", "why": "맨홀 (흔들림 번짐)"},
-  {"t": [89.5, 90.5], "conf_max": 0.42, "judge": "fp", "why": "앞유리 얼룩"},
-  {"t": [95.0, 96.5], "conf_max": 0.59, "judge": "fp", "why": "앞유리 얼룩"},
-  {"t": [106.0, 106.0], "conf_max": 0.51, "judge": "fp", "why": "앞유리 얼룩"},
-  {"t": [107.5, 107.5], "conf_max": 0.37, "judge": "fp", "why": "앞유리 얼룩"},
-  {"t": [132.0, 132.0], "conf_max": 0.41, "judge": "real", "why": "보닛 앞 오른쪽 작은 포트홀 (1프레임)"}
+  {
+   "t": [
+    59.5,
+    59.5
+   ],
+   "conf_max": 0.43,
+   "judge": "fp",
+   "why": "대시보드 반사"
+  },
+  {
+   "t": [
+    78.5,
+    78.5
+   ],
+   "conf_max": 0.51,
+   "judge": "amb",
+   "why": "번진 납작한 자국 (맨홀로 보임, 두 판정이 오탐·애매로 갈림)"
+  },
+  {
+   "t": [
+    89.5,
+    90.5
+   ],
+   "conf_max": 0.42,
+   "judge": "fp",
+   "why": "대시보드 반사"
+  },
+  {
+   "t": [
+    95.0,
+    96.5
+   ],
+   "conf_max": 0.59,
+   "judge": "fp",
+   "why": "대시보드 반사"
+  },
+  {
+   "t": [
+    106.0,
+    106.0
+   ],
+   "conf_max": 0.51,
+   "judge": "fp",
+   "why": "대시보드 반사"
+  },
+  {
+   "t": [
+    107.5,
+    107.5
+   ],
+   "conf_max": 0.37,
+   "judge": "fp",
+   "why": "대시보드 반사"
+  },
+  {
+   "t": [
+    132.0,
+    132.0
+   ],
+   "conf_max": 0.41,
+   "judge": "amb",
+   "why": "거친 포장(벗겨진 곳)의 끝부분, 두 판정이 애매·진짜로 갈림"
+  }
  ],
  "crack_events_tiles": [
-  {"t": [4.5, 4.5], "judge": "amb", "why": "그늘 속 가로 선"},
-  {"t": [9.5, 14.5], "judge": "real", "why": "차로 왼쪽 긴 세로 균열 (0.47~0.79)"},
-  {"t": [16.5, 20.5], "judge": "real", "why": "같은 세로 균열 이어짐"},
-  {"t": [23.0, 26.0], "judge": "real", "why": "가는 세로 균열, base 24.0 도 잡음"},
-  {"t": [28.5, 28.5], "judge": "amb", "why": "그늘 속 짙은 선 (base 도)"},
-  {"t": [30.0, 31.0], "judge": "amb", "why": "그늘 속 대각 선 + 노란선 가장자리 벗겨짐"},
-  {"t": [32.5, 33.5], "judge": "real", "why": "32.5 가는 균열 (33.5 는 노면표시+보닛 오탐, base 33.5)"},
-  {"t": [35.5, 35.5], "judge": "amb", "why": "가는 선"},
-  {"t": [42.0, 46.0], "judge": "fp", "why": "노란 중앙선 (base 43.0~43.5 도)"},
-  {"t": [47.5, 48.5], "judge": "real", "why": "47.5 갈라진 균열 (base 도). 48.5 는 차선·그림자"},
-  {"t": [51.5, 52.0], "judge": "amb", "why": "노란 중앙선 위 갈라짐"},
-  {"t": [94.5, 94.5], "judge": "fp", "why": "보닛 끝선"},
-  {"t": [104.0, 104.0], "judge": "fp", "why": "보닛 끝선"},
-  {"t": [141.5, 141.5], "judge": "amb", "why": "보수 자국 경계"}
+  {
+   "t": [
+    4.5,
+    4.5
+   ],
+   "judge": "amb",
+   "why": "그늘 속 어두운 줄"
+  },
+  {
+   "t": [
+    9.5,
+    14.5
+   ],
+   "judge": "real",
+   "why": "11.5~14.0 벌어진 틈, 9.5~11.0·14.5 는 애매"
+  },
+  {
+   "t": [
+    16.5,
+    20.5
+   ],
+   "judge": "real",
+   "why": "18.0~20.0 틈, 16.5~17.5 는 닳은 중앙선과 겹쳐 애매"
+  },
+  {
+   "t": [
+    23.0,
+    26.0
+   ],
+   "judge": "real",
+   "why": "가는 세로 틈 6프레임 모두 진짜"
+  },
+  {
+   "t": [
+    28.5,
+    28.5
+   ],
+   "judge": "amb",
+   "why": "그늘 속 짙은 선 (base 도)"
+  },
+  {
+   "t": [
+    30.0,
+    31.0
+   ],
+   "judge": "amb",
+   "why": "흐린 줄 · 페인트와 겹친 틈"
+  },
+  {
+   "t": [
+    32.5,
+    33.5
+   ],
+   "judge": "real",
+   "why": "32.5 틈 (33.5 는 두 판정이 갈려 애매)"
+  },
+  {
+   "t": [
+    35.5,
+    35.5
+   ],
+   "judge": "amb",
+   "why": "가는 선"
+  },
+  {
+   "t": [
+    42.0,
+    46.0
+   ],
+   "judge": "real",
+   "why": "42.0·43.0 노란 중앙선 옆 틈, 43.5 뒤는 애매"
+  },
+  {
+   "t": [
+    47.5,
+    48.5
+   ],
+   "judge": "real",
+   "why": "47.5 갈라진 균열 (48.5 는 두 판정이 갈려 애매)"
+  },
+  {
+   "t": [
+    51.5,
+    52.0
+   ],
+   "judge": "amb",
+   "why": "노란 중앙선 페인트 갈라짐"
+  },
+  {
+   "t": [
+    94.5,
+    94.5
+   ],
+   "judge": "fp",
+   "why": "대시보드 가장자리 반사"
+  },
+  {
+   "t": [
+    104.0,
+    104.0
+   ],
+   "judge": "fp",
+   "why": "대시보드 가장자리 반사"
+  },
+  {
+   "t": [
+    141.5,
+    141.5
+   ],
+   "judge": "amb",
+   "why": "보수 자국 경계"
+  }
  ],
- "fixed_fp": {"class": "pothole", "cause": "앞유리 얼룩", "t_s": [59.0, 113.5], "box_1080p": [1030, 470, 1280, 700],
-              "frames_ge_0.1": 15, "frames_ge_thr": 9, "events": 5},
+ "fixed_fp": {
+  "class": "pothole",
+  "cause": "대시보드 반사 (11/21 에는 앞유리 얼룩으로 잘못 적음)",
+  "t_s": [
+   59.0,
+   113.5
+  ],
+  "box_1080p": [
+   1030,
+   470,
+   1280,
+   700
+  ],
+  "frames_ge_0.1": 15,
+  "frames_ge_thr": 9,
+  "events": 5
+ },
  "guardrail_note": "10~18초 가드레일이 크게 보이는데 0.1 이상 탐지 0",
- "decision": "e2e_smoke 에 넣지 않음 (진짜 포트홀 1프레임, 앞유리 얼룩 오탐 5이벤트). 11/21 판정: 시연 영상 gn_b 유지, 발표 근거로만. 11/22 갱신: 시연은 gn_b + asan_a 0~40초 (handoff 27-3). 판정 일부 재확인 중 (27-4)."
+ "decision": "e2e_smoke 에 넣지 않음 (확실한 포트홀 없음, 대시보드 반사 오탐 5이벤트). 11/22 갱신: 시연은 gn_b + asan_a 0~40초 (handoff 27-3).",
+ "rejudge_1124": {
+  "rule": "탐지별로 두 번(서로 안 보고) 매김. 같으면 그대로, 다르면 amb. 이벤트는 real 이 1개라도 있으면 real, 없고 amb 가 있으면 amb",
+  "agree": "53/69 (균열 37/51, kappa 0.55)",
+  "items": [
+   {"id": 0, "t": 4.5, "src": "tiles", "cls": "crack", "conf": 0.48, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 1, "t": 9.5, "src": "tiles", "cls": "crack", "conf": 0.47, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 2, "t": 10.0, "src": "tiles", "cls": "crack", "conf": 0.68, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 3, "t": 10.5, "src": "tiles", "cls": "crack", "conf": 0.65, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 4, "t": 11.0, "src": "tiles", "cls": "crack", "conf": 0.69, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 5, "t": 11.5, "src": "tiles", "cls": "crack", "conf": 0.72, "a": "real", "b": "real", "final": "real"},
+   {"id": 6, "t": 12.0, "src": "tiles", "cls": "crack", "conf": 0.67, "a": "real", "b": "real", "final": "real"},
+   {"id": 7, "t": 12.5, "src": "tiles", "cls": "crack", "conf": 0.75, "a": "real", "b": "real", "final": "real"},
+   {"id": 8, "t": 13.0, "src": "tiles", "cls": "crack", "conf": 0.66, "a": "real", "b": "real", "final": "real"},
+   {"id": 9, "t": 13.5, "src": "tiles", "cls": "crack", "conf": 0.79, "a": "real", "b": "real", "final": "real"},
+   {"id": 10, "t": 14.0, "src": "tiles", "cls": "crack", "conf": 0.79, "a": "real", "b": "real", "final": "real"},
+   {"id": 11, "t": 14.5, "src": "tiles", "cls": "crack", "conf": 0.51, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 12, "t": 16.5, "src": "tiles", "cls": "crack", "conf": 0.56, "a": "amb", "b": "fp", "final": "amb"},
+   {"id": 13, "t": 17.0, "src": "tiles", "cls": "crack", "conf": 0.47, "a": "amb", "b": "fp", "final": "amb"},
+   {"id": 14, "t": 17.5, "src": "tiles", "cls": "crack", "conf": 0.52, "a": "amb", "b": "real", "final": "amb"},
+   {"id": 15, "t": 18.0, "src": "tiles", "cls": "crack", "conf": 0.46, "a": "real", "b": "real", "final": "real"},
+   {"id": 16, "t": 18.5, "src": "tiles", "cls": "crack", "conf": 0.63, "a": "real", "b": "real", "final": "real"},
+   {"id": 17, "t": 19.0, "src": "base", "cls": "sign", "conf": 0.4, "a": "real", "b": "real", "final": "real"},
+   {"id": 18, "t": 19.5, "src": "tiles", "cls": "crack", "conf": 0.71, "a": "real", "b": "real", "final": "real"},
+   {"id": 19, "t": 20.0, "src": "base", "cls": "sign", "conf": 0.45, "a": "real", "b": "real", "final": "real"},
+   {"id": 20, "t": 20.0, "src": "tiles", "cls": "crack", "conf": 0.73, "a": "real", "b": "real", "final": "real"},
+   {"id": 21, "t": 20.5, "src": "base", "cls": "sign", "conf": 0.6, "a": "real", "b": "real", "final": "real"},
+   {"id": 22, "t": 20.5, "src": "tiles", "cls": "crack", "conf": 0.54, "a": "amb", "b": "real", "final": "amb"},
+   {"id": 23, "t": 21.5, "src": "base", "cls": "sign", "conf": 0.67, "a": "real", "b": "real", "final": "real"},
+   {"id": 24, "t": 23.0, "src": "base", "cls": "sign", "conf": 0.37, "a": "real", "b": "real", "final": "real"},
+   {"id": 25, "t": 23.0, "src": "tiles", "cls": "crack", "conf": 0.73, "a": "real", "b": "real", "final": "real"},
+   {"id": 26, "t": 23.5, "src": "tiles", "cls": "crack", "conf": 0.8, "a": "real", "b": "real", "final": "real"},
+   {"id": 27, "t": 24.0, "src": "base", "cls": "crack", "conf": 0.44, "a": "real", "b": "real", "final": "real"},
+   {"id": 28, "t": 24.0, "src": "tiles", "cls": "crack", "conf": 0.76, "a": "real", "b": "real", "final": "real"},
+   {"id": 29, "t": 24.5, "src": "tiles", "cls": "crack", "conf": 0.7, "a": "real", "b": "real", "final": "real"},
+   {"id": 30, "t": 25.0, "src": "tiles", "cls": "crack", "conf": 0.62, "a": "real", "b": "real", "final": "real"},
+   {"id": 31, "t": 26.0, "src": "tiles", "cls": "crack", "conf": 0.65, "a": "real", "b": "real", "final": "real"},
+   {"id": 32, "t": 28.5, "src": "base", "cls": "crack", "conf": 0.46, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 33, "t": 28.5, "src": "tiles", "cls": "crack", "conf": 0.46, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 34, "t": 30.0, "src": "tiles", "cls": "crack", "conf": 0.65, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 35, "t": 31.0, "src": "tiles", "cls": "crack", "conf": 0.5, "a": "amb", "b": "fp", "final": "amb"},
+   {"id": 36, "t": 32.5, "src": "tiles", "cls": "crack", "conf": 0.51, "a": "real", "b": "real", "final": "real"},
+   {"id": 37, "t": 33.5, "src": "base", "cls": "crack", "conf": 0.46, "a": "real", "b": "fp", "final": "amb"},
+   {"id": 38, "t": 33.5, "src": "tiles", "cls": "crack", "conf": 0.46, "a": "real", "b": "fp", "final": "amb"},
+   {"id": 39, "t": 35.5, "src": "tiles", "cls": "crack", "conf": 0.54, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 40, "t": 42.0, "src": "tiles", "cls": "crack", "conf": 0.65, "a": "real", "b": "real", "final": "real"},
+   {"id": 41, "t": 43.0, "src": "base", "cls": "crack", "conf": 0.6, "a": "real", "b": "real", "final": "real"},
+   {"id": 42, "t": 43.0, "src": "tiles", "cls": "crack", "conf": 0.7, "a": "real", "b": "real", "final": "real"},
+   {"id": 43, "t": 43.5, "src": "base", "cls": "crack", "conf": 0.53, "a": "real", "b": "amb", "final": "amb"},
+   {"id": 44, "t": 43.5, "src": "tiles", "cls": "crack", "conf": 0.53, "a": "real", "b": "amb", "final": "amb"},
+   {"id": 45, "t": 44.5, "src": "tiles", "cls": "crack", "conf": 0.6, "a": "amb", "b": "fp", "final": "amb"},
+   {"id": 46, "t": 45.0, "src": "tiles", "cls": "crack", "conf": 0.64, "a": "amb", "b": "fp", "final": "amb"},
+   {"id": 47, "t": 46.0, "src": "tiles", "cls": "crack", "conf": 0.47, "a": "amb", "b": "fp", "final": "amb"},
+   {"id": 48, "t": 47.5, "src": "base", "cls": "crack", "conf": 0.5, "a": "real", "b": "real", "final": "real"},
+   {"id": 49, "t": 47.5, "src": "tiles", "cls": "crack", "conf": 0.5, "a": "real", "b": "real", "final": "real"},
+   {"id": 50, "t": 48.5, "src": "tiles", "cls": "crack", "conf": 0.67, "a": "fp", "b": "amb", "final": "amb"},
+   {"id": 51, "t": 51.5, "src": "tiles", "cls": "crack", "conf": 0.67, "a": "amb", "b": "fp", "final": "amb"},
+   {"id": 52, "t": 52.0, "src": "tiles", "cls": "crack", "conf": 0.61, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 53, "t": 59.5, "src": "base", "cls": "pothole", "conf": 0.43, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 54, "t": 78.5, "src": "base", "cls": "pothole", "conf": 0.51, "a": "fp", "b": "amb", "final": "amb"},
+   {"id": 55, "t": 89.5, "src": "base", "cls": "pothole", "conf": 0.42, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 56, "t": 90.5, "src": "base", "cls": "pothole", "conf": 0.4, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 57, "t": 94.5, "src": "tiles", "cls": "crack", "conf": 0.46, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 58, "t": 95.0, "src": "base", "cls": "pothole", "conf": 0.56, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 59, "t": 95.5, "src": "base", "cls": "pothole", "conf": 0.39, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 60, "t": 96.0, "src": "base", "cls": "pothole", "conf": 0.47, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 61, "t": 96.5, "src": "base", "cls": "pothole", "conf": 0.59, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 62, "t": 104.0, "src": "tiles", "cls": "crack", "conf": 0.53, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 63, "t": 106.0, "src": "base", "cls": "pothole", "conf": 0.51, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 64, "t": 107.5, "src": "base", "cls": "pothole", "conf": 0.37, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 65, "t": 132.0, "src": "base", "cls": "pothole", "conf": 0.41, "a": "amb", "b": "real", "final": "amb"},
+   {"id": 66, "t": 141.5, "src": "tiles", "cls": "crack", "conf": 0.6, "a": "amb", "b": "amb", "final": "amb"},
+   {"id": 67, "t": 156.0, "src": "base", "cls": "sign", "conf": 0.29, "a": "fp", "b": "fp", "final": "fp"},
+   {"id": 68, "t": 156.5, "src": "base", "cls": "sign", "conf": 0.29, "a": "fp", "b": "fp", "final": "fp"}
+  ]
+ }
 }

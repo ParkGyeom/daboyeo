@@ -1,7 +1,7 @@
 {
  "note": "handoff 27장. 친구 실제 주행 영상 asan_a (발표 근거 전용, 공개 게시 금지). 영상·크롭은 git 밖 data/videos/own/, data/presentation/asan/. 판정은 Claude 가 크롭을 눈으로 본 것 (real/amb/fp).",
  "video": {"id": "asan_a", "wh": [1920, 1080], "fps": 30, "duration_s": 162.3, "codec": "h264", "osd": false,
-           "capture": "휴대폰 촬영 추정 (보닛 화면 아래 30~35%, 화각 흔들림·옆보기)",
+           "capture": "휴대폰 촬영 추정 (보닛 화면 아래 22~30%, 화각 흔들림·옆보기)",
            "gps": {"rows": 326, "t_s": [0.0, 162.3], "every_s": 0.5, "speed_kmh_mean": 17.2, "speed_kmh_max": 21.3}},
  "model": "ai/models/detector_v3.onnx",
  "class_conf": {"pothole": 0.31, "crack": 0.42, "guardrail": 0.21, "sign": 0.21},
@@ -42,7 +42,7 @@
   {"t": [141.5, 141.5], "judge": "amb", "why": "보수 자국 경계"}
  ],
  "fixed_fp": {"class": "pothole", "cause": "앞유리 얼룩", "t_s": [59.0, 113.5], "box_1080p": [1030, 470, 1280, 700],
-              "frames_ge_0.1": 15, "frames_ge_thr": 10, "events": 5},
+              "frames_ge_0.1": 15, "frames_ge_thr": 9, "events": 5},
  "guardrail_note": "10~18초 가드레일이 크게 보이는데 0.1 이상 탐지 0",
- "decision": "e2e_smoke 에 넣지 않음 (진짜 포트홀 1프레임, 앞유리 얼룩 오탐 5이벤트). 시연 영상은 gn_b 유지. 발표 근거로만 사용."
+ "decision": "e2e_smoke 에 넣지 않음 (진짜 포트홀 1프레임, 앞유리 얼룩 오탐 5이벤트). 11/21 판정: 시연 영상 gn_b 유지, 발표 근거로만. 11/22 갱신: 시연은 gn_b + asan_a 0~40초 (handoff 27-3). 판정 일부 재확인 중 (27-4)."
 }

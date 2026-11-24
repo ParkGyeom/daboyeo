@@ -3,7 +3,7 @@
 #
 #   scripts/demo.sh up       DB(Docker) → 서버(8000) → 화면(8501) 을 띄운다
 #   scripts/demo.sh status   무엇이 떠 있는지 본다
-#   scripts/demo.sh reset    DB 와 사진을 비워 처음 상태로 (시연용 시민 3명은 다시 넣는다)
+#   scripts/demo.sh reset    DB 와 사진을 비워 처음 상태로 (시연용 시민 6명은 다시 넣는다)
 #   scripts/demo.sh drive <모델.onnx> [기기 수] [구간 또는 영상.mp4] [배속]
 #                            가상 블랙박스를 기기 수만큼 동시에 돌린다 (기본 1대, 서울 우천 구간, 4배속)
 #                            영상을 주면 그 영상을 10 프레임마다 탐지한다 (GPS 는 영상 옆 <영상 이름>.gps.csv)
@@ -12,6 +12,9 @@
 #   scripts/demo.sh replay <기록.jsonl> <영상> [기기 수] [배속]
 #                            모델 추론 없이 탐지 기록대로 영상을 운전한다 (모델 파일·빠른 CPU 가 없을 때).
 #                            기록은 미리 run 에 --record <기록.jsonl> 을 붙여 onnx 로 한 번 돌려 만든다
+#   scripts/demo.sh both [배속] [모델.onnx]
+#                            시연: 영상 2개를 3대씩 = 6대 동시에 (기본 1배속). gn_b 는 bb-01~03, 아산 클립은 bb-04~06.
+#                            아산 차량은 블랙박스 화면에 내보내지 않는다 (앞차 번호판). 모델을 주면 replay 대신 실시간 탐지
 #   scripts/demo.sh down     서버와 화면을 끈다 (DB 는 둔다. DB 까지 끄려면 down --db)
 #
 # 로그는 server_data/logs/ 에 남는다.
@@ -24,6 +27,11 @@ LOGS=server_data/logs
 SERVER_PORT=${SERVER_PORT:-8000}
 WEB_PORT=${WEB_PORT:-8501}
 DEFAULT_SEGMENT=0401_light_rainy_smooth:03000071-03000182
+# both 의 영상 2개 (영상 · replay 기록). 영상 옆에 <영상 이름>.gps.csv 가 있어야 한다
+BOTH_A_VIDEO=${BOTH_A_VIDEO:-data/videos/gn_b_3320-3620.mp4}
+BOTH_A_RECORD=${BOTH_A_RECORD:-data/replay/gn_b_3320-3620.v3tiles.jsonl}
+BOTH_B_VIDEO=${BOTH_B_VIDEO:-data/videos/asan_a_0-40.mp4}
+BOTH_B_RECORD=${BOTH_B_RECORD:-data/replay/asan_a_0-40.v3tiles.jsonl}
 VIDEO_DETECT_EVERY=${VIDEO_DETECT_EVERY:-10}  # 영상 입력의 탐지 주기 (시연 설정, 60fps 영상이면 초당 6번)
 mkdir -p "$RUN" "$LOGS"
 
@@ -126,7 +134,7 @@ cmd_reset() {
     rm -f server_data/snapshots/*.jpg server_data/clips/*.mp4
     rm -rf server_data/blackbox
     rm -f server_data/live/*.jpg server_data/live/*.json
-    say "처음 상태로 되돌렸다 (결함·신고·사진·클립, 블랙박스가 남긴 결함 구간·화면 삭제, 시민 3명 다시 넣음)"
+    say "처음 상태로 되돌렸다 (결함·신고·사진·클립, 블랙박스가 남긴 결함 구간·화면 삭제, 시민 6명 다시 넣음)"
 }
 
 cmd_drive() {
@@ -148,6 +156,43 @@ cmd_drive() {
         --server "http://localhost:$SERVER_PORT" 2>&1 | tee "$LOGS/blackbox.log"
 }
 
+record_every() {  # replay 기록 머리 줄의 탐지 주기
+    "$PY" -c 'import json,sys; print(json.loads(open(sys.argv[1]).readline())["detect_every"])' "$1" \
+        || die "$1 은(는) 탐지 기록이 아니다"
+}
+
+cmd_both() {
+    local speed=${1:-1}; local model=${2:-}
+    local v
+    for v in "$BOTH_A_VIDEO" "$BOTH_B_VIDEO"; do
+        [[ -f $v ]] || die "영상이 없다: $v"
+        [[ -f ${v%.*}.gps.csv ]] || die "GPS CSV 가 없다: ${v%.*}.gps.csv"
+    done
+    local a=() b=()
+    if [[ -n $model ]]; then
+        [[ -f $model ]] || die "모델 파일이 없다: $model"
+        a=(--model "$model" --detect-every "$VIDEO_DETECT_EVERY"); b=("${a[@]}")
+    else
+        [[ -f $BOTH_A_RECORD ]] || die "replay 기록이 없다: $BOTH_A_RECORD"
+        [[ -f $BOTH_B_RECORD ]] || die "replay 기록이 없다: $BOTH_B_RECORD (run 에 --record 를 붙여 onnx 로 한 번 돌려 만든다)"
+        a=(--detector replay --record "$BOTH_A_RECORD" --detect-every "$(record_every "$BOTH_A_RECORD")")
+        b=(--detector replay --record "$BOTH_B_RECORD" --detect-every "$(record_every "$BOTH_B_RECORD")")
+    fi
+    curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null || die "서버가 꺼져 있다. scripts/demo.sh up 을 먼저 한다"
+
+    say "영상 2개 × 3대 = 6대, ${speed}배속 ($( [[ -n $model ]] && echo "실시간 $model" || echo replay ))"
+    say "  bb-01~03 $BOTH_A_VIDEO (블랙박스 화면에 나옴)"
+    say "  bb-04~06 $BOTH_B_VIDEO (블랙박스 화면에 안 나옴: --live-fps 0)"
+    # 두 묶음을 동시에. Ctrl-C 는 두 묶음 모두에 간다 (variants 가 기기들을 끝낸다)
+    {
+        "$PY" -m edge.blackbox.variants --devices 3 --first-device 1 --video "$BOTH_A_VIDEO" "${a[@]}" \
+            --speed "$speed" --server "http://localhost:$SERVER_PORT" &
+        "$PY" -m edge.blackbox.variants --devices 3 --first-device 4 --video "$BOTH_B_VIDEO" "${b[@]}" \
+            --speed "$speed" --live-fps 0 --server "http://localhost:$SERVER_PORT" &
+        wait
+    } 2>&1 | tee "$LOGS/blackbox.log"
+}
+
 cmd_replay() {
     local record=${1:-}; local video=${2:-}; local devices=${3:-1}; local speed=${4:-4}
     [[ -n $record && -f $record && -n $video && -f $video ]] \
@@ -155,8 +200,7 @@ cmd_replay() {
     [[ $devices =~ ^[1-3]$ ]] || die "기기 수는 1~3 (시연용 시민이 3명이다)"
     curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null || die "서버가 꺼져 있다. scripts/demo.sh up 을 먼저 한다"
     local every
-    every=$("$PY" -c 'import json,sys; print(json.loads(open(sys.argv[1]).readline())["detect_every"])' "$record") \
-        || die "$record 은(는) 탐지 기록이 아니다"
+    every=$(record_every "$record")
 
     "$PY" -m edge.blackbox.variants --devices "$devices" --video "$video" --detector replay --record "$record" \
         --detect-every "$every" --speed "$speed" --server "http://localhost:$SERVER_PORT" 2>&1 | tee "$LOGS/blackbox.log"
@@ -169,5 +213,6 @@ case ${1:-} in
     reset) cmd_reset ;;
     drive) shift; cmd_drive "$@" ;;
     replay) shift; cmd_replay "$@" ;;
-    *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    both) shift; cmd_both "$@" ;;
+    *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

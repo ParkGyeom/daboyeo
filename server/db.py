@@ -1,7 +1,7 @@
 """DB 연결과 스키마. 스키마는 server/sql/001_init.sql 한 곳에만 있다 (PRD 9장).
 
 docker compose 의 DB 는 처음 뜰 때 001_init.sql 을 스스로 실행한다. 테스트용 DB 처럼 테이블이 없는 DB 는
-init_db() 가 같은 파일을 실행한다. 시연용 시민 3명과 차량(bb-01~03)은 고정 UUID 로 넣어 몇 번 불러도 같다.
+init_db() 가 같은 파일을 실행한다. 시연용 시민 6명과 차량(bb-01~06)은 고정 UUID 로 넣어 몇 번 불러도 같다.
 """
 
 from __future__ import annotations
@@ -20,11 +20,14 @@ SCHEMA_SQL = Path(__file__).resolve().parent / "sql" / "001_init.sql"
 EXTRA_SQL = sorted(p for p in SCHEMA_SQL.parent.glob("0*.sql") if p != SCHEMA_SQL)
 
 # 시연용 시민과 차량. 차량 이름(label)은 가상 블랙박스의 --device-id 와 같다
-DEMO = [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03")]
+# 영상마다 3대. bb-01~03 은 1개째(gn_b), bb-04~06 은 2개째(asan_a) 영상을 지나간다 (scripts/demo.sh both)
+DEMO = [("시민 A", "bb-01"), ("시민 B", "bb-02"), ("시민 C", "bb-03"),
+        ("시민 D", "bb-04"), ("시민 E", "bb-05"), ("시민 F", "bb-06")]
 # 기기 초기 설정 때 등록했다고 가정하는 가짜 연락처 (모의 문자의 받는 번호)
-DEMO_PHONE = {"bb-01": "010-0000-0001", "bb-02": "010-0000-0002", "bb-03": "010-0000-0003"}
+DEMO_PHONE = {f"bb-0{i}": f"010-0000-000{i}" for i in range(1, 7)}
 # 시연 차량의 가짜 차량 번호. 관리자 지도에서 차량을 이 번호로 구분한다 (server/sql/004_region_plate.sql)
-DEMO_PLATE = {"bb-01": "12가 3456", "bb-02": "34나 5678", "bb-03": "56다 7890"}
+DEMO_PLATE = {"bb-01": "12가 3456", "bb-02": "34나 5678", "bb-03": "56다 7890",
+              "bb-04": "78라 1357", "bb-05": "90마 2468", "bb-06": "21바 3579"}
 _NS = uuid.UUID("6f1d3c52-6b8e-4a35-9d1e-2b8f6c0a9d41")
 
 

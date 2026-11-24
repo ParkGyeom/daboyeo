@@ -14,7 +14,7 @@
 #                            기록은 미리 run 에 --record <기록.jsonl> 을 붙여 onnx 로 한 번 돌려 만든다
 #   scripts/demo.sh both [배속] [모델.onnx]
 #                            시연: 영상 2개를 3대씩 = 6대 동시에 (기본 1배속). gn_b 는 bb-01~03, 아산 클립은 bb-04~06.
-#                            아산 차량은 블랙박스 화면에 내보내지 않는다 (앞차 번호판). 모델을 주면 replay 대신 실시간 탐지
+#                            6대 모두 블랙박스 화면에 나온다. 모델을 주면 replay 대신 실시간 탐지
 #   scripts/demo.sh down     서버와 화면을 끈다 (DB 는 둔다. DB 까지 끄려면 down --db)
 #
 # 로그는 server_data/logs/ 에 남는다.
@@ -181,14 +181,14 @@ cmd_both() {
     curl -fs "http://localhost:$SERVER_PORT/health" >/dev/null || die "서버가 꺼져 있다. scripts/demo.sh up 을 먼저 한다"
 
     say "영상 2개 × 3대 = 6대, ${speed}배속 ($( [[ -n $model ]] && echo "실시간 $model" || echo replay ))"
-    say "  bb-01~03 $BOTH_A_VIDEO (블랙박스 화면에 나옴)"
-    say "  bb-04~06 $BOTH_B_VIDEO (블랙박스 화면에 안 나옴: --live-fps 0)"
+    say "  bb-01~03 $BOTH_A_VIDEO"
+    say "  bb-04~06 $BOTH_B_VIDEO"
     # 두 묶음을 동시에. Ctrl-C 는 두 묶음 모두에 간다 (variants 가 기기들을 끝낸다)
     {
         "$PY" -m edge.blackbox.variants --devices 3 --first-device 1 --video "$BOTH_A_VIDEO" "${a[@]}" \
             --speed "$speed" --server "http://localhost:$SERVER_PORT" &
         "$PY" -m edge.blackbox.variants --devices 3 --first-device 4 --video "$BOTH_B_VIDEO" "${b[@]}" \
-            --speed "$speed" --live-fps 0 --server "http://localhost:$SERVER_PORT" &
+            --speed "$speed" --server "http://localhost:$SERVER_PORT" &
         wait
     } 2>&1 | tee "$LOGS/blackbox.log"
 }

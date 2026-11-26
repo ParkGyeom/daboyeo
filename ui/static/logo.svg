@@ -1,8 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="236" height="40" viewBox="0 0 236 40">
-  <rect x="2" y="5" width="30" height="30" rx="3" fill="#0a2f6b"/>
-  <path d="M10 29 L17 11 L24 29" fill="none" stroke="#fff" stroke-width="2.8" stroke-linejoin="miter"/>
-  <path d="M17 19 V21 M17 24 V26" stroke="#ffc400" stroke-width="2.2"/>
-  <text x="41" y="27" font-family="Pretendard GOV Variable, Apple SD Gothic Neo, sans-serif" font-size="20" font-weight="800" fill="#1e2124">다보여</text>
-  <line x1="108" y1="13" x2="108" y2="27" stroke="#c4c9cf" stroke-width="1"/>
-  <text x="117" y="26" font-family="Pretendard GOV Variable, Apple SD Gothic Neo, sans-serif" font-size="14" font-weight="600" fill="#5d6670">도로결함 관리시스템</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="40" viewBox="0 0 200 40">
+  <circle cx="18" cy="20" r="15" fill="none" stroke="#051766" stroke-width="2.4"/>
+  <path d="M8 26 Q18 10 28 26" fill="none" stroke="#57bbeb" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="18" cy="17" r="2.6" fill="#051766"/>
+  <text x="42" y="27" font-family="Pretendard Variable, Apple SD Gothic Neo, sans-serif" font-size="21" font-weight="800" fill="#051766" letter-spacing="-0.5">다보여</text>
+  <text x="112" y="27" font-family="Pretendard Variable, Apple SD Gothic Neo, sans-serif" font-size="13" font-weight="600" fill="#57bbeb" letter-spacing="1">ROAD CARE</text>
 </svg>

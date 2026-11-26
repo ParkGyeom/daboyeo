@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="168" height="40" viewBox="0 0 168 40">
+  <rect x="2" y="4" width="32" height="32" rx="9" fill="#2f4fb5"/>
+  <path d="M11 29 L18 11 L25 29" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M18 19 V21 M18 24 V26" stroke="#ffd34d" stroke-width="2.4" stroke-linecap="round"/>
+  <text x="44" y="28" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif" font-size="21" font-weight="800" fill="#1f2937">다보여</text>
+</svg>

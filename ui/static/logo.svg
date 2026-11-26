@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="40" viewBox="0 0 200 40">
+  <circle cx="18" cy="20" r="15" fill="none" stroke="#051766" stroke-width="2.4"/>
+  <path d="M8 26 Q18 10 28 26" fill="none" stroke="#57bbeb" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="18" cy="17" r="2.6" fill="#051766"/>
+  <text x="42" y="27" font-family="Pretendard Variable, Apple SD Gothic Neo, sans-serif" font-size="21" font-weight="800" fill="#051766" letter-spacing="-0.5">다보여</text>
+  <text x="112" y="27" font-family="Pretendard Variable, Apple SD Gothic Neo, sans-serif" font-size="13" font-weight="600" fill="#57bbeb" letter-spacing="1">ROAD CARE</text>
+</svg>

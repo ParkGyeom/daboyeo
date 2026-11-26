@@ -6,55 +6,65 @@
     #<base64(JSON)>           {fit, items}: items = 결함 목록. 바뀌면 지도를 다시 만들지 않고 점만 다시 찍는다(확대·위치 유지)
                               fit = 대시보드 필터를 나타내는 글자. 바뀌면 걸러진 결함이 다 보이게 옮긴다("" 이면 전국)
                               읽은 뒤 주소에서 지운다(긴 주소는 네이버 인증 실패)
-  처음 화면은 대한민국 전체. 결함마다 깜빡이는 신호, 새로 생긴 결함(d.fresh)은 크고 빠르게 깜빡인다.
+  처음 화면은 대한민국 전체. 새로 생긴 결함(d.fresh)은 하늘색 고리와 '신규' 알약 표시(움직이지 않는다).
   핀 색 = 유형(d.type_color, 블랙박스 화면 상자 색과 같다), 모양 = 상태. risk_level 은 쓰지 않는다.
   핀을 누르면 사진 말풍선(꼬리 끝이 핀 위), 빈 곳을 누르면 닫힌다. 다른 핀을 누르면 그 핀의 말풍선만 남는다.
   확대가 CLUSTER_UNTIL 보다 작으면 화면에서 가까운 점들을 숫자 묶음으로 보이고, 누르면 그 묶음으로 확대한다.
 -->
 <html lang="ko"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
-  html, body { margin: 0; height: 100%; font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  /* 화면 모양(ui/style.py)과 같다: 짙은 남색 #051766·하늘색 #57bbeb, 둥근 흰 상자, 알약 표시, 그림자는 아주 옅게 */
+  html, body { margin: 0; height: 100%; color: #111;
+               font-family: 'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
   #map { width: 100%; height: 100%; }  /* 네이버 지도가 position 을 relative 로 바꾸므로 inset 이 아니라 크기로 준다 */
   #err { display: none; position: absolute; inset: 0; z-index: 10; padding: 16px; background: #fff;
-         color: #b00020; font-size: 14px; }
-  /* 신호: 가운데 핀(색=유형, 모양=상태) + 퍼지는 고리(색=유형) */
+         color: #c42b1c; font-size: 14px; }
+  /* 결함 표시: 가운데 핀(색=유형, 모양=상태). 새 결함은 하늘색 고리 + '신규' 알약 (움직이지 않는다) */
   .sig { position: relative; width: 18px; height: 18px; }
-  .sig .ring { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
-               border-radius: 50%; opacity: 0; animation: pulse 2s ease-out infinite; }
-  .sig.fresh .ring { animation: pulse-fresh 1s ease-out infinite; }
-  .sig.fresh .ring.r2 { animation-delay: .5s; }
   .sig .core { position: absolute; left: 1px; top: 1px; }
-  @keyframes pulse { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(2.6); opacity: 0; } }
-  @keyframes pulse-fresh { 0% { transform: scale(.6); opacity: .95; } 100% { transform: scale(4.2); opacity: 0; } }
-  .pin { width: 16px; height: 16px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); box-sizing: border-box; }
+  .sig.fresh::before { content: ""; position: absolute; left: -6px; top: -6px; width: 30px; height: 30px; border-radius: 50%;
+                       border: 3px solid #57bbeb; box-sizing: border-box; background: rgba(230,243,251,.7); }
+  .pin { width: 16px; height: 16px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(5,23,102,.35); box-sizing: border-box;
+         border-radius: 3px; }
   .pin.c { border-radius: 50%; }
   .tri { width: 0; height: 0; margin-left: -1px; border-left: 9px solid transparent; border-right: 9px solid transparent;
-         border-bottom-width: 16px; border-bottom-style: solid; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
-  .new-tag { position: absolute; left: 14px; top: -16px; background: #111; color: #fff; font-size: 11px;
-             font-weight: 700; padding: 1px 5px; border-radius: 8px; white-space: nowrap; }
-  /* 묶음: 숫자 원 + 퍼지는 고리 */
-  .cl { position: relative; width: 36px; height: 36px; cursor: pointer; }
-  .cl .ring { position: absolute; inset: 0; border-radius: 50%; opacity: 0; animation: pulse 2s ease-out infinite; }
-  .cl.fresh .ring { animation: pulse-fresh 1s ease-out infinite; }
-  .cl .num { position: absolute; inset: 0; border-radius: 50%; color: #fff; font-weight: 700; font-size: 14px;
-             display: flex; align-items: center; justify-content: center; border: 3px solid rgba(255,255,255,.85);
-             box-shadow: 0 0 0 1px rgba(0,0,0,.3); box-sizing: border-box; }
-  /* 말풍선: 좁은 화면에서는 지도 폭에 맞춰 줄인다. 사진 칸 크기를 미리 정해 두어야 열 때 지도가 말풍선이 다 보이게 옮긴다 */
-  .iw { box-sizing: border-box; padding: 10px 12px; font-size: 13px; line-height: 1.45;
-        width: min(240px, calc(100vw - 48px)); }
-  .iw img { width: 100%; aspect-ratio: 16 / 9; max-height: 32vh; object-fit: cover; border-radius: 4px;
-            margin-bottom: 6px; display: block; background: #eee; }
-  .iw .t { font-size: 14px; font-weight: 700; }
-  .iw .t i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: 0;
-             box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
-  .iw .sub { color: #555; font-size: 12px; }
+         border-bottom-width: 16px; border-bottom-style: solid; filter: drop-shadow(0 0 1px rgba(5,23,102,.6)); }
+  .new-tag { position: absolute; left: 24px; top: -14px; background: #051766; color: #fff; font-size: 11px;
+             font-weight: 700; padding: 0 8px; line-height: 19px; border-radius: 999px; white-space: nowrap; }
+  /* 묶음: 남색 원 + 숫자 */
+  .cl { position: relative; width: 34px; height: 34px; cursor: pointer; }
+  .cl .num { position: absolute; inset: 0; border-radius: 50%; background: #051766; color: #fff; font-weight: 700;
+             font-size: 14px; display: flex; align-items: center; justify-content: center;
+             border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(5,23,102,.25); box-sizing: border-box; }
+  .cl.fresh .num { box-shadow: 0 0 0 3px #57bbeb; }
+  /* 말풍선: 흰 둥근 상자, 남색 제목, 라벨(회색 작은 글자) 위·값(남색) 아래 칸. 네이버 InfoWindow 의 테두리·바탕은 끈다.
+     좁은 화면에서는 지도 폭에 맞춰 줄인다. 사진 칸 크기를 미리 정해 두어야 열 때 지도가 말풍선이 다 보이게 옮긴다 */
+  .iw { box-sizing: border-box; width: min(270px, calc(100vw - 48px)); padding: 12px 14px 12px; background: #fff;
+        border: 1px solid #e3e7ee; border-radius: 14px; box-shadow: 0 4px 16px rgba(5,23,102,.10);
+        font-size: 12px; line-height: 1.45; }
+  .iw img { width: 100%; aspect-ratio: 16 / 9; max-height: 30vh; object-fit: cover; display: block;
+            background: #f6f7f9; border-radius: 10px; margin-bottom: 9px; }
+  .iw .t { color: #051766; font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .iw .tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 4px; }
+  .iw .chip, .iw .badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 9px; font-size: 11px; font-weight: 700;
+                          line-height: 18px; white-space: nowrap; border-radius: 999px; }
+  .iw .chip { background: #f6f7f9; color: #111; }
+  .iw .chip i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .iw .new { background: #051766; color: #fff; }
+  .iw .addr { color: #5e5e5e; margin-bottom: 6px; }
+  .iw .f { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #e3e7ee; }
+  .iw .f > div { padding: 6px 0; border-bottom: 1px solid #e3e7ee; min-width: 0; }
+  .iw .f > div:nth-child(even) { padding-left: 10px; border-left: 1px solid #e3e7ee; }
+  .iw .f .wide { grid-column: 1 / -1; padding-left: 0 !important; border-left: 0 !important; }
+  .iw .k { color: #5e5e5e; font-size: 11px; font-weight: 600; }
+  .iw .v { color: #051766; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
   .legend { position: absolute; left: 10px; bottom: 26px; z-index: 5; max-width: calc(100% - 20px); box-sizing: border-box;
-            background: rgba(255,255,255,.93); padding: 5px 10px; border-radius: 6px; font-size: 12px; line-height: 1.7;
-            box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+            background: #fff; padding: 7px 14px; border-radius: 12px; font-size: 12px; line-height: 1.75;
+            border: 1px solid #e3e7ee; box-shadow: 0 2px 10px rgba(5,23,102,.06); color: #111; }
   .legend .row { white-space: normal; }
   .legend .it { display: inline-block; white-space: nowrap; margin-right: 10px; }
-  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px;
-                 box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
+  .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
   @media (max-width: 520px) { .legend { font-size: 11px; padding: 4px 8px; } .legend .hint { display: none; } }
 </style></head>
 <body>
@@ -63,7 +73,7 @@
 <!-- 유형 색은 ui/naver_map.py TYPE_COLOR 와 같다 -->
 <div class="legend">
   <div class="row"><span class="it"><span class="dot" style="background:#e62828"></span>포트홀</span><span class="it"><span class="dot" style="background:#ff9600"></span>균열</span><span class="it"><span class="dot" style="background:#ffdc00"></span>차선 마모</span><span class="it"><span class="dot" style="background:#28a0e6"></span>가드레일</span><span class="it"><span class="dot" style="background:#50c850"></span>표지판</span></div>
-  <div class="row"><span class="it">● 미신고 ■ 신고됨 ▲ 보수 중</span><span class="it hint">숫자 = 결함 묶음(누르면 확대)</span></div>
+  <div class="row"><span class="it">● 미신고 ■ 신고됨 ▲ 보수 중</span><span class="it hint">숫자: 결함 묶음(누르면 확대)</span></div>
 </div>
 <script>
   var KOREA = { lat: 36.3, lon: 127.8, zoom: 7 };  // 처음 화면: 대한민국 전체
@@ -102,28 +112,33 @@
     return '<div class="pin' + (d.status === '미신고' ? ' c' : '') + '" style="background:' + esc(d.type_color) + '"></div>';
   }
   function sigHtml(d) {
-    var ring = '<div class="ring" style="background:' + esc(d.type_color) + '"></div>';
-    return '<div class="sig' + (d.fresh ? ' fresh' : '') + '">' + ring +
-      (d.fresh ? ring.replace('ring', 'ring r2') + '<div class="new-tag">새 결함</div>' : '') +
+    return '<div class="sig' + (d.fresh ? ' fresh' : '') + '">' + (d.fresh ? '<div class="new-tag">신규</div>' : '') +
       '<div class="core">' + coreHtml(d) + '</div></div>';
   }
   function clusterHtml(g) {
-    // 묶음 색: 모두 같은 유형이면 그 유형 색, 섞여 있으면 회색
-    var c = g.every(function (d) { return d.type_color === g[0].type_color; }) ? g[0].type_color : '#5f6368';
+    // 묶음은 남색 원(유형 색은 작은 핀에만 쓴다). 새 결함이 들어 있으면 하늘색 테두리
     var fresh = g.some(function (d) { return d.fresh; });
-    return '<div class="cl' + (fresh ? ' fresh' : '') + '"><div class="ring" style="background:' + c + '"></div>' +
-      '<div class="num" style="background:' + c + '">' + g.length + '</div></div>';
+    return '<div class="cl' + (fresh ? ' fresh' : '') + '"><div class="num">' + g.length + '</div></div>';
   }
+  // 상태 배지 색: (글자, 바탕). ui/style.py STATUS_STYLE 과 같다
+  var STATUS_STYLE = { '미신고': ['#c42b1c', '#fdeeec'], '신고됨': ['#051766', '#e6f3fb'], '보수 중': ['#8a5300', '#fff3dc'] };
   function infoHtml(d) {
+    var st = STATUS_STYLE[d.status] || ['#5e5e5e', '#f6f7f9'];
+    function cell(k, v, wide) {
+      return '<div' + (wide ? ' class="wide"' : '') + '><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
+    }
     return '<div class="iw">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : '') +
-      '<div class="t"><i style="background:' + esc(d.type_color) + '"></i>' + esc(d.title) +
-      (d.fresh ? ' <span style="color:#d62728">새 결함</span>' : '') + '</div>' +
-      '<b>' + esc(d.status) + '</b>' + (d.region ? ' · ' + esc(d.region) : '') + '<br>' +
-      '<div class="sub">' + (d.address ? esc(d.address) + '<br>' : '') +
-      (d.plates ? '차량 ' + esc(d.plates) + '<br>' : '') +
-      '관측 ' + d.obs + '건 · 차량 ' + d.vehicles + '대 · 신뢰도 ' + Number(d.conf).toFixed(2) + '<br>' +
-      '처음 ' + esc(d.first) + (d.last !== d.first ? '<br>마지막 ' + esc(d.last) : '') + '</div></div>';
+      '<div class="t">' + esc(d.title) + '</div>' +
+      '<div class="tags"><span class="chip"><i style="background:' + esc(d.type_color) + '"></i>' + esc(d.type) + '</span>' +
+      '<span class="badge" style="color:' + st[0] + ';background:' + st[1] + '">' + esc(d.status) + '</span>' +
+      (d.fresh ? '<span class="badge new">신규</span>' : '') + '</div>' +
+      '<div class="addr">' + esc(d.address || '') + (d.region ? ' · ' + esc(d.region) : '') + '</div>' +
+      '<div class="f">' + cell('확인 차량', d.vehicles + '대') + cell('관측 횟수', d.obs + '회') +
+      cell('처음 확인', esc(d.first)) + cell('최근 확인', esc(d.last)) +
+      (d.plates ? cell('차량 번호', esc(d.plates), true) : '') + '</div></div>';
   }
+
+
 
   var map = null, data = [], markers = [], openId = null, iw = null, fitted = '';
   var PIN_TOP = 9;  // 핀 가운데에서 위 끝(흰 테두리 바깥 그림자)까지(px). 말풍선 꼬리 끝을 여기에 붙인다
@@ -179,7 +194,7 @@
       var cm = new naver.maps.Marker({
         position: new naver.maps.LatLng(lat / g.length, lon / g.length), map: map, zIndex: 300,
         title: '결함 ' + g.length + '건 (누르면 확대)',
-        icon: { content: clusterHtml(g), anchor: new naver.maps.Point(18, 18) }
+        icon: { content: clusterHtml(g), anchor: new naver.maps.Point(17, 17) }
       });
       naver.maps.Event.addListener(cm, 'click', function () {
         var b = new naver.maps.LatLngBounds(
@@ -225,7 +240,7 @@
         zoomControl: true, zoomControlOptions: { position: naver.maps.Position.TOP_RIGHT }
       });
       iw = new naver.maps.InfoWindow({
-        content: '', borderWidth: 1, borderColor: '#bbb', backgroundColor: '#fff', anchorSize: new naver.maps.Size(14, 10),
+        content: '', borderWidth: 0, backgroundColor: 'transparent', anchorSize: new naver.maps.Size(14, 10),
         anchorSkew: false, anchorColor: '#fff'
       });
       naver.maps.Event.addListener(map, 'click', closeInfo);  // 빈 곳을 누르면 닫는다

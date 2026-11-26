@@ -3,3 +3,28 @@
 # ui/static/ 을 /app/static/ 으로 내준다. 네이버 지도 페이지(ui/static/naver_map.html)를
 # localhost:8501 주소로 띄워야 네이버가 등록한 Web 서비스 URL 로 인식한다.
 enableStaticServing = true
+
+[client]
+# 오른쪽 위 Deploy·개발 메뉴를 숨긴다 (서비스 화면처럼)
+toolbarMode = "minimal"
+
+# 다보여 테마. 항공사 예약 누리집처럼 차분한 서비스 화면: 짙은 남색 + 하늘색, 둥근 상자, 알약 버튼.
+# 화면별 모양은 ui/style.py
+[theme]
+base = "light"
+primaryColor = "#051766"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f6f7f9"
+textColor = "#111111"
+borderColor = "#e3e7ee"
+linkColor = "#051766"
+linkUnderline = false
+font = "'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+headingFont = "'Pretendard Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+headingFontWeights = [700, 700, 700, 600, 600, 600]
+baseRadius = "10px"
+buttonRadius = "999px"
+showWidgetBorder = true
+dataframeHeaderBackgroundColor = "#f6f7f9"
+dataframeBorderColor = "#e3e7ee"
+metricValueFontWeight = 700

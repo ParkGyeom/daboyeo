@@ -41,9 +41,8 @@ header[data-testid="stHeader"] {{
 [data-testid="stDecoration"] {{ display: none; }}
 /* 본문 */
 .block-container, [data-testid="stMainBlockContainer"] {{ padding-top: 4.5rem; padding-bottom: 3rem; }}
-/* 테두리 있는 상자 = 흰 카드 */
-[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]),
-div[data-testid="stVerticalBlock"][class*="border"] {{
+/* 흰 카드 = card() 로 만든 상자 (key 가 card- 로 시작 → class st-key-card-…) */
+[class*="st-key-card-"] {{
   background: #fff;
   box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.04);
 }}
@@ -98,6 +97,12 @@ def page_header(title: str, desc: str = "", kicker: str = "") -> None:
     k = f"<div class='kicker'>{escape(kicker)}</div>" if kicker else ""
     d = f"<p>{escape(desc)}</p>" if desc else ""
     st.html(f"<div class='dby-head'>{k}<h1>{escape(title)}</h1>{d}</div>")
+
+
+def card(key: str, **kw):
+    """흰 카드 상자 (테두리 + 그림자). st.container(border=True) 대신 쓴다. key 는 화면 안에서 겹치지 않게.
+    Streamlit 은 테두리 상자를 CSS 로 구분할 표시가 없어 key 로 붙는 class(st-key-card-…)로 고른다."""
+    return st.container(border=True, key=f"card-{key}", **kw)
 
 
 def badge(status: str) -> str:

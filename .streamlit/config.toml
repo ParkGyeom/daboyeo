@@ -8,22 +8,22 @@ enableStaticServing = true
 # 오른쪽 위 Deploy·개발 메뉴를 숨긴다 (서비스 화면처럼)
 toolbarMode = "minimal"
 
-# 다보여 테마. 색은 발표 자료(플로우차트)와 같은 남색. 화면별 모양은 ui/style.py
+# 다보여 테마. 공공기관 업무 화면처럼: 흰 바탕, 얇은 회색 선, 작은 모서리. 화면별 모양은 ui/style.py
 [theme]
 base = "light"
-primaryColor = "#2f4fb5"
-backgroundColor = "#f5f7fb"
-secondaryBackgroundColor = "#ffffff"
-textColor = "#1f2937"
-borderColor = "#e3e8f2"
-linkColor = "#2f4fb5"
+primaryColor = "#0b50b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f5f7"
+textColor = "#1e2124"
+borderColor = "#d5d9de"
+linkColor = "#0b50b4"
 linkUnderline = false
-font = "'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
-headingFont = "'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
-headingFontWeights = [800, 700, 700, 600, 600, 600]
-baseRadius = "10px"
-buttonRadius = "10px"
+font = "'Pretendard GOV Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+headingFont = "'Pretendard GOV Variable', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
+headingFontWeights = [800, 700, 700, 700, 600, 600]
+baseRadius = "4px"
+buttonRadius = "4px"
 showWidgetBorder = true
-dataframeHeaderBackgroundColor = "#eef2fb"
-dataframeBorderColor = "#e3e8f2"
+dataframeHeaderBackgroundColor = "#f3f5f7"
+dataframeBorderColor = "#d5d9de"
 metricValueFontWeight = 800

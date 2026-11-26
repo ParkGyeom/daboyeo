@@ -34,3 +34,4 @@ pages = st.navigation(
     position="top",
 )
 pages.run()
+style.footer()
